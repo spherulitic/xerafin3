@@ -33,7 +33,7 @@ def getCardboxStats():
   try:
     mysqlcon = xu.getMysqlCon()
     con = mysqlcon.cursor()
-  
+
     userid = xu.getUseridFromCookies()
 
     params = request.get_json(force=True) # returns dict
@@ -48,21 +48,21 @@ def getCardboxStats():
     searchType = params.get("searchType", "emptyList")
     minLength = params.get("minLength", 2)
     maxLength = params.get("maxLength", 15)
- 
+
     if searchType == "emptyList":
       quizidList = []
-  
+
     elif searchType == "myQuizzes":
     # Subscriptions
     # Bookmarks
     # Cardbox
-    
+
       # Subscriptions
       command = "select sub_id from sub_user_xref where user_id = %s"
       con.execute(command, [userid])
       subList = [x[0] for x in con.fetchall()]
-  
-  
+
+
       quizidSet = set()
       command = "select quiz_id from quiz_master where sub_id in (%s)"
       for s in subList:
@@ -70,66 +70,66 @@ def getCardboxStats():
         row = con.fetchone()
         if row:
           quizidSet.add(row[0])
-  
+
       # User Bookmarks
       command = "select quiz_id from user_quiz_bookmark where user_id = %s"
       con.execute(command, [userid])
       quizidSet = quizidSet | set([x[0] for x in con.fetchall()])
-  
+
       # no completed quizzes in My Quizzes. The front end wants them separate
       stmt = "select quiz_id from quiz_user_detail where user_id = %s group by quiz_id having sum(completed) = count(*)"
       con.execute(stmt, [userid])
       completedList = [x[0] for x in con.fetchall()]
       for q in completedList:
         quizidSet.discard(q)
-  
+
       quizidList = list(quizidSet)
-  
+
       # Cardbox
       quizidList.append(-1)
-  
+
     elif searchType == "completed":
       stmt = "select quiz_id from quiz_user_detail where user_id = %s group by quiz_id having sum(completed) = count(*) and max(last_answered) > DATE_SUB(CURDATE(), INTERVAL %s DAY)"
       con.execute(stmt, [userid, QUIZ_INACTIVE_TIMER])
       quizidList = [x[0] for x in con.fetchall()]
-  
+
     elif searchType == "daily":
       minDate = params["minDate"]
       maxDate = params["maxDate"]
-  
+
       command = "select quiz_id from quiz_master where quiz_type = 1 and DATE(create_date) between %s and %s and length between %s and %s"
       con.execute(command, [minDate, maxDate, minLength, maxLength])
       quizidList = [x[0] for x in con.fetchall()]
-      
+
     elif searchType == "weekly":
       minDate = params["minDate"]
       maxDate = params["maxDate"]
       stmt = "select quiz_id from quiz_master where quiz_type = 4 and YEARWEEK(create_date, 1) between YEARWEEK(%s, 1) and YEARWEEK(%s, 1)"
       con.execute(stmt, [minDate, maxDate])
       quizidList = [x[0] for x in con.fetchall()]
-  
+
     elif searchType == "monthly":
       minDate = params["minDate"]
       maxDate = params["maxDate"]
       stmt = "select quiz_id from quiz_master where quiz_type = 6 and EXTRACT(YEAR_MONTH from create_date) between EXTRACT(YEAR_MONTH from %s) and EXTRACT(YEAR_MONTH from %s)"
       con.execute(stmt, [minDate, maxDate])
       quizidList = [x[0] for x in con.fetchall()]
-      
+
     elif searchType == "quizid":
       quizidList = [params["quizid"]]
-  
+
     elif searchType == "new":
       stmt = "select quiz_id from quiz_master where quiz_type = %s and length between %s and %s order by length"
       con.execute(stmt, [QUIZ_TYPE_NEW, minLength, maxLength])
       quizidList = [x[0] for x in con.fetchall()]
-  
+
     elif searchType == "vowel":
       stmt = "select quiz_id from quiz_master where quiz_type = %s and length between %s and %s order by length"
       con.execute(stmt, [QUIZ_TYPE_VOWEL, minLength, maxLength])
       quizidList = [x[0] for x in con.fetchall()]
-  
+
     elif searchType == "probability":
-      try: 
+      try:
         minProb = params["minProb"]
         maxProb = params["maxProb"]
       except:
@@ -143,13 +143,13 @@ def getCardboxStats():
       stmt = stmt + " order by length, min_prob"
       con.execute(stmt, args)
       quizidList = [x[0] for x in con.fetchall()]
-  
+
     # we have a list of quizids to return. Get the metadata and status
-  
+
     quizidList = quizidList[:50] # hard limit of 50 results
-  
+
     for qid in quizidList:
-  
+
       if qid == -1:
         result[-1] = {"quizid": qid, "quizname": "Cardbox", "quizsize": -1, "untried": -1, "unsolved": -1, "status": "Active"}
       else:
@@ -160,18 +160,18 @@ def getCardboxStats():
         template["quizid"] = qid
         template["quizname"] = row[0]
         template["quizsize"] = int(row[1])
-  
+
         command = "select count(*), sum(completed), sum(sign(correct)), max(last_answered) from quiz_user_detail where user_id = %s and quiz_id = %s"
         con.execute(command, [userid, qid])
         row = con.fetchone()
-  
+
         if int(row[0]) == 0:
           template["status"] = "Inactive"
           template["untried"] = template["quizsize"]
           template["unsolved"] = template["quizsize"]
           template["correct"] = 0
           template["incorrect"] = 0
-  
+
         else:
           template["untried"] = template["quizsize"] - int(row[1])
           if template["untried"] == 0:
@@ -183,25 +183,25 @@ def getCardboxStats():
   #              continue
           else:
             template["status"] = "Active"
-  
+
           template["unsolved"] = template["quizsize"] - int(row[2])
           template["correct"] = int(row[2])
           template["incorrect"] = int(row[1]) - int(row[2])
-  
+
         stmt = "select count(*) from user_quiz_bookmark where user_id = %s and quiz_id = %s"
         con.execute(stmt, [userid, qid])
         template["bookmarked"] = (con.fetchone()[0] == 1)
         template["sub"] = (searchType == "myQuizzes" and qid != -1 and not template["bookmarked"] )
-  
+
         result[template["quizid"]] = template
-    
+
   except Exception as ex:
     xu.errorLog()
     result[-1] = "An error occurred. See log for details."
   finally:
     con.close()
     mysqlcon.close()
-    
+
   return jsonify(result)
 
 @app.route("/getSubscriptions", methods=["GET", "POST"])
@@ -214,22 +214,22 @@ def getSubscriptions():
   try:
     mysqlcon = xu.getMysqlCon()
     con = mysqlcon.cursor()
-  
+
     userid = xu.getUseridFromCookies()
 
     stmt = "select sub_group, descr, sub_id from sub_master order by sub_group, sub_id"
     con.execute(stmt)
-  
+
     for row in con.fetchall():
       if row[0] not in result["init"]:
         result["init"][row[0]] = { }
-  
+
       result["init"][row[0]][row[2]] = row[1]
-  
+
     stmt = "select sub_id from sub_user_xref where user_id = %s"
     con.execute(stmt, [userid])
     dbg = con.fetchall()
-  
+
     result["subs"] = [x[0] for x in dbg]
 
   except Exception as ex:
@@ -271,8 +271,8 @@ def newQuiz():
           # insert into quiz user detail
           for alpha in data["alphagrams"]:
             con.execute("insert into quiz_user_detail (id, quiz_id, user_id, alphagram, locked, completed, correct, incorrect) values (NULL, %s, %s, %s, 0, 0, 0, 0)", (quizid, userid, alpha))
-    
-      # send back cardbox info always 
+
+      # send back cardbox info always
       con.execute("select questionsAnswered, startScore from leaderboard where userid = %s and dateStamp = curdate()", (userid,))
       row = con.fetchone()
       if row is not None:
@@ -281,7 +281,7 @@ def newQuiz():
         result["score"] = xl.getCardboxScore(userid)
       else:
         result["qAnswered"] = 0
-        result["startScore"] = xl.getCardboxScore(userid)      
+        result["startScore"] = xl.getCardboxScore(userid)
         result["score"] = result["startScore"]
 
   except Exception as ex:
@@ -289,4 +289,3 @@ def newQuiz():
     result["error"] = "An error occurred. See log for details."
 
   return jsonify(result)
-

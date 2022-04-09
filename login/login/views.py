@@ -48,9 +48,9 @@ def webLogin():
       con.execute(stmt, [sessionid])
       cnt = con.fetchone()[0]
       if cnt == 1:
-        raise Exception("session found") 
-    
-    try: 
+        raise Exception("session found")
+
+    try:
       params = request.get_json(force=True)
       email = params["user"]
       password = params["pass"]
@@ -74,7 +74,7 @@ def webLogin():
         token = os.urandom(16).hex()
         exp = datetime.datetime.now() + datetime.timedelta(days=7)
         cookie = {"key": "XSESSID", "value": token, "expires": exp, "domain": "dev.localhost", "path": "/", "httponly": True, "secure": True, "samesite": "Strict"}
-      
+
       # delete and insert into login table
         con.execute("delete from login where userid = %s", [userid])
         stmt = "insert into login (userid, last_login, last_active, token, name, photo, firstname, lastname) values (%s, %s, %s, %s, %s, %s, %s, %s)"
@@ -86,7 +86,7 @@ def webLogin():
           command = "insert into user_prefs (userid, studyOrderIndex, closet, newWordsAtOnce, reschedHrs, showNumSolutions, cb0max, schedVersion, secLevel, isTD, firstLogin, countryId, lexicon) values (%s, 0, 20, 4, 24, 'Y', 200, 0, 1, 0, CURDATE(),0, 'csw')"
           con.execute(command, (userid,))
 
-        
+
       #check if they have a lexicon version for default
         command = "select count(*) from user_lexicon_master where userid = %s and lexicon = %s"
         con.execute(command, (userid,'csw'))  # csw is default
@@ -94,10 +94,10 @@ def webLogin():
           command = "insert into user_lexicon_master (userid, lexicon, version) values (%s, %s, %s)"
           con.execute(command, (userid,'csw', '21'))
       # check that the cardbox database is set up
-       
+
         if not xu.checkCardboxDatabase(userid):
           result["status"] = "Corrupted Cardbox Database Detected!"
-  
+
       else:
         result["status"] = "mismatch"
     except:
@@ -122,4 +122,3 @@ def webLogin():
   if cookie:
     response.set_cookie(**cookie)
   return response
-

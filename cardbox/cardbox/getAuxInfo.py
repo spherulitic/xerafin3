@@ -21,5 +21,3 @@ except:
 
 print "Content-type: application/json\n\n"
 print json.dumps([result, error])
-
-

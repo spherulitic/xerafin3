@@ -42,11 +42,10 @@ def getAllTimeStats():
       else:
         result["questions"] = 0
         result["users"] = 0
-  
-  except Exception as ex: 
+
+  except Exception as ex:
     xs.errorLog()
     error["status"] = "An error occurred. See log for more details"
-  
+
   response = jsonify(result)
   return response
-

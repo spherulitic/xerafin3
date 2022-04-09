@@ -40,8 +40,7 @@ try:
 
 except Exception as ex:
   xu.errorLog("Web Logout")
-  result["status"] = "An error occurred. See log for details." 
+  result["status"] = "An error occurred. See log for details."
 
 print ("Content-type: application/json\n")
 print (json.dumps(result))
-

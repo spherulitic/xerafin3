@@ -94,7 +94,7 @@ def checkCardboxDatabase (userid):
 #    return False
 
   return True
-	
+
 
 def updateActive (userid, timestamp=None) :
   if timestamp is None:
@@ -114,7 +114,6 @@ def updateActive (userid, timestamp=None) :
 
 def getMysqlCon():
    return mysql.connect(host=MYSQL_HOST, user=MYSQL_USER, passwd=MYSQL_PWD, db=MYSQL_DB)
-  
+
 def getDomain():
   return ""
-

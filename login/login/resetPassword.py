@@ -17,7 +17,7 @@ result = {"status": "success"}
 debugLog = xu.debugLog("Reset Password")
 mysqlcon = xs.getMysqlCon()
 con = mysqlcon.cursor()
-try: 
+try:
   email = params["email"]
   debugLog.write("Email: {}".format(email))
 
@@ -35,19 +35,19 @@ try:
     for x in range(3):
       con.execute(stmt)
       plist.append(con.fetchone()[0].capitalize())
-  
+
     password = ''.join(plist)
     salt = bcrypt.gensalt(12)
     phash = bcrypt.hashpw(password, salt)
 
     debugLog.write("\nGenerated New Password\n")
-  
+
     stmt = "update user_auth set password = %s where userid = %s"
     con.execute(stmt, [phash, uid])
     mysqlcon.commit()
     emailSubject = "Xerafin - Your New Password"
     message = "Your Xerafin password has been reset. It is now {}\n\n".format(password)
-  
+
     debugLog.write("Creating email. . . \n")
     msg = EmailMessage()
     msg.set_content(message)
@@ -61,8 +61,8 @@ try:
     smtpObj.quit()
 
     debugLog.write("Email sent\n")
-    
- 
+
+
   else:
     result["status"] = "Account Match Not Found"
 
@@ -75,4 +75,3 @@ con.close()
 mysqlcon.close()
 debugLog.close()
 print(json.dumps(result))
-
