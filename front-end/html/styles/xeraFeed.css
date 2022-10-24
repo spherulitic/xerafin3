@@ -1,0 +1,46 @@
+.xeraFeedPlayerRes {display:table;table-layout:fixed;width:98%;margin:auto;font-size:0.7em;font-variant:small-caps;}
+.xeraFeedPlayerResCont {
+	width:95%!important;
+	overflow-x:scroll;
+	margin:auto;
+	box-shadow: 0 0 5px rgba(224,224,224.0.8) ;
+	padding-bottom:5px;
+}
+.xeraFeedPlayerRes .resRow {
+	display:table-cell;
+	background-image:url('../images/xerafinbg.png');
+	background-size:160px, 100px;
+	background-clip: border-box;
+	color: #222;
+	background-color:rgba(247,247,223,0.9);
+	border:1px solid black;
+	border-spacing:none;
+	border-collapse:collapse;
+	padding:2px;
+	width:90px;
+	font-face:'Montserrat, sans-serif';
+	border-radius:5px;
+
+}
+.xeraFeedPlayerRes .resRow div:nth-child(2){
+	text-align:left;height:36px!important;overflow:hidden;border-radius:5px;
+}
+.xeraFeedPlayerRes .resRow div:nth-child(3){
+	height:30px!important;font-size:0.95em;line-height:30px;vertical-align:middle;
+}
+.xeraFeedPlayerRes .resRow div:nth-child(4){
+	font-size:1.3em;font-weight:bold;border:1px solid #222;
+}
+.xeraFeedPlayerRes .resRow img {
+	width:36px!important;
+	border-radius: 5px;
+}
+.xeraFeedWinHighlight {
+	background-color:rgba(128,164,48,0.8)!important;
+}
+.xeraFeedLossHighlight {
+	background-color:rgba(186,64,48,0.8)!important;
+}
+.xeraFeedDrawHighlight {
+	background-color:rgba(197,197,197,0.8)!important;
+}

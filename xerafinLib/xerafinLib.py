@@ -1,21 +1,18 @@
-#!/usr/bin/python3
+'''xerafinLib is a library of functions that abstracts access to a user's cardbox,
+     the dictionary database, and user preferences. '''
 
-# TODO: blank cardbox quizzes
-
-import MySQLdb as mysql
-import sqlite3 as lite
+from datetime import datetime, timedelta
 import sys
 import time
-import math
 import random
 import string
 import os
 import itertools
+import sqlite3 as lite
 import dawg_python as dawg
 from xerafinUtil import xerafinUtil as xs
-from datetime import datetime, timedelta
 
-#   studyOrderIndex
+#  studyOrderIndex
 #  closet
 #  newWordsAtOnce
 #  reschedHrs
@@ -29,31 +26,36 @@ from datetime import datetime, timedelta
 # 3 : Locked
 # 4 : In the future, not eligible to be completed now
 
-cardboxDBPath = "cardbox-data"
+CARDBOX_DB_PATH = "cardbox-data"
 
 def getLexicon(userid):
-
+  ''' Returns lexicon and version for this user
+  '''
   lexicon = "csw"
   with xs.getMysqlCon().cursor() as con:
     command = "select version from user_lexicon_master where userid = %s and lower(lexicon) = %s"
     con.execute(command, (userid, lexicon))
     version = con.fetchone()[0]
-  return "{0}{1}".format(lexicon, version)
+  return f"{lexicon}{version}"
 
 def getDBFile(userid):
-
-  try:
-    DBFile = os.path.join(sys.path[0], cardboxDBPath, userid + ".db")
-    return DBFile
-  except:
-    return None
+  ''' Return path to the user's cardbox sqlite DB file
+  '''
+  dbFile = os.path.join(sys.path[0], CARDBOX_DB_PATH, userid + ".db")
+  return dbFile
 
 def getDBCur(userid):
+  ''' Return a sqlite DB connection to the user's cardbox
+  '''
   return lite.connect(getDBFile(userid)).cursor()
 
 def getAllPrefs(userid):
+  ''' Returns a dict with all user preferences
+  '''
   with xs.getMysqlCon().cursor() as con:
-    command = "select studyOrderIndex, closet, newWordsAtOnce, reschedHrs, showNumSolutions, cb0max, showHints, schedVersion from user_prefs where userid = %s"
+    command = ("select studyOrderIndex, closet, newWordsAtOnce, reschedHrs, " +
+      "showNumSolutions, cb0max, showHints, schedVersion " +
+      "from user_prefs where userid = %s")
     con.execute(command, (userid,))
     row = con.fetchone()
     result = {}
@@ -68,18 +70,19 @@ def getAllPrefs(userid):
   return result
 
 def getPrefs (prefName, userid):
+  ''' Returns the value of the requested user preference
+  '''
   with xs.getMysqlCon().cursor() as con:
     command = "select " + prefName + " from user_prefs where userid = %s"
     con.execute(command, (userid,))
     return con.fetchone()[0]
 
 def setPrefs2(prefName, userid, prefValue):
+  ''' Takes in a preference name and value, and updates for the user
+  '''
   with xs.getMysqlCon().cursor() as con:
     command = "update user_prefs set " + prefName + " = %s where userid = %s"
-    try:
-      con.execute(command, (prefValue, userid))
-    except:
-      return "Error updating user_prefs"
+    con.execute(command, (prefValue, userid))
   return "success"
 
 def setPrefs (userid,
@@ -90,14 +93,17 @@ def setPrefs (userid,
     newWordsAtOnce = None,
     reschedHrs = None,
     showNumSolutions = None):
+  ''' Takes in a pref as a paramter and sets it
+  '''
 
-# TODO: check to be sure the inputs are correct data type, etc
+# need to: check to be sure the inputs are correct data type, etc
   with xs.getMysqlCon().cursor() as con:
     if prefName is not None:
       command = "update user_prefs set %s = %s where userid = %s"
-      command.execute(command, (prefName, prefValue, userid))
+      con.execute(command, (prefName, prefValue, userid))
     else:
-      command = "select studyOrderIndex, closet, newWordsAtOnce, reschedHrs, showNumSolutions from user_prefs where userid = %s"
+      command = ("select studyOrderIndex, closet, newWordsAtOnce, reschedHrs, " +
+        "showNumSolutions from user_prefs where userid = %s")
       con.execute(command, (userid,))
       newPrefs = list(con.fetchone())
       if studyOrderIndex is not None:
@@ -110,11 +116,16 @@ def setPrefs (userid,
         newPrefs[3] = reschedHrs
       if showNumSolutions is not None:
         newPrefs[4] = showNumSolutions
-      command = "update user_prefs set studyOrderIndex = %s, closet = %s, newWordsAtOnce = %s, reschedHrs = %s, showNumSolutions = %s where userid = %s"
+      command = ("update user_prefs set studyOrderIndex = %s, closet = %s, " +
+        "newWordsAtOnce = %s, reschedHrs = %s, showNumSolutions = %s where userid = %s")
       con.execute(command, tuple(newPrefs) + (userid,))
     return "Success updating user preferences"
 
 def getFromStudyOrder (numNeeded, userid, cur):
+  ''' Returns the next numNeeded alphagrams from study order. Excludes questions
+        already in cardbox or in next_added
+      Lord help me, I need to reimplement this from scratch
+  '''
   result = [ ]
   studyOrderIndex = getPrefs("studyOrderIndex", userid)
   if numNeeded < 1:
@@ -122,11 +133,16 @@ def getFromStudyOrder (numNeeded, userid, cur):
   with xs.getMysqlCon().cursor() as mysqlcon:
     if mysqlcon is None:
       return result
-    cur.execute("select question from questions where next_scheduled is not null union all select question from next_added")
-    allQuestions = set([x[0] for x in cur.fetchall()])
+    # union all for speed, since we're obsessive about keeping questions and
+    #   next_added mutually exclusive
+    cur.execute("select question from questions where next_scheduled is not null " +
+      "union all select question from next_added")
+    allQuestions = {x[0] for x in cur.fetchall()}
     while len(result) < numNeeded:
-      version = getLexicon(userid)[3:]
-      mysqlcon.execute("select alphagram, studyOrderIndex from {0} where studyOrderIndex between %s and %s order by studyOrderIndex".format("studyOrder"+version), (studyOrderIndex, studyOrderIndex + 100))
+      version = getLexicon(userid)[3:] # pylint: disable=unused-variable
+      mysqlcon.execute("select alphagram, studyOrderIndex from {'studyOrder'+version} " +
+        "where studyOrderIndex between %s and %s order by studyOrderIndex",
+        (studyOrderIndex, studyOrderIndex + 100))
       allStudyOrder = [row for row in mysqlcon.fetchall() if row[0] not in allQuestions]
       for row in allStudyOrder:
         result.append(row[0])
@@ -135,60 +151,38 @@ def getFromStudyOrder (numNeeded, userid, cur):
           break
       if len(allStudyOrder) == 0:
         studyOrderIndex = studyOrderIndex + 101
-#      allStudyOrder = mysqlcon.fetchall()
-#      studyOrder = list(set([x[0] for x in allStudyOrder]) - set(allQuestions))
-#      try:
-#        studyOrderIndex = min([x[1] for x in allStudyOrder if x[0] in studyOrder])
-#      except:
-#        studyOrderIndex = 0
-#    command = "select alphagram from studyOrder where studyOrderIndex = %s"
-#    while len(result) < numNeeded:
-#      mysqlcon.execute(command, studyOrderIndex)
-#      a = mysqlcon.fetchone()
-#      if a is None:
-#        return result
-#      if a[0] in allQuestions:
-#        pass
-#      else:
-#        result.append(a[0])
-#      studyOrderIndex = studyOrderIndex + 1
-  setPrefs(userid=userid, studyOrderIndex=studyOrderIndex)
+  setPrefs2("studyOrderIndex", userid, studyOrderIndex)
   return result
 
 def getCardboxScore (userid):
-
-  try:
-    with lite.connect(getDBFile(userid)) as con:
-      cur = con.cursor()
-      cur.execute("select sum(cardbox) from questions where next_scheduled is not null")
-      x = cur.fetchone()[0]
-      if x is None:
-        return "0"
-      return str(x)
-#  except lite.Error as e:
-#      return "sql error %s" % e.message
-#  except Exception as e:
-#      return "non-sql error " + str(e)
-  except:
-    return "0"
+  ''' Returns cardbox score
+  '''
+  with lite.connect(getDBFile(userid)) as con:
+    cur = con.cursor()
+    cur.execute("select sum(cardbox) from questions where next_scheduled is not null")
+    score = cur.fetchone()[0]
+    if score is None:
+      return "0"
+    return str(score)
 
 def getEarliestDueDate(userid):
+  ''' Returns the earliest date a cardbox question is due.
+      If this date is in the future, return cleared_until instead
+  '''
   now = int(time.time())
-  try:
-    with lite.connect(getDBFile(userid)) as con:
-      cur = con.cursor()
-      command = "select min(next_scheduled) from questions where next_scheduled is not null and next_Scheduled > 0 and difficulty != 4"
+  with lite.connect(getDBFile(userid)) as con:
+    cur = con.cursor()
+    command = ("select min(next_scheduled) from questions " +
+      "where next_scheduled is not null and next_Scheduled > 0 and difficulty != 4")
+    cur.execute(command)
+    mns = cur.fetchone()[0]
+    if mns > now:
+      command = "select * from cleared_until"
       cur.execute(command)
-      mns = cur.fetchone()[0]
-      if mns > now:
-        command = "select * from cleared_until"
-        cur.execute(command)
-        result = cur.fetchone()[0]
-      else:
-        result = mns
-    return result
-  except:
-    return -1
+      result = cur.fetchone()[0]
+    else:
+      result = mns
+  return result
 
 def getCurrentDue (userid, summarize=False):
   '''
@@ -196,27 +190,23 @@ def getCurrentDue (userid, summarize=False):
   '''
   now = int(time.time())
   result = { }
-  try:
-    with lite.connect(getDBFile(userid)) as con :
-      cur = con.cursor()
-  # What's due excludes difficulty 4 so let's make that accurate
-      futureSweep(cur)
-      cur.execute("select * from cleared_until")
-      clearedUntil = max(cur.fetchone()[0], now)
-      if summarize:
-        cur.execute("select count(*) from questions where next_scheduled < %d and cardbox is not null and difficulty != 4" % clearedUntil)
-        result["total"] = cur.fetchone()[0]
-      else:
-        cur.execute("select cardbox, count(*) from questions where next_scheduled < %d and cardbox is not null and difficulty != 4 group by cardbox" % clearedUntil)
-        for row in cur.fetchall():
-          result[row[0]] = row[1]
-    return result
-  except lite.Error as e:
-#      return  "sql error %s" % e.message
-      return {0: -1}
-  except Exception as e:
-#      return "non-sql error " + str(e)
-      return {0: -2}
+  with lite.connect(getDBFile(userid)) as con :
+    cur = con.cursor()
+# What's due excludes difficulty 4 so let's make that accurate
+    futureSweep(cur)
+    cur.execute("select * from cleared_until")
+    clearedUntil = max(cur.fetchone()[0], now)
+    if summarize:
+      cur.execute("select count(*) from questions where next_scheduled < {clearedUntil} " +
+        "and cardbox is not null and difficulty != 4")
+      result["total"] = cur.fetchone()[0]
+    else:
+      cur.execute("select cardbox, count(*) from questions " +
+        f"where next_scheduled < {clearedUntil} and cardbox is not null " +
+        "and difficulty != 4 group by cardbox")
+      for row in cur.fetchall():
+        result[row[0]] = row[1]
+  return result
 
 def getDueInRange(userid, start, end):
   '''
@@ -224,20 +214,14 @@ def getDueInRange(userid, start, end):
   start and end are integers - unix epoch time
   '''
   result = { }
-  try:
-    with lite.connect(getDBFile(userid)) as con:
-      cur = con.cursor()
-      statement = "select cardbox, count(*) from questions where next_scheduled between ? and ? and cardbox is not null group by cardbox"
-      cur.execute(statement, (start, end))
-      for row in cur.fetchall():
-        result[row[0]] = row[1]
-      return result
-  except lite.Error as e:
-#      return  "sql error %s" % e.message
-      return {0: -1}
-  except Exception as e:
-#      return "non-sql error " + str(e)
-      return {0: -2, "start": start, "end": end}
+  with lite.connect(getDBFile(userid)) as con:
+    cur = con.cursor()
+    statement = ("select cardbox, count(*) from questions " +
+      "where next_scheduled between ? and ? and cardbox is not null group by cardbox")
+    cur.execute(statement, (start, end))
+    for row in cur.fetchall():
+      result[row[0]] = row[1]
+    return result
 
 def getDueByDay(userid, cardbox = None):
   '''
@@ -247,76 +231,60 @@ def getDueByDay(userid, cardbox = None):
   '''
   result = { }
   estart = datetime(1970, 1, 1, 0, 0) # First date of the Epoch
-  try:
-    with lite.connect(getDBFile(userid)) as con:
-      cur = con.cursor()
-      statement = "select next_scheduled/86400, count(*) from questions ? group by next_scheduled/86400"
-      if cardbox is None:
-        cur.execute(statement, [""])
-      else:
-        cur.execute(statement, "where cardbox = %s".format(cardbox))
-      for row in cur.fetchall():
-        dt = estart + timedelta(days=row[0])
-        due = row[1]
-        result[dt] = due
-    return result
-  except lite.Error as e:
-    return {estart: -1}
-  except Exception as e:
-    return {estart: -2}
+  with lite.connect(getDBFile(userid)) as con:
+    cur = con.cursor()
+    statement = ("select next_scheduled/86400, count(*) from questions ? " +
+      "group by next_scheduled/86400")
+    if cardbox is None:
+      cur.execute(statement, [""])
+    else:
+      cur.execute(statement, (f"where cardbox = {cardbox}",))
+    for row in cur.fetchall():
+      day = estart + timedelta(days=row[0])
+      due = row[1]
+      result[day] = due
+  return result
 
 
 def getTotal(userid):
   '''
   Returns an integer, number of cards in all cardboxes
   '''
-  try:
-    with lite.connect(getDBFile(userid)) as con :
-      cur = con.cursor()
-      command = "select count(*) from questions where next_scheduled is not null"
-      cur.execute(command)
-      result = cur.fetchone()[0]
-    return result
-  except:
-    return -1
+  with lite.connect(getDBFile(userid)) as con :
+    cur = con.cursor()
+    command = "select count(*) from questions where next_scheduled is not null"
+    cur.execute(command)
+    result = cur.fetchone()[0]
+  return result
 
 def getTotalByCardbox(userid):
   '''
   Returns a dict: {cardbox: numberDue, cardbox: numberDue, etc }
   '''
   result = { }
-  try:
-    with lite.connect(getDBFile(userid)) as con :
-      cur = con.cursor()
-      command = "select cardbox, count(*) from questions where next_scheduled is not null group by cardbox"
-      cur.execute(command)
-      for row in cur.fetchall():
-        result[row[0]] = row[1]
-      return result
-  except lite.Error as e:
-#      return  "sql error %s" % e.message
-      return {0: -1}
-  except Exception as e:
-#      return "non-sql error " + str(e)
-      return {0: -2}
+  with lite.connect(getDBFile(userid)) as con :
+    cur = con.cursor()
+    command = ("select cardbox, count(*) from questions " +
+      "where next_scheduled is not null group by cardbox")
+    cur.execute(command)
+    for row in cur.fetchall():
+      result[row[0]] = row[1]
+  return result
 
 def getTotalByLength(userid):
 
+  ''' Returns a dict with {length: total, length: total}
+        describing total words in cardbox broken out by length
+  '''
   result = { }
-  try:
-    with lite.connect(getDBFile(userid)) as con:
-      cur = con.cursor()
-      command = "select length(question), count(*) from questions where next_scheduled is not null group by length(question)"
-      cur.execute(command)
-      for row in cur.fetchall():
-        result[row[0]] = row[1]
-    return result
-  except lite.Error as e:
-    return {0: -1}
-  except Exception as e:
-    return {0: -2}
-
-
+  with lite.connect(getDBFile(userid)) as con:
+    cur = con.cursor()
+    command = ("select length(question), count(*) from questions " +
+      "where next_scheduled is not null group by length(question)")
+    cur.execute(command)
+    for row in cur.fetchall():
+      result[row[0]] = row[1]
+  return result
 
 def getNext (newCardbox = 0, schedVersion = 0) :
 
@@ -327,8 +295,7 @@ def getNext (newCardbox = 0, schedVersion = 0) :
   now = int(time.time())
   day = 24*3600  # number of seconds in a day
 
-  if newCardbox > 12 :
-    newCardbox = 12
+  newCardbox = min(newCardbox, 12)
 
   random.seed()
   offset=random.randrange(day)
@@ -337,61 +304,79 @@ def getNext (newCardbox = 0, schedVersion = 0) :
 # cardbox x is rescheduled for a time [x,y]
 # between x and x+y days in the future
   if schedVersion == 1:
-    r = [ [.2, .3], [1, 1], [3, 3], [7, 7], [14, 14], [30,30], [60,45], [120, 90], [240, 120], [430, 100], [430,100], [430,100], [430,100] ]
+    sched = [ [.2, .3], [1, 1], [3, 3], [7, 7], [14, 14], [30,30], [60,45],
+              [120, 90], [240, 120], [430, 100], [430,100], [430,100], [430,100] ]
 
   elif schedVersion == 3:
-    r = [ [0.5,1] , [1,2] , [2,6] , [6,8] , [12,10] , [19,12] , [27,18] , [40,28] , [62,32] , [86,48] , [120,70] , [170,80] , [215,150] ]
+    sched = [ [0.5,1] , [1,2] , [2,6] , [6,8] , [12,10] , [19,12] , [27,18] ,
+              [40,28] , [62,32] , [86,48] , [120,70] , [170,80] , [215,150] ]
   else:
-    r = [ [.5,.8], [3,2], [5,4], [11,6], [16,10], [27,14], [50,20], [80,30], [130,40], [300,60], [430,100], [430,100],[430,100] ]
+    sched = [ [.5,.8], [3,2], [5,4], [11,6], [16,10], [27,14], [50,20], [80,30],
+              [130,40], [300,60], [430,100], [430,100],[430,100] ]
 
-  return int( now + (r[newCardbox][0]*day) + (r[newCardbox][1]*offset))
+  return int( now + (sched[newCardbox][0]*day) + (sched[newCardbox][1]*offset))
 
 def correct (alpha, userid, nextCardbox=None, quizid=-1) :
 
+  ''' Schedules a word in cardbox which has been marked correct
+  '''
   if quizid == -1:
     now = int(time.time())
     schedVersion = getPrefs("schedVersion", userid)
     with lite.connect(getDBFile(userid)) as con :
-
       cur = con.cursor()
       if nextCardbox is None:
-        cur.execute("select cardbox from questions where question='{0}'".format(alpha))
+        cur.execute(f"select cardbox from questions where question='{alpha}'")
         currentCardbox = cur.fetchone()[0]
         nextCardbox = currentCardbox + 1
-      cur.execute("update questions set cardbox = {0}, next_scheduled = {1}, correct=correct+1, streak=streak+1, last_correct = {2}, difficulty=4 where question = '{3}'".format(nextCardbox, getNext(nextCardbox, schedVersion), now, alpha))
+      cur.execute(f"update questions set cardbox = {nextCardbox}, " +
+        f"next_scheduled = {getNext(nextCardbox, schedVersion)}, " +
+        f"correct=correct+1, streak=streak+1, last_correct = {now}, difficulty=4 " +
+        f"where question = '{alpha}'")
   else:
     with xs.getMysqlCon().cursor() as con:
-     con.execute("update quiz_user_detail set correct=1, incorrect=0, last_answered=NOW(), completed=1 where alphagram = %s and user_id = %s and quiz_id = %s", (alpha, userid, quizid))
+      con.execute("update quiz_user_detail set correct=1, incorrect=0, " +
+        "last_answered=NOW(), completed=1 where alphagram = %s and user_id = %s " +
+        "and quiz_id = %s", (alpha, userid, quizid))
 
 
 def wrong (alpha, userid, quizid=-1) :
 
+  ''' Schedules a word in cardbox which has been marked wrong
+  '''
   if quizid == -1:
     schedVersion = getPrefs("schedVersion", userid)
     with lite.connect(getDBFile(userid)) as con:
       cur = con.cursor()
-      if schedVersion == 1 or schedVersion == 2 or schedVersion == 3:
-        cur.execute("select cardbox from questions where question='{0}'".format(alpha))
+      if schedVersion in (1, 2, 3):
+        cur.execute(f"select cardbox from questions where question='{alpha}'")
         currentCardbox = cur.fetchone()[0]
       else:
         currentCardbox = -1
-      stmt = "update questions set cardbox = ?, next_scheduled = ?, incorrect = incorrect+1, streak=0, difficulty=4 where question = ?"
+      stmt = ("update questions set cardbox = ?, next_scheduled = ?, " +
+        "incorrect = incorrect+1, streak=0, difficulty=4 where question = ?")
       if currentCardbox < 8:
         cur.execute(stmt, (0, getNext(0, schedVersion), alpha))
       else:
         cur.execute(stmt, (2, getNext(2, schedVersion), alpha))
   else:
     with xs.getMysqlCon().cursor() as con:
-       con.execute("update quiz_user_detail set incorrect=1, correct = 0, last_answered=NOW(), completed=1 where alphagram = %s and user_id = %s and quiz_id = %s", (alpha, userid, quizid))
+      con.execute("update quiz_user_detail set incorrect=1, correct = 0, " +
+        "last_answered=NOW(), completed=1 where alphagram = %s and user_id = %s " +
+        "and quiz_id = %s", (alpha, userid, quizid))
 
 
 
 def skipWord (alpha, userid) :
-  SKIP_DELAY = 3600*12 # twelve hour delay
+  ''' Skips a word in a cardbox quiz by rescheduling it into the near future
+  '''
+  # twelve hour delay
+  SKIP_DELAY = 3600*12 # pylint: disable=invalid-name
   now = int(time.time())
   with lite.connect(getDBFile(userid)) as con:
     cur = con.cursor()
-    command = "update questions set next_scheduled = max(next_scheduled + ?, ?), difficulty=4 where question = ?"
+    command = ("update questions set next_scheduled = max(next_scheduled + ?, ?), " +
+      "difficulty=4 where question = ?")
     cur.execute(command, (SKIP_DELAY, now+SKIP_DELAY, alpha))
 
 def addWord (alpha, cur) :
@@ -403,14 +388,17 @@ def addWord (alpha, cur) :
   cur.execute("select count(*) from questions where question = ?", (alpha,))
   qCount = cur.fetchone()[0]
   if qCount == 0:
-    command = "insert into questions (question, correct, incorrect, streak, last_correct, difficulty, cardbox, next_scheduled) values (?, 0, 0, 0, 0, -1, 0, ?)"
+    command = ("insert into questions (question, correct, incorrect, streak, " +
+      "last_correct, difficulty, cardbox, next_scheduled) " +
+      "values (?, 0, 0, 0, 0, -1, 0, ?)")
     cur.execute(command, (alpha, now))
     dbClean(cur)
   return qCount == 0
 
 def addWords (numWords, userid, cur) :
-
-  now = int(time.time())
+  ''' Pull words from next_added and study_order and send each
+        to addWord (which puts it in the cardbox)
+  '''
 
 # We assume everything in next_added and study_order is valid
 
@@ -424,11 +412,13 @@ def addWords (numWords, userid, cur) :
     for word in wordsToAdd:
       addWord(word, cur)
   if numWords > nextAddedCount:
-    x = getFromStudyOrder(numWords-nextAddedCount, userid, cur)
-    for alpha in x:
+    studyOrderAlphas = getFromStudyOrder(numWords-nextAddedCount, userid, cur)
+    for alpha in studyOrderAlphas:
       addWord(alpha, cur)
 
 def getNextAddedCount(userid):
+  ''' Returns number of items in next_added
+  '''
   with lite.connect(getDBFile(userid)) as con:
     cur = con.cursor()
     cur.execute("select count(*) from next_added")
@@ -445,13 +435,12 @@ def insertIntoNextAdded(alphagrams, userid, cur):
   command = "insert into next_added (question, timeStamp) values (?, ?)"
   for alpha in alphagrams:
     if isAlphagramValid(alpha, userid):
-      try:
-        cur.execute(command, (alpha, now))
-      except:
-        pass
+      cur.execute(command, (alpha, now))
   dbClean(cur)
 
 def getAllNextAdded(userid):
+  ''' Returns all data from next_added
+  '''
 
   result = [ ]
   with lite.connect(getDBFile(userid)) as con:
@@ -462,75 +451,84 @@ def getAllNextAdded(userid):
   return result
 
 def deleteNextAdded(alphas, cur):
- '''
- Takes a list of alphagrams to delete from next_added
- '''
- placeholder = ', '.join('?'*len(alphas))
- sql = "delete from next_added where question in ({})".format(placeholder)
- cur.execute(sql, (alphas,))
- return cur.rowcount
+  '''
+  Takes a list of alphagrams to delete from next_added
+  '''
+  placeholder = ', '.join('?'*len(alphas))# pylint: disable=unused-variable
+  sql = "delete from next_added where question in ({placeholder})"
+  cur.execute(sql, (alphas,))
+  return cur.rowcount
 
 def nextAddedMoveToFront(alphas, cur):
- '''
- Takes a list of alphagrams to move to the front of the queue
- '''
- cur.execute("select min(timestamp) from next_added")
- minT = cur.fetchone()[0]
- placeholder = ', '.join('?'*len(alphas))
- sql = "update next_added set timeStamp = ? where question in ({})".format(placeholder)
- cur.execute(sql, [minT-1].extend(alphas))
- return cur.rowcount
+  '''
+  Takes a list of alphagrams to move to the front of the queue
+  '''
+  cur.execute("select min(timestamp) from next_added")
+  minT = cur.fetchone()[0]
+  # note: f-strings are interpreted at runtime so pylint doesn't see this usage
+  placeholder = ', '.join('?'*len(alphas)) # pylint: disable=unused-variable
+  sql = "update next_added set timeStamp = ? where question in ({placeholder})"
+  cur.execute(sql, [minT-1].extend(alphas))
+  return cur.rowcount
 
 def nextAddedMoveToBack(alphas, cur):
- '''
- Takes a list of alphagrams to move to the back of the queue
- '''
- cur.execute("select max(timestamp) from next_added")
- maxT = cur.fetchone()[0]
- placeholder = ', '.join('?'*len(alphas))
- sql = "update next_added set timeStamp = ? where question in ({})".format(placeholder)
- cur.execute(sql, [maxT+1].extend(alphas))
- return cur.rowcount
+  '''
+  Takes a list of alphagrams to move to the back of the queue
+  '''
+  cur.execute("select max(timestamp) from next_added")
+  maxT = cur.fetchone()[0]
+  placeholder = ', '.join('?'*len(alphas))
+  sql = f"update next_added set timeStamp = ? where question in ({placeholder})"
+  cur.execute(sql, [maxT+1].extend(alphas))
+  return cur.rowcount
 
 def isAlphagramValid(alpha, userid):
+  ''' Returns boolean -- does this alphagram have an answer?
+  '''
   lexicon = getLexicon(userid)
   chCommand = "select count(*) from " + lexicon + " where alphagram = %s"
   with xs.getMysqlCon().cursor() as con:
     if con is not None:
       con.execute(chCommand, [alpha])
       return con.fetchone()[0] > 0
-    else:
-      return False
-  return False
+    return False
 
 def ghostbuster(userid):
-   with lite.connect(getDBFile(userid)) as con:
-     cur = con.cursor()
-     cur.execute("select question from questions")
-     rows = cur.fetchall()
-     for row in rows:
-       if isAlphagramValid(row[0], userid):
-         pass
-       else:
-         cur.execute("delete from questions where question = ?", (row[0],))
+  ''' Removes questions that have no answer
+  '''
+  with lite.connect(getDBFile(userid)) as con:
+    cur = con.cursor()
+    cur.execute("select question from questions")
+    rows = cur.fetchall()
+    for row in rows:
+      if isAlphagramValid(row[0], userid):
+        pass
+      else:
+        cur.execute("delete from questions where question = ?", (row[0],))
 
 
 def dbClean (cur) :
+  ''' Make sure the database is in a good state.
+      - No overlap between questions and next_added
+      - Nothing with a difficult that's not in cardbox
+  '''
 
-# Make sure that the database is in a good state. Things happen.
-
-  cur.execute("delete from next_added where question in (select question from questions where next_scheduled is not null)")
+  cur.execute("delete from next_added where question in " +
+    "(select question from questions where next_scheduled is not null)")
   cur.execute("update questions set difficulty = null where cardbox is null")
 
 
 def closetSweep (cur, userid) :
-
-# Note this will unlock anything locked with difficulty 3
+  ''' Puts backlog items in backlog status
+      Note this will unlock anything locked with difficulty 3
+  '''
 
   now = int(time.time())
   closet = getPrefs("closet", userid)
-  cur.execute("update questions set difficulty = 0 where cardbox < {0} and difficulty != 1".format(closet))
-  cur.execute("update questions set difficulty = 2 where cardbox >= {0} and difficulty != 1 and next_scheduled < {1}".format(closet, now))
+  cur.execute("update questions set difficulty = 0 where " +
+    f"cardbox < {closet} and difficulty != 1")
+  cur.execute("update questions set difficulty = 2 " +
+    f"where cardbox >= {closet} and difficulty != 1 and next_scheduled < {now}")
 
 def futureSweep(cur) :
   """
@@ -541,9 +539,11 @@ def futureSweep(cur) :
   now = int(time.time())
   cur.execute("update questions set difficulty = 0 where difficulty in (4, 50)")
   # Anything in cardbox 10 or higher we can see 30 days ahead of schedule
-  cur.execute("update questions set difficulty = 4 where cardbox >= 10 and next_scheduled > ?+(3600*24*30) and difficulty in (0, -1)", (now,))
+  cur.execute("update questions set difficulty = 4 where cardbox >= 10 " +
+    "and next_scheduled > ?+(3600*24*30) and difficulty in (0, -1)", (now,))
   # Anything in cardbox N; 1 <= N <= 9; we can see N days ahead of schedule
-  cur.execute("update questions set difficulty = 4 where cardbox < 10 and next_scheduled > ?+(cardbox*3600*24) and difficulty in (0, -1)", (now,))
+  cur.execute("update questions set difficulty = 4 where cardbox < 10 " +
+    "and next_scheduled > ?+(cardbox*3600*24) and difficulty in (0, -1)", (now,))
 
 def makeWordsAvailable (userid, cur) :
   """
@@ -555,14 +555,11 @@ def makeWordsAvailable (userid, cur) :
   cb0max = getPrefs("cb0max", userid)
 
   cur.execute("select max(cardbox) from questions")
-  try:
-    maxCardbox = cur.fetchone()[0]
-    if maxCardbox is None:
-      maxCardbox = 0
-    if maxCardbox >= 10:
-      maxCardbox = 30
-  except:
+  maxCardbox = cur.fetchone()[0]
+  if maxCardbox is None:
     maxCardbox = 0
+  if maxCardbox >= 10:
+    maxCardbox = 30
   soonestNewWordsAt = now + (3600*reschedHrs)
   maxReadAhead = max(now + (maxCardbox*3600*24), soonestNewWordsAt+60)
   cur.execute("select * from cleared_until")
@@ -574,7 +571,8 @@ def makeWordsAvailable (userid, cur) :
   else:
     cur.execute("select count(*) from questions where cardbox = 0")
     cb0cnt = cur.fetchone()[0]
-    cur.execute("select count(*) from questions where difficulty != 4 and next_Scheduled is not null")
+    cur.execute("select count(*) from questions where difficulty != 4 " +
+      "and next_Scheduled is not null")
     readycnt = cur.fetchone()[0]
     # if readycnt = 0, there are no words available to repeat so we must add new
     #   even overriding newWordsAtOnce = 0 or cb0max
@@ -588,12 +586,20 @@ def makeWordsAvailable (userid, cur) :
     newWordsAt = newWordsAt + 3600
   if clearedUntil > now:
     futureSweep(cur)
-    cur.execute("update questions set difficulty = -1 where question in (select question from questions where difficulty = 2 order by cardbox, next_scheduled limit 10)")
-  cur.execute("update questions set difficulty = -1 where difficulty = 0 and next_scheduled < %s" % clearedUntil)
-  cur.execute("update new_words_at set timeStamp = {0}".format(min(newWordsAt,maxReadAhead)))
-  cur.execute("update cleared_until set timeStamp = {0}".format(min(clearedUntil, maxReadAhead+1)))
+    cur.execute("update questions set difficulty = -1 " +
+      "where question in (select question from questions " +
+                          "where difficulty = 2 "+
+                          "order by cardbox, next_scheduled limit 10)")
+  cur.execute("update questions set difficulty = -1 " +
+    f"where difficulty = 0 and next_scheduled < {clearedUntil}")
+  cur.execute(f"update new_words_at set timeStamp = {min(newWordsAt,maxReadAhead)}")
+  cur.execute(f"update cleared_until set timeStamp = {min(clearedUntil, maxReadAhead+1)}")
 
 def newQuiz (userid):
+  '''Resets the difficulty parameter in cardbox to prepare for a new quiz:
+     - puts backlog words in the backlog
+     - marks future words as either doable or undoable
+  '''
   now = int(time.time())
   checkCardboxDatabase(userid)
   with lite.connect(getDBFile(userid)) as con:
@@ -612,22 +618,29 @@ def getBingoFromCardbox (userid, cardbox=0):
   """
   with lite.connect(getDBFile(userid)) as con:
     cur = con.cursor()
-    cur.execute("select question from questions where cardbox is not null and length(question) >= 7 and difficulty in (-1,0,2) order by case cardbox when ? then -2 else difficulty end, cardbox, next_scheduled limit 1", (cardbox,))
+    cur.execute("select question from questions " +
+      "where cardbox is not null and length(question) >= 7 and difficulty in (-1,0,2) " +
+      "order by case cardbox when ? then -2 " +
+      "else difficulty end, cardbox, next_scheduled limit 1", (cardbox,))
     result = cur.fetchone()
     if result is not None:
       return result[0]
-    cur.execute("select question from next_added where length(question) >= 7 order by timeStamp limit 1")
+    cur.execute("select question from next_added where length(question) >= 7 " +
+      "order by timeStamp limit 1")
     result = cur.fetchone()
     if result is not None:
       addWord(result[0], cur)
       return result[0]
     # need to get from study order
     studyOrderIndex = getPrefs("studyOrderIndex", userid)
-    cur.execute("select question from questions where cardbox is not null and length(question) >= 7")
+    cur.execute("select question from questions where cardbox is not null " +
+      "and length(question) >= 7")
     allCardboxBingos = [ x[0] for x in cur.fetchall() ]
     version = getLexicon(userid)[3:]
     with xs.getMysqlCon().cursor() as mysqlcon:
-      mysqlcon.execute("select alphagram from {0} where length(alphagram) >= 7 and studyOrderIndex > %s order by studyOrderIndex".format("studyOrder"+version), (studyOrderIndex,))
+      mysqlcon.execute(f"select alphagram from {'studyOrder'+version} " +
+        "where length(alphagram) >= 7 " +
+        "and studyOrderIndex > %s order by studyOrderIndex", (studyOrderIndex,))
       for row in mysqlcon.fetchall():
         if row[0] not in allCardboxBingos:
           addWord(row[0], cur)
@@ -635,10 +648,13 @@ def getBingoFromCardbox (userid, cardbox=0):
   return None
 
 
-def getQuestions (numNeeded, userid, cardbox, questionLength=None, isCardbox=True, quizid=-1) :
+def getQuestions (numNeeded, userid, cardbox, questionLength=None, isCardbox=True, quizid=-1) : # pylint: disable=unused-argument
   """
-  Returns a dict with a quiz of numNeeded questions in the format { "Alphagram" -> [ Word, Word, Word ] }
+  Returns a dict with a quiz of numNeeded questions in the format
+    { "Alphagram" -> [ Word, Word, Word ] }
+  Note questionLength is currently unused but is reserved for future functionality
   """
+  # pylint: disable=too-many-arguments,too-many-locals
   quiz = {}
   allQuestions = []
   if isCardbox:
@@ -654,10 +670,12 @@ def getQuestions (numNeeded, userid, cardbox, questionLength=None, isCardbox=Tru
       dFormat = "?"
     with lite.connect(getDBFile(userid)) as qCon:
       cur = qCon.cursor()
-      getCardsQry = "select question from questions where difficulty in ({0}) and next_scheduled is not null order by case cardbox when ? then -1 else cardbox end, next_scheduled limit ?".format(dFormat)
+      getCardsQry = ("select question from questions " +
+        f"where difficulty in ({dFormat}) and next_scheduled is not null " +
+         "order by case cardbox when ? then -1 else cardbox end, next_scheduled limit ?")
       cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
       result = cur.fetchall()
-      while (len(result) < numNeeded):
+      while len(result) < numNeeded:
      #  if questionLength is None:
         makeWordsAvailable(userid, cur)
         cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
@@ -666,7 +684,8 @@ def getQuestions (numNeeded, userid, cardbox, questionLength=None, isCardbox=Tru
      #    makeWordsAvailableWithFilter(numNeeded, questionLength)
       allQuestions = [x[0] for x in result]
   else:  # non cardbox quiz
-    getCardsQry = "select alphagram from quiz_user_detail where quiz_id = %s and user_id = %s and locked = 0 and completed = 0 limit %s"
+    getCardsQry = ("select alphagram from quiz_user_detail " +
+      "where quiz_id = %s and user_id = %s and locked = 0 and completed = 0 limit %s")
     with xs.getMysqlCon().cursor() as con:
       con.execute(getCardsQry, (quizid, userid, numNeeded))
       allQuestions = [x[0] for x in con.fetchall()]
@@ -688,43 +707,35 @@ def getQuestions (numNeeded, userid, cardbox, questionLength=None, isCardbox=Tru
 ##  with lite.connect(getDBFile(userid)) as con:
 ##    cur = con.cursor()
 ##
-##    cur.execute("update questions set difficulty = -1 where question in (select question from questions where length(question) = {0} and difficulty in (-1,0,2) order by next_scheduled limit {1})".format(questionLength, numNeeded))
+##    cur.execute("update questions set difficulty = -1
+##      where question in (select question from questions
+##                          where length(question) = {0} and difficulty in (-1,0,2)
+##      order by next_scheduled limit {1})".format(questionLength, numNeeded))
 
 def getDef (word, userid) :
+  '''Returns definition of the word'''
 
   lexicon = getLexicon(userid)
 
   with xs.getMysqlCon().cursor() as con:
-    if con is None:
-      return " "
     command = "select definition from " + lexicon + " where word = %s"
     con.execute(command, [word])
-    try:
-      return con.fetchone()[0]
-    except:
-      return " "
+    return con.fetchone()[0]
 
 def getAnagrams (alpha, userid) :
   '''
   Takes in an alphagram and returns a list of words
   '''
   lexicon = getLexicon(userid)
-  x = []
+  result = []
   with xs.getMysqlCon().cursor() as con:
     if con is not None:
       command = "select word from " + lexicon + " where alphagram = %s"
       con.execute(command, [alpha])
       for row in con.fetchall():
-        x.append(row[0])
-  return x
+        result.append(row[0])
+  return result
 
-#1##def getAnagramsWithHooks (alpha) :
-#1##  x = []
-#1##  with lite.connect(A_DB_PATH) as con:
-#1##    cur = con.cursor()
-#1##    cur.execute("select front_hooks, word, back_hooks from words where alphagram = '{0}'".format(alpha))
-#1##    return cur.fetchall()
-#1##
 def getHooks (word, userid) :
   '''
   Takes in a word
@@ -733,11 +744,11 @@ def getHooks (word, userid) :
   lexicon = getLexicon(userid)
   with xs.getMysqlCon().cursor() as con:
     if con is not None:
-      command = "select front_hooks, word, lexicon_symbols, back_hooks from " + lexicon + " where word = %s"
+      command = ("select front_hooks, word, lexicon_symbols, back_hooks from " +
+        lexicon + " where word = %s")
       con.execute(command, [word])
       return con.fetchone()
-    else:
-        return (None, None, None, None)
+    return (None, None, None, None)
 
 def getAuxInfo (alpha, userid):
   '''
@@ -746,19 +757,22 @@ def getAuxInfo (alpha, userid):
   '''
   with lite.connect(getDBFile(userid)) as con:
     cur = con.cursor()
-    cur.execute("select cardbox, next_scheduled, correct, incorrect, difficulty from questions where question = '{0}' and next_scheduled is not null".format(alpha))
+    cur.execute('select cardbox, next_scheduled, correct, incorrect, difficulty ' +
+                f'from questions where question = "{alpha}" ' +
+                'and next_scheduled is not null')
     result = cur.fetchall()
     if len(result) > 0:
-      return {"cardbox": result[0][0], "nextScheduled": result[0][1], "correct": result[0][2], "incorrect": result[0][3], "difficulty": result[0][4] }
-    else:
-      return {}
+      return {"cardbox": result[0][0], "nextScheduled": result[0][1],
+        "correct": result[0][2], "incorrect": result[0][3], "difficulty": result[0][4] }
+    return {}
 
 def powerset (alpha):
   '''
   Takes an alphagram and returns a list of all possible subsets
     of length 2 or more
   '''
-  return [ u''.join(a) for a in itertools.chain.from_iterable([itertools.combinations(alpha, r) for r in range(2,len(alpha)+1)])]
+  return [ ''.join(a) for a in itertools.chain.from_iterable([itertools.combinations(alpha, r)
+          for r in range(2,len(alpha)+1)])]
 
 def getSubanagrams (alpha, userid):
   '''
@@ -766,58 +780,61 @@ def getSubanagrams (alpha, userid):
    valid words which are a valid subset of the alphagram
   '''
   filename = getLexicon(userid) + '.dawg'
-  d = dawg.CompletionDAWG().load(filename)
+  allAlphas = dawg.CompletionDAWG().load(filename)
   result = [ ]
-  for x in powerset(alpha):
-    if x in d and x not in result:
-      result.append(x)
+  for subword in powerset(alpha):
+    if subword in allAlphas and subword not in result:
+      result.append(subword)
   return result
 
 def getValidBlanagrams (alpha) :
-
-# Takes an alphagram. Returns a list with all alphagrams that make
-# valid words with the input plus a blank
-
+  '''  Takes an alphagram. Returns a list with all alphagrams that make
+       valid words with the input plus a blank
+  '''
   alphaDawg = dawg.CompletionDAWG().load('alpha.dawg')
   result = []
-  for char in string.uppercase:
-    x = u''.join(sorted(alpha + char))
-    if x in alphaDawg:
-      result.append(x)
+  for char in string.ascii_uppercase:
+    possibleResult = ''.join(sorted(alpha + char))
+    if possibleResult in alphaDawg:
+      result.append(possibleResult)
 
   return result
 
 def getBlanagramQuestion (alpha, userid) :
-
-# Takes an alphagram
-# Returns a list of valid questions with that alphagram plus blank
-# [ alpha: xxx, words: [ word, word, word ], auxInfo: { ... } ]
-
+  '''  Takes an alphagram
+       Returns a list of valid questions with that alphagram plus blank
+       [ alpha: xxx, words: [ word, word, word ], auxInfo: { ... } ]
+  '''
   result = [ ]
 
   for question in getValidBlanagrams(alpha):
-    result.append({ "alpha": question, "words": getAnagrams(question, userid), "auxInfo": getAuxInfo(question, userid)})
+    result.append({ "alpha": question, "words": getAnagrams(question, userid),
+                    "auxInfo": getAuxInfo(question, userid)})
   return result
 
 def checkCardboxDatabase (userid):
-
+  ''' Ensures that the user's cardbox contains all necessary tables, and
+       creates them if necessary
+  '''
   now = int(time.time())
   try:
-    pass
     with lite.connect(getDBFile(userid)) as con:
       cur = con.cursor()
       cur.execute("select name from sqlite_master where type='table'")
       tables = [x[0] for x in cur.fetchall()]
-      if u'questions' not in tables:
-        cur.execute("create table questions (question varchar(16), correct integer, incorrect integer, streak integer, last_correct integer, difficulty integer, cardbox integer, next_scheduled integer)")
-      if u'cleared_until' not in tables:
+      if 'questions' not in tables:
+        cur.execute("create table questions (question varchar(16), correct integer, " +
+                    "incorrect integer, streak integer, last_correct integer, " +
+                    "difficulty integer, cardbox integer, next_scheduled integer)")
+      if 'cleared_until' not in tables:
         cur.execute("create table cleared_until (timeStamp integer)")
-      if u'new_words_at' not in tables:
+      if 'new_words_at' not in tables:
         cur.execute("create table new_words_at (timeStamp integer)")
-      if u'next_Added' not in tables:
+      if 'next_Added' not in tables:
         cur.execute("create table next_Added (question varchar(16), timeStamp integer)")
       cur.execute("create unique index if not exists question_index on questions(question)")
-      cur.execute("create unique index if not exists next_added_question_idx on next_added(question)")
+      cur.execute("create unique index if not exists next_added_question_idx " +
+       "on next_added(question)")
 
       cur.execute("select * from cleared_until")
       row = cur.fetchone()
@@ -829,7 +846,7 @@ def checkCardboxDatabase (userid):
       if row is None:
         cur.execute("insert into new_words_at values (?)", (now+1,))
 
-  except:
+  except Exception:
     return False
   return True
 
@@ -850,28 +867,33 @@ def getDots (word, userid) :
 
 
 def checkOut (alpha, userid, lock, isCardbox=True, quizid=-1) :
-   """
-   if LOCK is true, set difficulty = 3 (locked)
-   if LOCK is false, set difficulty = 0
-   locks are cleared by closetSweep() and newQuiz()
-   """
-   if isCardbox:
-     if lock:
-       difficulty = 3
-     else:
-       difficulty = 0
+  """
+  if LOCK is true, set difficulty = 3 (locked)
+  if LOCK is false, set difficulty = 0
+  locks are cleared by closetSweep() and newQuiz()
+  """
+  if isCardbox:
+    if lock:
+      difficulty = 3
+    else:
+      difficulty = 0
 
-     with lite.connect(getDBFile(userid)) as con:
-       cur = con.cursor()
-       cur.execute("update questions set difficulty = ? where question = ?", (difficulty, alpha))
-   else:
-     with xs.getMysqlCon().cursor() as con:
-       con.execute("update quiz_user_detail set locked = %s where quiz_id = %s and user_id = %s and alphagram = %s", (int(lock), quizid, userid, alpha))
+    with lite.connect(getDBFile(userid)) as con:
+      cur = con.cursor()
+      cur.execute("update questions set difficulty = ? where question = ?", (difficulty, alpha))
+  else:
+    with xs.getMysqlCon().cursor() as con:
+      con.execute("update quiz_user_detail set locked = %s " +
+                  "where quiz_id = %s and user_id = %s and alphagram = %s",
+                  (int(lock), quizid, userid, alpha))
 
 def isInCardbox(alpha, userid) :
+  '''Takes in an alphagram and userid
+  Returns boolean indicating if alphagram is in the user's cardbox '''
 
-   with lite.connect(getDBFile(userid)) as con:
-     cur = con.cursor()
-     cur.execute("select count(*) from questions where question = ? and next_scheduled is not null", (alpha,))
-     c = cur.fetchone()[0]
-   return c==1
+  with lite.connect(getDBFile(userid)) as con:
+    cur = con.cursor()
+    cur.execute("select count(*) from questions " +
+                "where question = ? and next_scheduled is not null", (alpha,))
+    result = cur.fetchone()[0]
+  return result==1

@@ -12,3 +12,7 @@ repos:
     rev: v2.13.5
     hooks:
     -   id: pylint
+        args:
+          [
+            "--rcfile=/home/spherulitic/xerafin3/.pylintrc"
+          ]

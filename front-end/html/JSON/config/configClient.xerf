@@ -1,0 +1,263 @@
+{
+  "preload": [
+    {
+      "group": "Core",
+      "files": [
+        {"title":"core.storage","level":-1},
+        {"title":"core.xerafin","level":-1},
+        {"title":"core.xError","level":-1},
+        {"title":"core.config","level":-1},
+        {"title":"core.home","level":-1},
+        {"title":"countries","level":-1},
+        {"title":"frag.newShowcase","level":-1},
+        {"title":"frag.xeraDoc","level":-1},
+        {"title":"frag.homeMenu","level":-1},
+        {"title":"frag.loginDialog","level":-1},
+        {"title":"getBrowserInfo","level":-1},
+        {"title":"MD5","level":-1},
+        {"title":"proto","level":-1},
+        {"title":"ui.xeraForm","level": -1},
+        {"title":"ui.xeraListboxBasic","level": -1},
+        {"title":"ui.xeraSelect","level": -1},
+        {"title":"ui.xeraTabGenerator","level": -1},
+        {"title":"util.general","level": -1}
+      ]
+    }
+  ],
+  "scripts": [
+        {
+            "group": "Logged Core",
+            "files": [
+                {"title": "panels","level": 1},
+        {"title": "proto.xeraPanelUI","level": 1},
+        {"title": "proto.xeraActionHandler","level": 1},
+        {"title": "frag.paginator","level": 1},
+        {"title": "quiz","level":1},
+        {"title": "xerafinLayout", "level": 1}
+            ]
+        },
+    {
+      "group": "Fragments",
+      "files": [
+        {"title": "emojiParse","level": 1},
+        {"title": "frag.alphaDisplay","level": 1},
+        {"title": "frag.answerArea","level": 1},
+        {"title": "frag.colorStrip","level": 1},
+        {"title": "frag.comboFilters","level": 1},
+        {"title": "frag.panelDebug","level": 1},
+        {"title": "frag.qAnswers","level": 1},
+        {"title": "frag.qButtonBank","level": 1},
+        {"title": "frag.qInfo","level": 1},
+        {"title": "frag.qInputs","level": 1},
+        {"title": "frag.qRack","level": 1},
+        {"title": "frag.qStatus","level": 1},
+        {"title": "frag.overviewGoRegion","level": 1},
+        {"title": "frag.overviewList","level": 1},
+        {"title": "frag.overviewRow","level": 1},
+        {"title": "frag.overviewSearch","level": 1},
+        {"title": "frag.paginTabs","level": 1},
+        {"title": "frag.rankingsRow","level": 1},
+        {"title": "frag.rankingsTable","level": 1},
+        {"title": "frag.searchRow","level": 1},
+        {"title": "frag.slothBar","level": 1},
+        {"title": "frag.slothBoard","level": 1},
+        {"title": "frag.slothHome","level": 1},
+        {"title": "frag.slothInputs","level": 1},
+        {"title": "frag.slothLeaderboard","level": 1},
+        {"title": "frag.slothStats","level": 1},
+        {"title": "frag.slothTable","level": 1},
+        {"title": "frag.slothTimer","level": 1},
+        {"title": "frag.subscriptionList","level": 1},
+        {"title": "frag.tile","level": 1},
+        {"title": "proto.xeraLexiconSelector","level": 1},
+        {"title": "frag.adminSummary","level": 60},
+        {"title": "frag.errorList","level": 60},
+        {"title": "frag.waitList","level": 60}
+      ]
+    },
+    {
+            "group": "Widgets",
+            "files": [
+                {"title": "alphaStats","level": 1},
+                {"title": "cardboxStats","level": 1},
+        {"title": "chat","level": 1},
+        {"title": "gameStats","level": 1},
+                {"title": "widget.rankings","level": 1},
+        {"title": "liveTournament","level": 1},
+                {"title": "userPrefs","level": 1},
+                {"title": "xeraUI","level": 1},
+        {"title": "widget.debug","level": 42},
+        {"title": "manageUsers","level": 60},
+        {"title": "oldManageUsers","level": 60}
+            ]
+        },
+    {
+      "group": "Apps",
+      "files": [
+        {"title": "app.basicQuiz","level": 1},
+        {"title": "app.sloth","level": 1},
+        {"title": "basicQuiz","level": 1},
+        {"title": "invaders","level": 1},
+        {"title": "wordwall","level": 1}
+      ]
+    }
+    ],
+    "nav": [
+        {
+            "group": "Games",
+      "privLevel" : "1",
+            "content": [
+                {
+                    "icon": "images\/icons\/question-png-icon-1.jpg",
+                    "title": "Basic Quiz",
+                    "onClick": "startQuiz()",
+                    "hasChildren": false,
+                    "privLevel": "1",
+                    "lastChild": false,
+                    "new": false
+                },
+                {
+                    "icon": "images\/sloth.png",
+                    "title": "Subword Sloth!",
+                    "onClick": "initSloth()",
+                    "hasChildren": false,
+                    "privLevel": "1",
+                    "lastChild": false,
+                    "new": false
+                },
+                {
+                    "icon": "images\/invaders.png",
+                    "title": "Cardbox Invaders",
+                    "onClick": "initInvaders()",
+                    "hasChildren": false,
+                    "privLevel": "1",
+                    "lastChild": false,
+                    "new": false
+                },
+        {
+                    "icon": "images\/invaders.png",
+                    "title": "Wall of Words",
+                    "onClick": "initWordwall()",
+                    "hasChildren": false,
+                    "privLevel": "1",
+                    "lastChild": true,
+                    "new": true
+                }
+            ]
+        },
+       {
+            "group": "Widgets",
+      "privLevel" : "1",
+            "content": [
+                {
+                    "icon": "images\/icons\/question-png-icon-1.jpg",
+                    "title": "Cardbox Info",
+                    "onClick": "showCardboxStats()",
+                    "hasChildren": false,
+                    "privLevel": "1",
+                    "lastChild": false,
+                    "new": false
+                },
+                {
+                    "icon": "images\/icons\/question-png-icon-1.jpg",
+                    "title": "Rankings",
+                    "onClick": "initLeaderboard()",
+                    "hasChildren": false,
+                    "privLevel": "1",
+                    "lastChild": false,
+                    "new": false
+                },
+                {
+                    "icon": "images\/icons\/question-png-icon-1.jpg",
+                    "title": "Alphagram Info",
+                    "onClick": "showAlphaStats(toAlpha($.trim(prompt(\"Enter a word or alphagram to display\"))))",
+                    "hasChildren": false,
+                    "privLevel": "1",
+                    "lastChild": false,
+                    "new": false
+                },
+                {
+                    "icon": "images\/icons\/question-png-icon-1.jpg",
+                    "title": "Game Stats",
+                    "onClick": "showGameStats()",
+                    "hasChildren": false,
+                    "privLevel": "1",
+                    "lastChild": false,
+                    "new": false
+                },
+                {
+                    "icon": "images\/icons\/question-png-icon-1.jpg",
+                    "title": "TSH feed",
+                    "onClick": "initTournamentStandings()",
+                    "hasChildren": false,
+                    "privLevel": "1",
+                    "lastChild": true,
+                    "new": true
+                }
+            ]
+        },
+        {
+            "group": "Settings",
+      "privLevel" : "1",
+            "content": [
+                {
+                    "icon": "images\/icons\/question-png-icon-1.jpg",
+                    "title": "User Prefs",
+                    "onClick": "initUserPrefs()",
+                    "hasChildren": false,
+                    "privLevel": "1",
+                    "lastChild": false,
+                    "new": false
+                },
+                {
+                    "icon": "images\/icons\/question-png-icon-1.jpg",
+                    "title": "Logout",
+                    "onClick": "logoutUser()",
+                    "hasChildren": false,
+                    "privLevel": "1",
+                    "lastChild": true,
+                    "new": false
+                }
+            ]
+        },
+        {
+            "group": "Admin",
+      "privLevel" : "60",
+            "content": [
+                {
+                    "icon": "images\/icons\/question-png-icon-1.jpg",
+                    "title": "Manage Users",
+                    "onClick": "initManageUsers()",
+                    "hasChildren": false,
+                    "privLevel": "60",
+                    "lastChild": true,
+                    "new": true
+                }
+            ]
+        },
+        {
+            "group": "Developer",
+      "privLevel" : "70",
+            "content": [
+                {
+                    "icon": "images\/icons\/question-png-icon-1.jpg",
+                    "title": "Manage Alerts",
+                    "onClick": "",
+                    "hasChildren": false,
+                    "privLevel": "70",
+                    "lastChild": false,
+                    "new": false
+                },
+         {
+                    "icon": "images\/icons\/question-png-icon-1.jpg",
+                    "title": "Configure",
+                    "onClick": "devConfigInit()",
+                    "hasChildren": false,
+                    "privLevel": "70",
+                    "lastChild": true,
+                    "new": false
+                }
+            ]
+        }
+    ]
+}

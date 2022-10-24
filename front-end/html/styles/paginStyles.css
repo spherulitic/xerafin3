@@ -1,0 +1,100 @@
+/* Styles for pagination object */
+.paginTabs {
+	width:100%!important;
+	display:inline-block;
+}
+.paginHighlight {
+	color:rgba(140,176,48,1);
+	font-size:0.9em;
+}
+.numCurResCont {
+	width:100%;
+	text-align:center;
+	font-size:0.75em;
+	font-family:Lato, sans-serif;
+	color:rgba(213,213,200,1);
+	border-top-left-radius:10px;
+	border-top-right-radius:10px;
+	margin-top:5px;
+	font-variant:small-caps;
+	border:1px solid black;
+}
+.numCurResCont div:first-child, .numCurResCont div:last-child {display:inline-block;width:15%;}
+.numCurResCont div:nth-child(2) {display:inline-block;width:70%;}
+.numCurResCont div:first-child {text-align:left;}
+.numCurResCont div:last-child {
+	text-align:right;
+	color:rgba(213,213,200,1);
+	font-size:0,7em;
+}
+.numCurResExpand {
+	margin-right:5px;
+}
+.paginInputRegion {
+	width:100%;
+	font-size:0.75em;
+	font-family:Lato, sans-serif;
+	color:rgba(146,190,128,1);
+	border:1px solid black;
+	border-top:0px;
+}
+.paginOptionRegion {
+	padding-top:3px;
+	width:100%;
+}
+.paginNumTabs {
+	display:inline-block;
+	padding:2px 0px;
+	border-radius:3px;
+	border:1px solid black;
+	min-width:22px;
+	text-align:center;
+}
+.paginNumTabs:hover {background-color:rgba(64,64,64,0.7);}
+.paginNumTabCur {border: 1px solid rgba(213,213,200,1);}
+.paginNumTabGap {
+	display:inline-block;
+	padding:2px 0px;
+	border-radius:3px;
+	text-align:center;
+	min-width:15px;
+	color:rgba(213,213,200,1);
+}
+.paginInputLabel {
+	display:inline-block;
+	padding-right:5px;
+	font-variant:small-caps;
+	color:rgba(213,213,200,1);
+}
+.paginInputSubRegion {
+	width:50%;
+	display:inline-block;
+	border:1px solid black;
+}
+.paginInput {
+	display:inline-block;
+	color:black;
+	background-color:rgba(230,230,190,1);
+	text-align:center;
+	outline:none!important;
+	border:1px solid black;
+	border-radius':4px;
+	appearance: none!important;
+	-webkit-appearance: none !important;
+}
+.paginInput:hover {
+	outline:none!important;
+	webkit-appearance:none!important;
+	appearance:none!important;
+}
+.paginFooter {
+	border-bottom-left-radius:10px;border-bottom-right-radius:10px;border:1px solid black;
+	color:rgba(213,213,210,1);font-size:0.7em;font-family:lato,san-serif;
+}
+
+
+
+
+
+
+/*End Styles */

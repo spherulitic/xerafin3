@@ -1,0 +1,31 @@
+.prefTable {border:none;width:100%;min-width:100%;max-width:100%;}
+.prefTable .lexChild {width:100%;display:table;table-layout:fixed;}
+.prefTable .lexChild .lexRow .lexCell {background:rgba(226,226,226,0.4);vertical-align:middle;height:30px;border:1px solid black;border-width:1px 0 0 0;}
+/*
+.prefTable .lexChild:first-child .lexRow .lexCell:last-child {background:transparent;border:none;}
+.prefTable .lexChild:first-child .lexRow .lexCell:nth-child(4) {border-radius:0 10px 0 0;border-right:1px solid black;}
+
+*/
+.prefTable .lexChild:first-child .lexRow .lexCell:empty {background:transparent;border:none;}
+.prefTable .lexChild:first-child {font-size:0.85em;}
+.lexCellRightBorder {border-radius:0 10px 0 0;border-right:1px solid black;}
+.prefTable .lexChild:nth-child(n+2) {font-size: 0.9em;}
+.prefTable .lexChild:nth-child(n+2) .lexRow .lexCell:nth-child(5)	{border-right:1px solid black;}
+.prefTable .lexChild .lexRow .lexCell:nth-child(1) {border-left:1px solid black;width:14%}
+.prefTable .lexChild .lexRow .lexCell {overflow:hidden;}
+.lexChild .lexRow {width:100%;display:table-row;}
+.lexRow .lexCell {display:table-cell;font-size:0.9em;width:20%;font-variant:small-caps;border:0 0 1px 0;
+color:rgba(26,26,26,1);}
+.lexRow .lexCell:last-child {overflow-x:hidden;border:none;border-radius:0 10px 10px 0;width:26%;}
+.lexRow .lexCell:last-child button {width:100%;max-height:30px!important;border-radius:10px;}
+.prefTable .lexChild:last-child .lexRow .lexCell {border-bottom:1px solid black!important;}
+
+.prefTable .lexChild .lexRow .quizCell {background:rgba(226,226,226,0.4);vertical-align:middle;height:30px;border:1px solid black;border-width:1px 0 0 0;}
+.prefTable .lexChild:first-child .lexRow .quizCell:empty {background:transparent;border:none;}
+.prefTable .lexChild:nth-child(n+2) .lexRow .quizCell:nth-child(5)	{border-right:1px solid black;}
+.prefTable .lexChild .lexRow .quizCell:nth-child(1) {border-left:1px solid black;width:25%;}
+.prefTable .lexChild .lexRow .quizCell {overflow:hidden;width:12%;}
+.lexRow .quizCell {display:table-cell;font-size:0.9em;font-variant:small-caps;border:0 0 1px 0;
+color:rgba(26,26,26,1);}
+.prefTable .lexChild:last-child .lexRow .quizCell {border-bottom:1px solid black!important;}
+.lexRow .quizCell:last-child {overflow-x:hidden;border-right:1px solid black!important}
