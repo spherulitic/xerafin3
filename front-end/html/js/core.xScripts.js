@@ -1,8 +1,6 @@
 XScripts.prototype = {
     constructor: XScripts,
     loadScript: function(d){
-      console.log ("loadScript data");
-      console.log(d);
       let self=this;
       return new Promise(resolve =>  {
         let path = 'js/' + d.title + ".js";
@@ -10,7 +8,7 @@ XScripts.prototype = {
         $.getScript(path)
         .then(
           function(data,textStatus){
-            if (self.logged||true){xerafin.error.log.add(d.title + " script loaded",'HTTP');}
+            if (self.logged){xerafin.error.log.add(d.title + " script loaded",'HTTP');}
             resolve(true);
           }
         );
@@ -65,6 +63,7 @@ XScripts.prototype = {
 //          data: JSON.stringify({'status': this.logged}),
 //          success: async function(response, responseStatus) {
             self.data = JSON.parse(response);
+            console.log("Logging self.data from the script.get() function");
             console.log(self.data);
             if (self.logged) {
               self.files = self.data.scripts;
