@@ -11,7 +11,7 @@
   <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
   <script async src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui-touch-punch/0.2.3/jquery.ui.touch-punch.min.js"></script>
     <script src="https://ko-fi.com/widgets/widget_2.js"></script>
-  <script src="js/core.xScripts.js"></script>
+  <script src="js/core.xScripts.js?x=1></script>
     <script src="https://cdn.polyfill.io/v2/polyfill.min.js"></script>
   <!-- Bootstrap code -->
   <link rel="stylesheet" href="vendor/bootstrap/css/bootstrap.css">
@@ -24,17 +24,15 @@
   <link href="styles/paginStyles.css?v=<?php echo filemtime('styles/paginStyles.css');?>" rel="stylesheet" type="text/css" />
   <link href="styles/prefs.css?v=<?php echo filemtime('styles/prefs.css');?>" rel="stylesheet" type="text/css" />
   <link href="styles/overview.css.php?v=<?php echo filemtime('styles/overview.css.php');?>" rel="stylesheet" type="text/css" />
+  <script src="js/proto.js"></script>
 <script>
-  function initKeycloak() {
+   function initKeycloak() {
     keycloak = new Keycloak();
-    keycloak.init({onLoad: 'login-required'}).then(function(authenticated) {
+    try {
+    keycloak.init({onLoad: 'login-required'}).then(async function(authenticated) {
       if (authenticated) {
         console.log("Authenticated");
         // all the login callback stuff goes here
-        questionCounter = 0;
-        correctCounter = 0;
-        leaderboardPanel = "today";
-        cardboxStatsPanel = "dueNow";
 //        $.ajax({
 //          type: "POST",
 //          url: "getCardboxScore",
@@ -48,21 +46,25 @@
 //          }
 //        });
 
-///        overlay=new Overlay({opacity:0.3});
-///        let preload = new XScripts({'logged':false});
-///        preload.get();
-///        console.log("Creating Xerafin object");
-        xerafin=new Object();
-//        xerafin.config = new Config();
-//        xerafin.error = new XError();
-//        xerafin.scripts = d;
-//        xerafin.scripts = new XScripts({'logged':true});
 
+        let preload = new XScripts({'logged':false});
+        let x = await preload.get();
+        xerafin=new Object();
+        xerafin.config = new Config();
+        xerafin.error = new XError();
+        xerafin.scripts = new XScripts({'logged':true});
+
+        overlay=new Overlay({opacity:0.3});
+        questionCounter = 0;
+        correctCounter = 0;
+        leaderboardPanel = "today";
+        cardboxStatsPanel = "dueNow";
+        generateScripts();
+        console.log("finished authentication callback");
       } else { console.log("Not Authenticated"); }
 
-      }).catch(function() { console.log('failed to initialize'); });
-    }
-
+      }) } catch(error) {console.error(error)};
+   }
   </script>
   <script>
 
@@ -257,11 +259,16 @@ function appendDebugLog(input){
       }
     }
 <!-- Generates Required Scripts---------------------------------------------------------------------------------->
-    async function generateScripts(response, responseStatus) {
+//    async function generateScripts(response, responseStatus) {
+   async function generateScripts() {
+      console.log("generateScripts");
       let x = await xerafin.scripts.get();
+      console.log(xerafin);
       if (x) {
         if (!noaccess){
-          xerafin.user = xerafin.scripts.data.user;
+//          xerafin.user = xerafin.scripts.data.user;
+//        I don't know what this is used for, but userdata should come from keycloak now
+          xerafin.user = 1;
           xerafin.storage = new UserStorage({'defaults':xerafin.scripts.data.storage, 'user': xerafin.user});
           generatePanels(response, responseStatus);
         }
@@ -324,6 +331,3 @@ function appendDebugLog(input){
   </div>
 </body>
 </html>
-<?php // }
-//else {echo "You don't have permissions to be here. You need to be logged in to regular Xerafin first. If problems persist, please contact Chris or Rick.";}
-?>
