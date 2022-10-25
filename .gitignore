@@ -1,3 +1,4 @@
 *.pyc
 front-end/html/images
 front-end/html/vendor
+front-end/localhost*
