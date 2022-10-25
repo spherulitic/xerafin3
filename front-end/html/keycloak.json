@@ -1,6 +1,6 @@
 {
   "realm": "Xerafin",
-  "auth-server-url": "http://localhost/auth/auth/",
+  "auth-server-url": "http://localhost/auth/",
   "ssl-required": "external",
   "resource": "x-client",
   "public-client": true,
