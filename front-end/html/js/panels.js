@@ -70,7 +70,7 @@ function getPanelValue(value){
 
 function panelFunctionLookup(panel){
   switch (panel){
-	case '0': initXeraOverview();break;
+  case '0': initXeraOverview();break;
     case '1_a': initBQ(); break;
     case '1_b': initSloth(); break;
     case '1_c': initInvaders(); break;
@@ -83,12 +83,12 @@ function panelFunctionLookup(panel){
     case '4': showCardboxStats(); break;
     case '5': showAlphaStats(""); break;
     case '6': showGameStats(); break;
-	case '7': showProfile(); break;
-	case '20': initBQ(); break;
+  case '7': showProfile(); break;
+  case '20': initBQ(); break;
     case '100': initTournamentStandings(); break;
     case '500': initOldManageUsers(); break;
-	case '501': initDebug();break;
-	case '502': initManageUsers(); break;
+  case '501': initDebug();break;
+  case '502': initManageUsers(); break;
 
 
 
@@ -115,7 +115,7 @@ function populatePanelsFromArray(){
 //clearing those two localStorage variables on closure (so that they don't fire again without being
 //reinitialized.)
   var panelList=JSON.parse(localStorage.panelPositions);
-  //console.log('Panel Population called, contents: '+ JSON.stringify(panelList));
+  console.log('Panel Population called, contents: '+ JSON.stringify(panelList));
   //special edge case to init chat if not in existing list
   var colStateArray = new Array();
   //These 2 loops have to be separate (thread/race conditions between generatePanel & AjaX calls)
@@ -132,9 +132,11 @@ function populatePanelsFromArray(){
     }
   }
   createPlaceholderDivs(panelList);
+  console.log(panelList);
   localStorage.setItem('panelStateArray', JSON.stringify(colStateArray));
   for (var x=0;x<3;x++){
     for (var y=0;y<panelList[x].length;y++){
+      console.log("PPFA Debug " + x + " " + y);
       if (typeof panelList[x][y].length!=='undefined'){
         panelFunctionLookup(panelList[x][y][0].toString());
       }
@@ -333,42 +335,43 @@ function generatePanel(ident, data, targ, refresher, closure){
 
 <!------------------------------------------------------------------------------------------------------------->
 
-		function getPanelMinimizeStatus (value){
-			if ($('#minim_button_'+value+' > span').hasClass("glyphicon-chevron-down")){return true;}
-			else {return false;}
-		}
+    function getPanelMinimizeStatus (value){
+      if ($('#minim_button_'+value+' > span').hasClass("glyphicon-chevron-down")){return true;}
+      else {return false;}
+    }
 <!------------------------------------------------------------------------------------------------------------->
-		function writePanelStatus(panelArray){
-			var newPanelArray=[];
-			for (x=0;x<panelArray.length;x++){
-				if (typeof panelArray[x]!=0){
-					newPanelArray[x]=[];
-					for (y=0;y<panelArray[x].length;y++){
-						if (typeof panelArray[x][y]!=0){
-							var temp=panelArray[x][y].replace('pan_' , '');
-							newPanelArray[x][y]=[temp, getPanelMinimizeStatus(panelArray[x][y])];
-						}
-					}
-				}
-				else {newPanelArray[x][0]=[]}
-			}
-			localStorage.panelPositions=JSON.stringify(newPanelArray);
-			appendDebugLog("Panel configuration:"+localStorage.panelPositions);
+    function writePanelStatus(panelArray){
+      var newPanelArray=[];
+      for (x=0;x<panelArray.length;x++){
+        if (typeof panelArray[x]!=0){
+          newPanelArray[x]=[];
+          for (y=0;y<panelArray[x].length;y++){
+            if (typeof panelArray[x][y]!=0){
+              var temp=panelArray[x][y].replace('pan_' , '');
+              newPanelArray[x][y]=[temp, getPanelMinimizeStatus(panelArray[x][y])];
+            }
+          }
+        }
+        else {newPanelArray[x][0]=[]}
+      }
+      localStorage.panelPositions=JSON.stringify(newPanelArray);
+      appendDebugLog("Panel configuration:"+localStorage.panelPositions);
       console.log("New Panel Config Written");
-		}
+    }
 <!------------------------------------------------------------------------------------------------------------->
-		function generatePanels(response, responseStatus){
+    function generatePanels(){
 
-			$('#logProgress').html("Populating user interface");
-			if (responseStatus=== 'success'){
-				$.ajax({
-				type: "POST",
-				url: "PHP/contentLogged.php",
-				success: function(response2, responseStatus2) {
+      console.log("Start generatePanels");
+      $('#logProgress').html("Populating user interface 1");
+      if (true){
+        $.ajax({
+        type: "GET",
+        url: "PHP/contentLogged.htm",
+        success: function(response2, responseStatus2) {
           // NB panel positions is an array which contains three arrays -- one per column
           //  with each element in the column array is an array: [panel_id, isCollapsed]
 
-          console.log('Populating User Interface');
+          console.log('Populating User Interface 2');
           if (typeof localStorage.panelPositions!=='undefined') {
           var pp = JSON.parse(localStorage.panelPositions);
           var hasOverview = false;
@@ -385,51 +388,55 @@ function generatePanel(ident, data, targ, refresher, closure){
           }
           }
 
-		if (typeof localStorage.panelPositions==='undefined'){
-			xerafin.error.log.add('Panels config initialized as blank.','comment');
-			localStorage.setItem('panelPositions','[[["4",true],["1_b",false]],[["0",false]],[["2",false],["3",false]]]');
-		}
-		appendDebugLog("Content Populated Successfully");
-		$('#pageContent').append(response2);
-		$('#mainLayer').css('opacity','0');
-		populatePanelsFromArray();
-		switch_areas();
-		setTimeout(sessionRefresh,600000);
-						$( function() {
-							$('#middleArea, #leftArea, #rightArea').sortable({
-							connectWith:'#middleArea, #leftArea, #rightArea',
-							dropOnEmpty: true,
-							handle: '.dragMe',
-							placeholder: "panelPlaceholder",
-							scrollSensitivity: 5,
-							distance: 10,
-							revert: 200,
-							change: function(event, ui) {
-								ui.placeholder.css({visibility: 'visible'});
-							},
-							start: function (event, ui) {
+    if (typeof localStorage.panelPositions==='undefined'){
+      xerafin.error.log.add('Panels config initialized as blank.','comment');
+      localStorage.setItem('panelPositions','[[["4",true],["1_b",false]],[["0",false]],[["2",false],["3",false]]]');
+    }
+    appendDebugLog("Content Populated Successfully");
+    $('#pageContent').append(response2);
+    $('#mainLayer').css('opacity','0');
+    console.log("Panels Debug 3");
+    populatePanelsFromArray();
+    console.log("Panels Debug 4");
+    switch_areas();
+    console.log("Panels Debug 5");
+    setTimeout(sessionRefresh,600000);
+    console.log("Panels Debug 6");
+            $( function() {
+              $('#middleArea, #leftArea, #rightArea').sortable({
+              connectWith:'#middleArea, #leftArea, #rightArea',
+              dropOnEmpty: true,
+              handle: '.dragMe',
+              placeholder: "panelPlaceholder",
+              scrollSensitivity: 5,
+              distance: 10,
+              revert: 200,
+              change: function(event, ui) {
+                ui.placeholder.css({visibility: 'visible'});
+              },
+              start: function (event, ui) {
 
-								ui.item.toggleClass("panelPlaceholder");
-								ui.placeholder.height(50);
-								if (isMobile()===false) {
-									var placeholderHeight = ui.item.outerHeight();
-									ui.placeholder.height(placeholderHeight + 10);
-								}
-							},
-							stop: function (event, ui) {
-								ui.item.toggleClass("panelPlaceholder");
-								var x= [$( "#leftArea" ).sortable( "toArray" ),$( "#middleArea" ).sortable( "toArray" ), $( "#rightArea" ).sortable( "toArray" )];
-								writePanelStatus(x);
-							},
-							tolerance:'touch'});
-						});
-						$('#logProgress').html("Finalising user interface");
-						generateNav(response2, responseStatus2);
+                ui.item.toggleClass("panelPlaceholder");
+                ui.placeholder.height(50);
+                if (isMobile()===false) {
+                  var placeholderHeight = ui.item.outerHeight();
+                  ui.placeholder.height(placeholderHeight + 10);
+                }
+              },
+              stop: function (event, ui) {
+                ui.item.toggleClass("panelPlaceholder");
+                var x= [$( "#leftArea" ).sortable( "toArray" ),$( "#middleArea" ).sortable( "toArray" ), $( "#rightArea" ).sortable( "toArray" )];
+                writePanelStatus(x);
+              },
+              tolerance:'touch'});
+            });
+            $('#logProgress').html("Finalising user interface");
+//            generateNav(response2, responseStatus2);
 
-				},
-				error: function(jqXHR, textStatus, errorThrown) {
-					appendDebugLog("<b>Something went wrong whilst loading content!</b>");
-				}
-			});
-			}
-		}
+        },
+        error: function(jqXHR, textStatus, errorThrown) {
+          appendDebugLog("<b>Something went wrong whilst loading content!</b>");
+        }
+      });
+      }
+    }

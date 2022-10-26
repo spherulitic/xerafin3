@@ -768,21 +768,22 @@ function Sloth(question,lex){
 }
 
 function initSloth(q,lex){
-  console.log(q);
-  console.log(lex);
-  if (typeof sloth!=='undefined'){
-    if (!sloth.inProgress) {
-      if (sloth.question!==q){sloth = new Sloth(q,lex);}
-    }
-    else {
-      if (typeof q!=='undefined'){
-        sloth = new Sloth(q,lex);
-      }
-    }
-  }
-  else {
-    //Yes there are lots of globals, won't be in V2
-    sloth = new Sloth(q,lex);
-    sloth.output();
-  }
+  console.log("initSloth - todo issue #21");
+//***  console.log(q);
+//***  console.log(lex);
+//***  if (typeof sloth!=='undefined'){
+//***    if (!sloth.inProgress) {
+//***      if (sloth.question!==q){sloth = new Sloth(q,lex);}
+//***    }
+//***    else {
+//***      if (typeof q!=='undefined'){
+//***        sloth = new Sloth(q,lex);
+//***      }
+//***    }
+//***  }
+//***  else {
+//***    //Yes there are lots of globals, won't be in V2
+//***    sloth = new Sloth(q,lex);
+//***    sloth.output();
+//***  }
 }

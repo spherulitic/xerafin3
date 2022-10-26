@@ -4,7 +4,6 @@ XScripts.prototype = {
       let self=this;
       return new Promise(resolve =>  {
         let path = 'js/' + d.title + ".js";
-        console.log("Loading " + path);
         $.getScript(path)
         .then(
           function(data,textStatus){
@@ -15,8 +14,7 @@ XScripts.prototype = {
       });
     },
     loadGroup: async function(group){
-      console.log("Load Group");
-      console.log(group);
+      console.log("Load Group" + group.group);
       let self = this;
       let f = new Array();
       $.ajaxSetup({cache:true});
@@ -33,8 +31,6 @@ XScripts.prototype = {
       })
     },
     load: async function(current){
-      console.log("Loading Scripts");
-      console.log(this.files);
       let group = await this.loadGroup(this.files[current]);
       if (group) {
         if (current < this.files.length - 1) {
@@ -63,8 +59,6 @@ XScripts.prototype = {
 //          data: JSON.stringify({'status': this.logged}),
 //          success: async function(response, responseStatus) {
             self.data = JSON.parse(response);
-            console.log("Logging self.data from the script.get() function");
-            console.log(self.data);
             if (self.logged) {
               self.files = self.data.scripts;
               self.nav = self.data.nav;
