@@ -32,6 +32,7 @@
     keycloak.init({onLoad: 'login-required'}).then(async function(authenticated) {
       if (authenticated) {
         console.log("Authenticated");
+        userid = -1; // legacy to suppress errors; not used anymore
         // all the login callback stuff goes here
 //        $.ajax({
 //          type: "POST",
@@ -288,9 +289,7 @@ function appendDebugLog(input){
                 "defaultActivity" : 0
               } };
           xerafin.storage = new UserStorage({'defaults':xerafin.scripts.data.storage, 'user': xerafin.user});
-          console.log("Xerafin Storage");
-          console.log(xerafin.storage);
-          generatePanels(response, responseStatus);
+          generatePanels();
         }
         else {
           $('#logProgress').html('');
