@@ -34,18 +34,19 @@
         $('#adminNote').html('<hr>Login Successful');
         userid = -1; // legacy to suppress errors; not used anymore
         // all the login callback stuff goes here
-//        $.ajax({
-//          type: "POST",
-//          url: "getCardboxScore",
-//          success: function(response2, responseStatus2) {
-//            appendDebugLog(response2[0]);
-//            if (!localStorage.qQScore) {localStorage.qQScore = response2[0].score;}
-//            if (!localStorage.qQAlpha) {localStorage.qQAlpha = 0;}
-//          },
-//          error: function(jqXHR, textStatus, errorThrown) {
-//            appendDebugLog("Error getting cardbox score, status = " + textStatus + " error: " + errorThrown);
-//          }
-//        });
+        $.ajax({
+          type: "POST",
+          url: "getCardboxScore",
+          success: function(response2, responseStatus2) {
+            console.log("Got Cardbox Score");
+            console.log(response2[0]);
+            if (!localStorage.qQScore) {localStorage.qQScore = response2[0].score;}
+            if (!localStorage.qQAlpha) {localStorage.qQAlpha = 0;}
+          },
+          error: function(jqXHR, textStatus, errorThrown) {
+            console.error("Error getting cardbox score, status = " + textStatus + " error: " + errorThrown);
+          }
+        });
 
 
         let preload = new XScripts({'logged':false});
