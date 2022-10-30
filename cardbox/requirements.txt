@@ -1,4 +1,6 @@
 Flask>=2.0.2
+Flask-OIDC
+itsdangerous<2.1.0
 mysqlclient==2.1.0
 dawg-python>=0.7.2
 requests>=2.25.1
