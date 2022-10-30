@@ -362,7 +362,7 @@ function generatePanel(ident, data, targ, refresher, closure){
     function generatePanels(){
 
       console.log("Start generatePanels");
-      $('#logProgress').html("Populating user interface 1");
+      $('#logProgress').html("Populating user interface");
       if (true){
         $.ajax({
         type: "GET",

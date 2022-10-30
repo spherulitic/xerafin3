@@ -31,7 +31,7 @@
     try {
     keycloak.init({onLoad: 'login-required'}).then(async function(authenticated) {
       if (authenticated) {
-        console.log("Authenticated");
+        $('#adminNote').html('<hr>Login Successful');
         userid = -1; // legacy to suppress errors; not used anymore
         // all the login callback stuff goes here
 //        $.ajax({
@@ -313,16 +313,24 @@ function appendDebugLog(input){
       <div class="col-xs-12 col-sm-7 col-md-8">
         <div class="row">
           <div id='middleAreaHome' class="col-xs-12 col-sm-12 col-md-6">
-            <div class="well frontPage" id="Area5" style="width:100%;text-align: center;">
+            <div class="well frontPage" id="Area5" style="width:100%;text-align: center;visibility:hidden;">
             </div>
           </div>
           <div id='leftAreaHome' class="col-xs-12 col-sm-12 col-md-6">
             <div class="well frontPage" id="Area2" style="width:100%;text-align: center;">
               <div id="logoWrapper" style="width:100%;margin-bottom:10px;"><img src="images/xerafinNew.png" style="height:80px"></div>
               <div id="loginArea">
+                <div style='margin:auto;min-width:60%;border:1px solid black;'>
+                </div>
                 <div id="spacer" style="min-height:10px; display:inline block;"></div>
+                <div id="loginMessage1" class="logProgress" style="color:red;"></div>
+                <div id="loginMessage2" class="logProgress"></div>
+                <div id="spacer" style="min-height:10px; display:inline block;"></div>
+                <div id="loginMessage3" class="logProgress"></div>
                 <div id="spacer" style="min-height:20px; display:inline block;"></div>
-                <div id="adminNote" class="logProgress" style="font-size:0.8em"><hr>Xerafin is undergoing Beta testing and successful registration is at present limited to those we know (or know of).</div>
+              <div id="logProgress" class="logProgress"></div>
+              <div id="adminNote" class="logProgress" style="font-size:0.8em"><hr>Redirecting to Xerafin login ... </div>
+              <div id="logHint" style="width:100%;visibility:hidden;margin:auto 5px;padding:5px;text-align:left;background: #bbbb44;color:#444444"></div>
               <hr>
               <div id="privacy"><a onclick="showPrivacy()">Privacy</a>&nbsp;-&nbsp;<a onclick="showToS()">Terms</a></div>
             </div>
@@ -330,17 +338,9 @@ function appendDebugLog(input){
         </div>
       </div>
         <div id='rightAreaHome' class="col-xs-12 col-sm-5 col-md-4">
-        <div class="well frontPage" id="Area1" style="width: 100%; text-align: center;font-size:0.8em;font-family:'Montserrat',sans-serif;color:rgba(26,26,26,1);background-color:rgba(140,176,48,0.97);"></div>
-          <div class="well frontPage" id="Area4" style="width:100%;text-align:left;font-size:0.8em;font-family:'Montserrat',sans-serif;color:rgba(247,247,223,1);">
+        <div class="well frontPage" id="Area1" style="width: 100%; visibility: hidden;"></div>
+          <div class="well frontPage" id="Area4" style="width:100%;visibility: hidden;">
             <div style='text-align:center;margin:auto;width:100%;'>
-              <div class="fb-like"  style="margin:auto!important;text-align:center;width:90%;"
-                data-href="https://xerafin.net"
-                data-layout="standard"
-                data-action="like"
-                data-show-faces="true"
-                data-share="false"
-                data-colorscheme="dark">
-              </div>
             </div>
           </div>
         </div>
