@@ -330,6 +330,3 @@ def getCardboxStats():
 #
 #  return jsonify([result, error])
 # Library functions
-
-def get_keycloak_public_key():
-  return public_key
