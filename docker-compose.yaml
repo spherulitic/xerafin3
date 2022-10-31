@@ -1,14 +1,13 @@
 services:
   keycloak:
     image: jboss/keycloak:latest
-#    ports:
-#      - "8089:8080"
     volumes:
       - /var/opt/keycloak:/opt/jboss/keycloak/standalone/data
     environment:
 #      KEYCLOAK_USER: "admin"
 #      KEYCLOAK_PASSWORD: "admin"
       PROXY_ADDRESS_FORWARDING: "true"
+#      KEYCLOAK_LOGLEVEL: "DEBUG"
   frontend:
     image: x-frontend:latest
     ports:

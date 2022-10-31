@@ -132,11 +132,9 @@ function populatePanelsFromArray(){
     }
   }
   createPlaceholderDivs(panelList);
-  console.log(panelList);
   localStorage.setItem('panelStateArray', JSON.stringify(colStateArray));
   for (var x=0;x<3;x++){
     for (var y=0;y<panelList[x].length;y++){
-      console.log("PPFA Debug " + x + " " + y);
       if (typeof panelList[x][y].length!=='undefined'){
         panelFunctionLookup(panelList[x][y][0].toString());
       }
@@ -371,12 +369,10 @@ function generatePanel(ident, data, targ, refresher, closure){
           // NB panel positions is an array which contains three arrays -- one per column
           //  with each element in the column array is an array: [panel_id, isCollapsed]
 
-          console.log('Populating User Interface 2');
           if (typeof localStorage.panelPositions!=='undefined') {
           var pp = JSON.parse(localStorage.panelPositions);
           var hasOverview = false;
           // Panel 0 is the overview
-          console.log("Reviewing open panels");
           for (var x=0;x<pp.length;x++) {
             hasOverview = hasOverview || pp[x].map(x => x[0]).includes("0");
           }
@@ -395,12 +391,8 @@ function generatePanel(ident, data, targ, refresher, closure){
     appendDebugLog("Content Populated Successfully");
     $('#pageContent').append(response2);
     $('#mainLayer').css('opacity','0');
-    console.log("Panels Debug 3");
     populatePanelsFromArray();
-    console.log("Panels Debug 4");
     switch_areas();
-    console.log("Panels Debug 5");
-    setTimeout(sessionRefresh,600000);
     console.log("Panels Debug 6");
             $( function() {
               $('#middleArea, #leftArea, #rightArea').sortable({
