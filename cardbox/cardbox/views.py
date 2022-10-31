@@ -32,6 +32,16 @@ dictConfig({
 
 @app.before_request
 def get_user():
+  public_key_url = 'http://keycloak:8080/auth/realms/Xerafin'
+  with urllib.request.urlopen(public_key_url) as r:
+    public_key = json.loads(r.read())['public_key']
+    public_key = f'''-----BEGIN PUBLIC KEY-----
+{public_key}
+-----END PUBLIC KEY-----'''
+  raw_token = request.headers["Authorization"]
+  auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
+  g.uuid = auth_token["sub"]
+  
   return None
 
 @app.route("/", methods=['GET', 'POST'])
@@ -40,11 +50,7 @@ def default():
 
 @app.route("/getCardboxScore", methods=['GET', 'POST'])
 def getCardboxScore():
-  pk = get_keycloak_public_key()
-  raw_token = request.headers["Authorization"]
-  auth_token = jwt.decode(raw_token, pk, audience="x-client", algorithms=['RS256'])
-  uuid = auth_token["sub"]
-  return jsonify({"userid": uuid})
+  return jsonify({"userid": g.uuid})
 #  try:
 #    userid = xu.getUseridFromCookies()
 #    result = { }
@@ -326,9 +332,4 @@ def getCardboxStats():
 # Library functions
 
 def get_keycloak_public_key():
-  with urllib.request.urlopen('http://keycloak:8080/auth/realms/Xerafin') as r:
-    public_key = json.loads(r.read())['public_key']
-    public_key = f'''-----BEGIN PUBLIC KEY-----
-{public_key}
------END PUBLIC KEY-----'''
   return public_key
