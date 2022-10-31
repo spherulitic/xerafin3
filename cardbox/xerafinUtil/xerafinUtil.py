@@ -7,11 +7,10 @@ import time
 from datetime import datetime
 from cardbox import app
 
-MYSQL_USER = "xerafin"
-MYSQL_DB = "xerafin"
-MYSQL_PWD = "x3r4f1N)"
-MYSQL_HOST = "172.17.0.1"
-#MYSQL_HOST = "localhost"
+MYSQL_USER = ""
+MYSQL_DB = ""
+MYSQL_PWD = ""
+MYSQL_HOST = "172.17.0.1" # Docker alias to localhost
 cardboxDBPath = "cardbox-data"
 
 def errorLog():
@@ -23,35 +22,6 @@ def errorLog():
 
 def debug(message):
   app.logger.info("{} {} {}\n".format(__name__, datetime.now().strftime("%Y %m %d %H:%M:%S"), message))
-
-def getTokenFromCookies():
-
-  if 'XSESSID' in request.cookies:
-    return request.cookies.get('XSESSID')
-  else:
-    return None
-
-def getUseridFromCookies():
-  sessionid = getTokenFromCookies()
-  if sessionid:
-    return str(getUseridFromToken(sessionid))
-  else:
-    return None
-
-def getUseridFromToken(token):
-
-  mysqlcon = getMysqlCon()
-  con = mysqlcon.cursor()
-  stmt = "select userid from login where token = %s"
-  con.execute(stmt, [token])
-  try:
-    userid = con.fetchone()[0]
-    return userid
-  except:
-    return None
-
-  con.close()
-  mysqlcon.close()
 
 def getDBFile(userid):
 
