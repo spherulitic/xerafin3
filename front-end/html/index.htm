@@ -6,7 +6,7 @@
   <title>Xerafin Word Study System</title>
   <link rel="icon" type="image/png" href="images/xerafin2.png">
   <link rel="apple-touch-icon" href="apple-icon-144x144.png">
-  <script src="vendor/keycloak/keycloak.js"></script>
+  <script src="http://localhost/auth/js/keycloak.js"></script>
   <script src="vendor/jQuery/jquery-3.3.1.min.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
   <script async src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui-touch-punch/0.2.3/jquery.ui.touch-punch.min.js"></script>
@@ -29,7 +29,7 @@
    function initKeycloak() {
     keycloak = new Keycloak();
     try {
-    keycloak.init({onLoad: 'login-required'}).then(async function(authenticated) {
+    keycloak.init({onLoad: 'login-required', scope: 'roles profile'}).then(async function(authenticated) {
       if (authenticated) {
         $('#adminNote').html('<hr>Login Successful');
         userid = -1; // legacy to suppress errors; not used anymore
@@ -37,6 +37,7 @@
         $.ajax({
           type: "POST",
           url: "getCardboxScore",
+          headers: {"Accept": "application/json", "Authorization": keycloak.token},
           success: function(response2, responseStatus2) {
             console.log("Got Cardbox Score");
             console.log(response2[0]);
