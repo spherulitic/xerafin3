@@ -41,7 +41,7 @@ def get_user():
   raw_token = request.headers["Authorization"]
   auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
   g.uuid = auth_token["sub"]
-  
+
   return None
 
 @app.route("/", methods=['GET', 'POST'])
@@ -50,19 +50,26 @@ def default():
 
 @app.route("/getCardboxScore", methods=['GET', 'POST'])
 def getCardboxScore():
-  return jsonify({"userid": g.uuid})
-#  try:
-#    userid = xu.getUseridFromCookies()
-#    result = { }
-#    error = {"status": "success"}
-#
-#    result["score"] = xerafinLib.getCardboxScore(userid)
-#
-#  except Exception as ex:
-#    xu.errorLog()
-#    error["status"] = "An error occurred. See log for details."
-#
-#  return jsonify([result, error])
+
+  try:
+    result = { }
+    error = {"status": "success"}
+
+    db_file = xu.getDBFile(g.uuid)
+    with lite.connect(db_file) as con:
+      cur = con.cursor()
+      cur.execute("select sum(cardbox) from questions where next_scheduled is not null")
+      score = cur.fetchone()[0]
+      if score is None:
+        result["score"] = 0
+      else:
+        result["score"] = score
+
+  except Exception as ex:
+    xu.errorLog()
+    error["status"] = "An error occurred. See log for details."
+
+  return jsonify([result, error])
 
 @app.route("/prepareNewWords", methods=['POST'])
 def prepareNewWords():

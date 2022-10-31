@@ -41,4 +41,5 @@ services:
       - cardbox-data:/app/cardbox-data
 volumes:
   cardbox-data:
+    external: true
   quizjson:
