@@ -1,9 +1,11 @@
 '''Xerafin cardbox module'''
 
-#from flask_oidc import OpenIDConnect
 from cardbox import app
-from flask import jsonify, request, Response
+from flask import jsonify, request, Response, g, session
+import urllib
+import json
 import requests
+import jwt
 #from multiprocessing.dummy import Pool
 from logging.config import dictConfig
 import sys
@@ -27,16 +29,28 @@ dictConfig({
     }
 })
 
+
+@app.before_request
+def get_user():
+  public_key_url = 'http://keycloak:8080/auth/realms/Xerafin'
+  with urllib.request.urlopen(public_key_url) as r:
+    public_key = json.loads(r.read())['public_key']
+    public_key = f'''-----BEGIN PUBLIC KEY-----
+{public_key}
+-----END PUBLIC KEY-----'''
+  raw_token = request.headers["Authorization"]
+  auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
+  g.uuid = auth_token["sub"]
+  
+  return None
+
 @app.route("/", methods=['GET', 'POST'])
 def default():
   return "Xerafin Cardbox Service"
 
 @app.route("/getCardboxScore", methods=['GET', 'POST'])
-#@oidc.accept_token(require_token=True)
 def getCardboxScore():
-
-  return jsonify("Hello")
-#  return jsonify(oidc_token_info)
+  return jsonify({"userid": g.uuid})
 #  try:
 #    userid = xu.getUseridFromCookies()
 #    result = { }
@@ -254,63 +268,65 @@ def getQuestions():
 
 @app.route("/getCardboxStats", methods=["GET", "POST"])
 def getCardboxStats():
-  try:
-    userid = xu.getUseridFromCookies()
-
-    params = request.get_json(force=True) # returns dict
-
-    due = params.get("due", False)
-    coverage = params.get("coverage", False)
-    overview = params.get("overview", False)
-    earliest = params.get("earliest", False)
-
-    result = { }
-    error = {"status": "success"}
-    now = int(time.time())
-    DAY = 3600 * 24 # length of a day in seconds
-
-    if earliest:
-      earliestDueDate = xerafinLib.getEarliestDueDate(userid)
-      result["earliestDueDate"] = earliestDueDate
-
-    if overview:
-      dueNow = xerafinLib.getCurrentDue(userid,True) # summarize=True to get total w/ no cardbox breakout
-      totalCards = xerafinLib.getTotal(userid)
-      result["totalCards"] = totalCards
-      result["totalDue"] = dueNow["total"]
-
-    if due:
-      dueNow = xerafinLib.getCurrentDue(userid)
-      overdue = xerafinLib.getDueInRange(userid, 0, now)
-      dueToday = xerafinLib.getDueInRange(userid, now, now+DAY)
-      dueThisWeek = xerafinLib.getDueInRange(userid, now, now+(DAY*7))
-      dueByCardbox = {"dueNow": dueNow, "overdue": overdue, "dueToday": dueToday,
-                      "dueThisWeek": dueThisWeek}
-      totalCards = xerafinLib.getTotalByCardbox(userid)
-      result["totalCards"] = totalCards
-      result["score"] = xerafinLib.getCardboxScore(userid)
-      result["queueLength"] = xerafinLib.getNextAddedCount(userid)
-      result["totalDue"] = sum(dueNow.values())
-      result["dueByCardbox"] = dueByCardbox
-
-    if coverage:
-      lexicon = xerafinLib.getLexicon(userid)
-      allLenFreq = { }
-      result["coverage"] = { }
-      totalCards = xerafinLib.getTotalByLength(userid)
-      with xu.getMysqlCon().cursor() as con:
-        command = ( "select length(alphagram), count(distinct alphagram) from "
-                  + lexicon + " group by length(alphagram) order by length(alphagram)" )
-        con.execute(command)
-        for row in con.fetchall():
-          allLenFreq[row[0]] = row[1]
-      for box in totalCards:
-        result["coverage"][box] = {"cardbox": totalCards[box], "total": allLenFreq[box]}
-        pct = (float(totalCards[box])/float(allLenFreq[box])) * 100.0
-        result["coverage"][box]["percent"] = format(pct, '.2f')
-
-  except Exception as ex:
-    xu.errorLog()
-    error["status"] = "An error occurred. See log for details."
-
-  return jsonify([result, error])
+  return jsonify({"Population": "Tire"})
+#  try:
+#    userid = xu.getUseridFromCookies()
+#
+#    params = request.get_json(force=True) # returns dict
+#
+#    due = params.get("due", False)
+#    coverage = params.get("coverage", False)
+#    overview = params.get("overview", False)
+#    earliest = params.get("earliest", False)
+#
+#    result = { }
+#    error = {"status": "success"}
+#    now = int(time.time())
+#    DAY = 3600 * 24 # length of a day in seconds
+#
+#    if earliest:
+#      earliestDueDate = xerafinLib.getEarliestDueDate(userid)
+#      result["earliestDueDate"] = earliestDueDate
+#
+#    if overview:
+#      dueNow = xerafinLib.getCurrentDue(userid,True) # summarize=True to get total w/ no cardbox breakout
+#      totalCards = xerafinLib.getTotal(userid)
+#      result["totalCards"] = totalCards
+#      result["totalDue"] = dueNow["total"]
+#
+#    if due:
+#      dueNow = xerafinLib.getCurrentDue(userid)
+#      overdue = xerafinLib.getDueInRange(userid, 0, now)
+#      dueToday = xerafinLib.getDueInRange(userid, now, now+DAY)
+#      dueThisWeek = xerafinLib.getDueInRange(userid, now, now+(DAY*7))
+#      dueByCardbox = {"dueNow": dueNow, "overdue": overdue, "dueToday": dueToday,
+#                      "dueThisWeek": dueThisWeek}
+#      totalCards = xerafinLib.getTotalByCardbox(userid)
+#      result["totalCards"] = totalCards
+#      result["score"] = xerafinLib.getCardboxScore(userid)
+#      result["queueLength"] = xerafinLib.getNextAddedCount(userid)
+#      result["totalDue"] = sum(dueNow.values())
+#      result["dueByCardbox"] = dueByCardbox
+#
+#    if coverage:
+#      lexicon = xerafinLib.getLexicon(userid)
+#      allLenFreq = { }
+#      result["coverage"] = { }
+#      totalCards = xerafinLib.getTotalByLength(userid)
+#      with xu.getMysqlCon().cursor() as con:
+#        command = ( "select length(alphagram), count(distinct alphagram) from "
+#                  + lexicon + " group by length(alphagram) order by length(alphagram)" )
+#        con.execute(command)
+#        for row in con.fetchall():
+#          allLenFreq[row[0]] = row[1]
+#      for box in totalCards:
+#        result["coverage"][box] = {"cardbox": totalCards[box], "total": allLenFreq[box]}
+#        pct = (float(totalCards[box])/float(allLenFreq[box])) * 100.0
+#        result["coverage"][box]["percent"] = format(pct, '.2f')
+#
+#  except Exception as ex:
+#    xu.errorLog()
+#    error["status"] = "An error occurred. See log for details."
+#
+#  return jsonify([result, error])
+# Library functions
