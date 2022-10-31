@@ -28,6 +28,8 @@ services:
     image: x-cardbox:latest
     volumes:
       - cardbox-data:/app/cardbox-data
+    depends_on:
+      - keycloak
   quiz:
     image: x-quiz:latest
     volumes:
@@ -39,4 +41,5 @@ services:
       - cardbox-data:/app/cardbox-data
 volumes:
   cardbox-data:
+    external: true
   quizjson:
