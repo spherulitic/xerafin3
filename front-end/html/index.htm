@@ -234,8 +234,8 @@ function appendDebugLog(input){
 
 
 <!-- Generates Navbar ------------------------------------------------------------------------------------------>
-    function generateNav(response, responseStatus){
-      if (responseStatus === 'success') {
+    function generateNav(response){
+      console.log("Generate Nav");
       $('html').css('overflow','hidden');
       $.ajax({
         type: "POST",
@@ -259,7 +259,6 @@ function appendDebugLog(input){
           appendDebugLog("<b>Something went wrong with the Navbar!</b>");
         }
       });
-      }
     }
 <!-- Generates Required Scripts---------------------------------------------------------------------------------->
 //    async function generateScripts(response, responseStatus) {
