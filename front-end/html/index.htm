@@ -234,7 +234,8 @@ function appendDebugLog(input){
 
 
 <!-- Generates Navbar ------------------------------------------------------------------------------------------>
-    function generateNav(r, r2){
+    function generateNav(response){
+      console.log("Generate Nav");
       $('html').css('overflow','hidden');
       $.ajax({
         type: "GET",
@@ -243,19 +244,17 @@ function appendDebugLog(input){
         success: function(response, responseStatus) {
           overlay.clear();
           $('#logProgress').html("Xerf's up!");
-          console.log("Navbar response");
-          console.log(response);
-//          appendDebugLog("Navbar Populated Successfully");
-//          window.scrollTo(0,0);
-//          $('#homeLayer').fadeTo(300,0.01,function(){
-//            $('#homeLayer').hide().remove();
-//            $('#mainNav').html(response);
-//            window.scrollTo(0,0);
-//            $('body').css({'margin-top':'60px'});
-//            $('#mainLayer').css('opacity','0').fadeTo(500,1,function(){
-//              $('html').css('overflow','auto');
-//            });
-//          });
+          appendDebugLog("Navbar Populated Successfully");
+          window.scrollTo(0,0);
+          $('#homeLayer').fadeTo(300,0.01,function(){
+            $('#homeLayer').hide().remove();
+            $('#mainNav').html(response);
+            window.scrollTo(0,0);
+            $('body').css({'margin-top':'60px'});
+            $('#mainLayer').css('opacity','0').fadeTo(500,1,function(){
+              $('html').css('overflow','auto');
+            });
+          });
         },
         error: function(jqXHR, textStatus, errorThrown) {
           appendDebugLog("<b>Something went wrong with the Navbar!</b>");

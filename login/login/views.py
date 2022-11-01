@@ -47,7 +47,58 @@ def index():
 
 @app.route("/getNavbar", methods=['GET'])
 def getNavbar():
-  return(g.auth_token)
+
+  contents = [
+    {'title': 'Basic Quiz', 'onClick': 'overview.setGoAction({context:"MY",value:0});overviewUI.update("MY_GO_SET_DEFAULT",0);overviewUI.update("SEARCH_GO_SET_DEFAULT",0);overview.go("MY");', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
+    {'title': 'Subword Sloth!', 'onClick': 'initSloth()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
+    {'title': 'Cardbox Invaders', 'onClick': 'initInvaders()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
+    {'title': 'Wall of Words', 'onClick': 'overview.setGoAction({context:"MY",value:1});overviewUI.update("MY_GO_SET_DEFAULT",1);overviewUI.update("SEARCH_GO_SET_DEFAULT",1);overview.go("MY");', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
+    {'title': 'Widgets', 'onClick': '', 'hasChildren': True, 'privLevel': 1, 'lastChild': False, 'new': False},
+#    {'title': 'Cardbox & Chill', 'onClick': 'initTogether()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': True},
+    {'title': 'Cardbox', 'onClick': 'showCardboxStats()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
+    {'title': 'Alphagram Info', 'onClick': 'showAlphaStats(toAlpha($.trim(prompt("Enter a word or alphagram to display"))))', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
+    {'title': 'Rankings', 'onClick': 'initLeaderboard()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
+    {'title': 'Debug', 'onClick': 'initDebug()', 'hasChildren': False, 'privLevel': 42, 'lastChild': False, 'new': True},
+    {'title': 'Game Stats', 'onClick': 'showGameStats()', 'hasChildren': False, 'privLevel': 1, 'lastChild': True, 'new': False},
+#    {'title': 'TSH feed', 'onClick': 'initTournamentStandings()', 'hasChildren': False, 'privLevel': 1, 'lastChild': True, 'new': True},
+    {'title': 'Settings', 'onClick': '', 'hasChildren': True, 'privLevel': 1, 'lastChild': False, 'new': False},
+    {'title': 'User Prefs', 'onClick': 'initUserPrefs()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
+    {'title': 'Manage Words to Add', 'onClick': '', 'hasChildren': False, 'privLevel': 60, 'lastChild': False, 'new': True},
+    {'title': 'Logout', 'onClick': 'logoutUser()', 'hasChildren': False, 'privLevel': 1, 'lastChild': True, 'new': False},
+    {'title': 'Admin', 'onClick': '', 'hasChildren': True, 'privLevel': 60, 'lastChild': False, 'new': False},
+    {'title': 'Manage', 'onClick': 'initManageUsers()', 'hasChildren': False, 'privLevel': 60, 'lastChild': False, 'new': True},
+    {'title': 'Manage Users', 'onClick': 'initOldManageUsers()', 'hasChildren': False, 'privLevel': 60, 'lastChild': True, 'new': False}
+  ]
+  result = '''<div class="container-fluid">
+    <nav class="navbar navbar-inverse navbar-fixed-top metalBThree" id="xeraNav">
+      <img class="navbar-brand noselect" src="images/xerafinNew.png" style="height:50px;padding:5px!important;background:transparent;vertical-align:middle;">
+      <div class="navbar-header" style="padding:0px!important;margin:0px!important;">
+      <button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#myNavbar">
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+          <span class="icon-bar"></span>
+        </button>
+      </div>
+      <div class="collapse navbar-collapse" id="myNavbar">
+        <ul class="nav navbar-nav " style="vertical-align:middle;" id="menuList">'''
+
+  nest=0
+  for value in contents:
+
+    values = navbarCreateElement(value, nest)
+    result = f'{result} {values[0]}'
+    nest = values[1]
+
+  kofiWidget = "<li style='margin-top:5px!important;'> <span id='kofiWidget'></span></li>"
+  result = f'''{result}
+        <script type='text/javascript'>
+          kofiwidget2.init('Support Xerafin', 'rgba(140,176,48,0.95)', 'V7V11H3Z1');
+          document.getElementById('kofiWidget').innerHTML = kofiwidget2.getHTML();
+          $('.kofi-button').addClass('metalBOne');
+        </script>'''
+  result = f'{result} {kofiWidget}'
+  result = f'{result} </ul></div></nav></div>'
+  return result
 
 @app.route("/login", methods=['GET', 'POST'])
 def web_login():
@@ -94,3 +145,24 @@ def web_login():
     result["status"] = "An error occurred. See log for more details"
 
   return jsonify(result)
+
+def navbarCreateElement(arr, nest):
+  # eventually privLevel will be replaced with mapping navbar items to keycloak roles
+  if arr['privLevel'] == 1:
+    if arr['hasChildren']:
+      line = f"<li class='dropdown'><a href='#' class='dropdown-toggle' data-toggle='dropdown'>{arr['title']}<b class='caret'></b></a>\n"
+      line = f"{line}<ul class='dropdown-menu'>\n"
+      nest += 1
+    else:
+      if arr['new']:
+        newtext = "<span style='color:red'>&nbsp;NEW!</span>"
+      else:
+        newtext = ""
+      line = f"<li><a href='#' onClick='{arr['onClick']}'>{arr['title']}{newtext}</a></li>\n"
+    if arr['lastChild'] and nest!=0:
+      line = f"{line}</ul>\n</li>\n"
+      nest = nest - 1
+  else:
+    line = ""
+
+  return line, nest

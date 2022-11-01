@@ -423,7 +423,7 @@ function generatePanel(ident, data, targ, refresher, closure){
               tolerance:'touch'});
             });
             $('#logProgress').html("Finalising user interface");
-//            generateNav(response2, responseStatus2);
+            generateNav(response2);
 
         },
         error: function(jqXHR, textStatus, errorThrown) {
