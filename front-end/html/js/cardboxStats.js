@@ -9,6 +9,7 @@ function showCardboxStats (value) {
   $.ajax({type: "POST",
     url: "getCardboxStats",
     data: JSON.stringify(d),
+    headers: {"Accept": "application/json", "Authorization": keycloak.token},
     beforeSend: function(){$("#heading_text_pan_4").html('Cardbox <img src="images/ajaxLoad.gif" style="height:0.8em">');},
     success:  function(response,responseStatus){
         $("#heading_text_pan_4").html("Cardbox");

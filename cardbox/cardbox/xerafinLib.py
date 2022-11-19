@@ -154,74 +154,6 @@ def getFromStudyOrder (numNeeded, userid, cur):
   setPrefs2("studyOrderIndex", userid, studyOrderIndex)
   return result
 
-def getCardboxScore (userid):
-  ''' Returns cardbox score
-  '''
-  with lite.connect(getDBFile(userid)) as con:
-    cur = con.cursor()
-    cur.execute("select sum(cardbox) from questions where next_scheduled is not null")
-    score = cur.fetchone()[0]
-    if score is None:
-      return "0"
-    return str(score)
-
-def getEarliestDueDate(userid):
-  ''' Returns the earliest date a cardbox question is due.
-      If this date is in the future, return cleared_until instead
-  '''
-  now = int(time.time())
-  with lite.connect(getDBFile(userid)) as con:
-    cur = con.cursor()
-    command = ("select min(next_scheduled) from questions " +
-      "where next_scheduled is not null and next_Scheduled > 0 and difficulty != 4")
-    cur.execute(command)
-    mns = cur.fetchone()[0]
-    if mns > now:
-      command = "select * from cleared_until"
-      cur.execute(command)
-      result = cur.fetchone()[0]
-    else:
-      result = mns
-  return result
-
-def getCurrentDue (userid, summarize=False):
-  '''
-  Returns a dict: {cardbox: numberDue, cardbox: numberDue, etc }
-  '''
-  now = int(time.time())
-  result = { }
-  with lite.connect(getDBFile(userid)) as con :
-    cur = con.cursor()
-# What's due excludes difficulty 4 so let's make that accurate
-    futureSweep(cur)
-    cur.execute("select * from cleared_until")
-    clearedUntil = max(cur.fetchone()[0], now)
-    if summarize:
-      cur.execute("select count(*) from questions where next_scheduled < {clearedUntil} " +
-        "and cardbox is not null and difficulty != 4")
-      result["total"] = cur.fetchone()[0]
-    else:
-      cur.execute("select cardbox, count(*) from questions " +
-        f"where next_scheduled < {clearedUntil} and cardbox is not null " +
-        "and difficulty != 4 group by cardbox")
-      for row in cur.fetchall():
-        result[row[0]] = row[1]
-  return result
-
-def getDueInRange(userid, start, end):
-  '''
-  Returns a dict: {cardbox: numberDue, cardbox: numberDue, etc }
-  start and end are integers - unix epoch time
-  '''
-  result = { }
-  with lite.connect(getDBFile(userid)) as con:
-    cur = con.cursor()
-    statement = ("select cardbox, count(*) from questions " +
-      "where next_scheduled between ? and ? and cardbox is not null group by cardbox")
-    cur.execute(statement, (start, end))
-    for row in cur.fetchall():
-      result[row[0]] = row[1]
-    return result
 
 def getDueByDay(userid, cardbox = None):
   '''
@@ -245,31 +177,6 @@ def getDueByDay(userid, cardbox = None):
       result[day] = due
   return result
 
-
-def getTotal(userid):
-  '''
-  Returns an integer, number of cards in all cardboxes
-  '''
-  with lite.connect(getDBFile(userid)) as con :
-    cur = con.cursor()
-    command = "select count(*) from questions where next_scheduled is not null"
-    cur.execute(command)
-    result = cur.fetchone()[0]
-  return result
-
-def getTotalByCardbox(userid):
-  '''
-  Returns a dict: {cardbox: numberDue, cardbox: numberDue, etc }
-  '''
-  result = { }
-  with lite.connect(getDBFile(userid)) as con :
-    cur = con.cursor()
-    command = ("select cardbox, count(*) from questions " +
-      "where next_scheduled is not null group by cardbox")
-    cur.execute(command)
-    for row in cur.fetchall():
-      result[row[0]] = row[1]
-  return result
 
 def getTotalByLength(userid):
 
@@ -530,20 +437,6 @@ def closetSweep (cur, userid) :
   cur.execute("update questions set difficulty = 2 " +
     f"where cardbox >= {closet} and difficulty != 1 and next_scheduled < {now}")
 
-def futureSweep(cur) :
-  """
-  Sets things to difficulty 4 which are in the future but are in a cardbox too low to be quizzed now
-  Only moves difficulty 0 and -1 -> 4
-  Note difficulty 2 and 4 are exclusive
-  """
-  now = int(time.time())
-  cur.execute("update questions set difficulty = 0 where difficulty in (4, 50)")
-  # Anything in cardbox 10 or higher we can see 30 days ahead of schedule
-  cur.execute("update questions set difficulty = 4 where cardbox >= 10 " +
-    "and next_scheduled > ?+(3600*24*30) and difficulty in (0, -1)", (now,))
-  # Anything in cardbox N; 1 <= N <= 9; we can see N days ahead of schedule
-  cur.execute("update questions set difficulty = 4 where cardbox < 10 " +
-    "and next_scheduled > ?+(cardbox*3600*24) and difficulty in (0, -1)", (now,))
 
 def makeWordsAvailable (userid, cur) :
   """
