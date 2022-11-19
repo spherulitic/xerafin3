@@ -38,6 +38,15 @@ services:
     image: x-login:latest
     volumes:
       - cardbox-data:/app/cardbox-data
+  lexicon:
+    image: x-lexicon:latest
+    environment:
+      MYSQL_USER: "xerafin"
+      MYSQL_DB: "xerafin"
+      MYSQL_PWD: "x3r4f1N)"
+      MYSQL_HOST: "172.17.0.1"
+    depends_on:
+      - keycloak
 volumes:
   cardbox-data:
     external: true
