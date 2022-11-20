@@ -47,6 +47,12 @@ services:
       MYSQL_HOST: "172.17.0.1"
     depends_on:
       - keycloak
+  lexicon-db:
+    image: lexicon-db:latest
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: admin
+      MONGO_INITDB_DATABASE: lexicon
 volumes:
   cardbox-data:
     external: true
