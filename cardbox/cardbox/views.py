@@ -49,7 +49,6 @@ def get_user():
 
 @app.after_request
 def close_sqlite(response):
-  g.con.commit()
   g.con.close()
   return response
 
