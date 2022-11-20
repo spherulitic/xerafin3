@@ -2,5 +2,5 @@
 front-end/html/images
 front-end/html/vendor
 front-end/localhost*
-docker-compose.yaml
 lexicon-db/*.js
+.env
