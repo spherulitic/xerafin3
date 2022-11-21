@@ -2,11 +2,8 @@ from login import app
 from flask import Flask, request, jsonify, Response, g
 from logging.config import dictConfig
 import urllib, json, jwt, requests
-import sys
 import datetime
 import time
-import os
-import MySQLdb as mysql
 import xerafinUtil.xerafinUtil as xu
 
 dictConfig({
@@ -54,11 +51,34 @@ def close_mysql(response):
 def index():
   return "Xerafin Login Service"
 
+@app.route("/getCountries", methods=['GET', 'POST'])
+def countries():
+  result = { }
+  result["status"] = "success"
+  try:
+    query = "SELECT countryid, name, short from countries"
+# I think this query was going to be used for country-level aggregation metrics
+#   unusedquery = """SELECT countrid, name, short, count(distinct countryId) as most from countries, user_prefs
+#                   WHERE countrid = countryId GROUP BY countryid ORDER BY most DESC, LIMIT 5"""
+    g.con.execute(query)
+    rows = g.con.fetchall()
+    rows = [{"id": r[0], "name": r[1], "short": r[2]} for r in rows]
+    result["byId"] = sorted(rows, key = lambda d: d["id"])
+    result["byName"] = sorted(rows, key = lambda d: d["name"])
+
+  except:
+    xu.errorLog()
+    result["status"] = "error"
+
+  return jsonify(result)
+
 @app.route("/getUserLexicons", methods=['GET', 'POST'])
 def getUserLexicons():
   result = { }
   result["status"] = "success"
   try:
+    # eventually when we have multiple language support, this will be a list of results
+    # for now we assume one
     query = f'select lexicon, version from user_lexicon_master where userid = "{g.uuid}"'
     g.con.execute(query)
     row = g.con.fetchone()
@@ -87,7 +107,7 @@ def getUserLexicons():
     xu.errorLog()
     result["status"] = "error"
 
-  return jsonify({"values": result, "default": {"lexicon": "CSW", "version": "21"}})
+  return jsonify({"values": [result], "default": {"lexicon": "CSW", "version": "21"}})
 
 @app.route("/getNavbar", methods=['GET'])
 def getNavbar():

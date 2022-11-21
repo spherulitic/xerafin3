@@ -33,7 +33,6 @@ SubscriptionList.prototype = {
     this.subItem[v]=document.createElement('div');
     $(this.subItem[v]).addClass('noselect subscribeButton');
     this.subs.has(Number(v)) ? $(this.subItem[v]).addClass('highlightRow') :$(this.subItem[v]).addClass('steelRowed');
-    //console.log("V: "+v+" Has: "+this.subs.has(v));
     $(this.subItem[v]).html(this.data.init[i][v]);
     this.addClickEvent(v);
     return this.subItem[v];
@@ -72,9 +71,7 @@ SubscriptionList.prototype = {
       headers: {"Accept": "application/json", "Authorization": keycloak.token},
       type: "POST",
       success: function(response,responseStatus){
-                                console.log("Got Subscription Data")
         self.data=response;
-                                console.log(self.data)
         xerafin.error.log.add('Subscriptions Data','comment');
         xerafin.error.log.add(self.data,'JSON');
         self.subs = new Set(self.data.subs);
@@ -96,7 +93,6 @@ SubscriptionList.prototype = {
     };
     xerafin.error.log.add('Updating Subscriptions','comment');
     xerafin.error.log.add(d,'JSON');
-    console.log(d);
     $.ajax({
       url:'subscribe.py',
       data: JSON.stringify(d),

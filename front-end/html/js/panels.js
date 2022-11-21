@@ -393,7 +393,6 @@ function generatePanel(ident, data, targ, refresher, closure){
     $('#mainLayer').css('opacity','0');
     populatePanelsFromArray();
     switch_areas();
-    console.log("Panels Debug 6");
             $( function() {
               $('#middleArea, #leftArea, #rightArea').sortable({
               connectWith:'#middleArea, #leftArea, #rightArea',
