@@ -447,14 +447,12 @@ XeraOverviewManager.prototype = {
     this.data.lexicon.initialized = false;
     let self=this;
     $.ajax({
-      url:'PHP/getUserLexicons.php',
+      url:'getUserLexicons',
       type: "POST",
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       success: function(response,responseStatus){
         if (typeof self.data.lexicon==='undefined'){self.data.lexicon={};}
-        let data = JSON.parse(response);
-        //xerafin.error.log.add('Lexicon DATA','comment');
-        //xerafin.error.log.add(data,'JSON');
-        //this is temporary until we have better object storage options in v2
+        let data = response;
         if (typeof data.default!=='undefined'){
           self.lexiconSetCurrent(data.default.lexicon.toUpperCase()+'-'+data.default.version);
           overviewUI.update('SET_LEX_VAL',data);
