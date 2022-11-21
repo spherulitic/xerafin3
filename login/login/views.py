@@ -37,13 +37,57 @@ def get_user():
   g.auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
   g.uuid = g.auth_token["sub"]
 
+  g.mysqlcon = xu.getMysqlCon()
+  g.con = g.mysqlcon.cursor()
 
   return None
+
+@app.after_request
+def close_mysql(response):
+  g.con.close()
+  g.mysqlcon.close()
+  return response
+
 
 
 @app.route("/", methods=['POST'])
 def index():
   return "Xerafin Login Service"
+
+@app.route("/getUserLexicons", methods=['GET', 'POST'])
+def getUserLexicons():
+  result = { }
+  result["status"] = "success"
+  try:
+    query = f'select lexicon, version from user_lexicon_master where userid = "{g.uuid}"'
+    g.con.execute(query)
+    row = g.con.fetchone()
+    if row is None:
+      userLex = 'CSW' # hard coded default; fix this someday
+      userVersion = '21'
+      query = f'''insert into user_lexicon_master (userid, lexicon, version)
+               values ("{g.uuid}", "{userLex}", "{userVersion}")'''
+      g.con.execute(query)
+    else:
+      userLex = row[0]
+      userVersion = row[1]
+
+    query = f'''SELECT name, country, replaced_by
+                FROM lexicon_info l
+               WHERE lexicon = "{userLex+userVersion}"'''
+    g.con.execute(query)
+    row = g.con.fetchone()
+    result["name"] = row[0]
+    result["country"] = row[1]
+    result["replaced_by"] = row[2]
+    result["lexicon"] = userLex
+    result["version"] = userVersion
+
+  except:
+    xu.errorLog()
+    result["status"] = "error"
+
+  return jsonify({"values": result, "default": {"lexicon": "CSW", "version": "21"}})
 
 @app.route("/getNavbar", methods=['GET'])
 def getNavbar():
@@ -110,19 +154,19 @@ def web_login():
 
   # get attributes from keycloak. If they don't exist, set defaults
   #
-  # studyOrderIndex	0
-  # closet		20
-  # newWordsAtOnce	4
-  # reschedHrs		24
-  # showNumSolutions	'Y' <-- currently ununsed I think
-  # cb0max		200
-  # schedVersion	0
-  # secLevel		1 <-- actual access level, replaced by roles?
-  # isTD		0 <-- also currently unused I think
-  # firstLogin		CURDATE <-- account creation time?
-  # countryId		0
-  # lexicon		'csw'
-  # lexiconVersion	21
+  # studyOrderIndex  0
+  # closet    20
+  # newWordsAtOnce  4
+  # reschedHrs    24
+  # showNumSolutions  'Y' <-- currently ununsed I think
+  # cb0max    200
+  # schedVersion  0
+  # secLevel    1 <-- actual access level, replaced by roles?
+  # isTD    0 <-- also currently unused I think
+  # firstLogin    CURDATE <-- account creation time?
+  # countryId    0
+  # lexicon    'csw'
+  # lexiconVersion  21
 
   # firstname, lastname, photo
 

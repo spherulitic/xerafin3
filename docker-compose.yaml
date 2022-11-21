@@ -42,8 +42,11 @@ services:
       - quizjson:/app/quizjson
   login:
     image: x-login:latest
-    volumes:
-      - cardbox-data:/app/cardbox-data
+    environment:
+      - MYSQL_USER
+      - MYSQL_DB
+      - MYSQL_PWD
+      - MYSQL_HOST
   lexicon:
     image: x-lexicon:latest
     environment:
