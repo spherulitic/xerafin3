@@ -6,6 +6,9 @@ function showCardboxStats (value) {
     case 1: d = {due:true};break;
     case 2: d = {coverage:true};break;
   }
+  // once the chat service is written, if there's long polling, this refresh
+  // might be better suited there.
+  keycloak.updateToken(30).then(function() {
   $.ajax({type: "POST",
     url: "getCardboxStats",
     data: JSON.stringify(d),
@@ -23,6 +26,7 @@ function showCardboxStats (value) {
     console.log("Error getting cardbox stats, status = " + textStatus + " error: " + errorThrown);
     }
   });
+  }).catch(function() { console.log('Failed to refresh token'); });
 }
 function refreshCardboxInfo() {
   if ($('#dueTab').hasClass('active')){showCardboxStats(1)}
