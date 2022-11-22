@@ -371,13 +371,14 @@ def getCurrentDue (summarize=False):
   g.cur.execute("select * from cleared_until")
   clearedUntil = max(g.cur.fetchone()[0], now)
   if summarize:
-    g.cur.execute("select count(*) from questions where next_scheduled < {clearedUntil} " +
-        "and cardbox is not null and difficulty != 4")
+    g.cur.execute(f"""SELECT COUNT(*) FROM questions
+                      WHERE next_scheduled < {clearedUntil}
+                      AND cardbox is not null AND difficulty != 4""")
     result["total"] = g.cur.fetchone()[0]
   else:
-    g.cur.execute("select cardbox, count(*) from questions " +
-      f"where next_scheduled < {clearedUntil} and cardbox is not null " +
-      "and difficulty != 4 group by cardbox")
+    g.cur.execute(f"""select cardbox, count(*) from questions
+                      where next_scheduled < {clearedUntil} and cardbox is not null
+                      and difficulty != 4 group by cardbox""")
     for row in g.cur.fetchall():
       result[row[0]] = row[1]
   return result
@@ -388,9 +389,10 @@ def getDueInRange(start, end):
   start and end are integers - unix epoch time
   '''
   result = { }
-  statement = ("select cardbox, count(*) from questions " +
-    "where next_scheduled between ? and ? and cardbox is not null group by cardbox")
-  g.cur.execute(statement, (start, end))
+  statement = f"""select cardbox, count(*) from questions
+                 where next_scheduled between {start} and {end} and cardbox is not null
+                 group by cardbox"""
+  g.cur.execute(statement)
   for row in g.cur.fetchall():
     result[row[0]] = row[1]
   return result
@@ -409,8 +411,8 @@ def getTotalByCardbox():
   Returns a dict: {cardbox: numberDue, cardbox: numberDue, etc }
   '''
   result = { }
-  command = ("select cardbox, count(*) from questions " +
-    "where next_scheduled is not null group by cardbox")
+  command = """select cardbox, count(*) from questions
+               where next_scheduled is not null group by cardbox"""
   g.cur.execute(command)
   for row in g.cur.fetchall():
     result[row[0]] = row[1]
@@ -428,8 +430,8 @@ def getTotalByLength():
         describing total words in cardbox broken out by length
   '''
   result = { }
-  command = ("select length(question), count(*) from questions " +
-    "where next_scheduled is not null group by length(question)")
+  command = """select length(question), count(*) from questions
+               where next_scheduled is not null group by length(question)"""
   g.cur.execute(command)
   for row in g.cur.fetchall():
     result[row[0]] = row[1]
