@@ -21,8 +21,13 @@ services:
       - quiz
   stats:
     image: x-stats:latest
-    volumes:
-      - cardbox-data:/app/cardbox-data
+    environment:
+      - MYSQL_USER
+      - MYSQL_DB
+      - MYSQL_PWD
+      - MYSQL_HOST
+    depends_on:
+      - keycloak
   cardbox:
     image: x-cardbox:latest
     volumes:
