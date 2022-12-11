@@ -1,2 +1,5 @@
 Flask>=2.0.2
+pyjwt[crypto]
 mysqlclient==2.1.0
+requests>=2.25.1
+pre-commit

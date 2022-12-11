@@ -6,7 +6,6 @@ import urllib
 import json
 import requests
 import jwt
-#from multiprocessing.dummy import Pool
 from logging.config import dictConfig
 import sys
 import time
