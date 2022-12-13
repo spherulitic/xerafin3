@@ -1,9 +1,9 @@
-from stats import app
-from flask import request, jsonify, Response, g, session
 import json, urllib, requests, jwt
+from flask import request, jsonify, g
+from stats import app
 from logging.config import dictConfig
-from dateutil.relativedelta import *
-import calendar
+from dateutil.relativedelta import relativedelta, MO
+from math import ceil
 import sys
 import datetime
 import xerafinUtil.xerafinUtil as xs
@@ -107,7 +107,8 @@ def getAllTimeStats():
   error = { }
 
   try:
-    command = "select ifnull(sum(questionsAnswered), 0), ifnull(count(distinct userid), 0) from leaderboard"
+    command = """select ifnull(sum(questionsAnswered), 0), ifnull(count(distinct userid), 0)
+               from leaderboard"""
     g.con.execute(command)
     row = g.con.fetchone()
     if row:
@@ -134,7 +135,7 @@ class Metaranks(object):
     self.period = data.get("period", "daily")
     if self.period not in PERIODS:
       self.period = "daily"
-    self.countUsers();
+    self.countUsers()
     self.findUser()
     self.getRankingBounds()
 
@@ -150,7 +151,7 @@ class Metaranks(object):
     # note -- the PHP was returning an assoc array with column names mapped to values
     # to do this in Python you need to use cursor.description
     # result is returning cursor.fetchall() which only contains the values
-    result = self.runQuery();
+    result = self.runQuery()
     for row in result:
       self.userCount = row[0]
 
@@ -171,6 +172,22 @@ class Metaranks(object):
 #  private $userRank;
 #  private $offset;
 #  private $rankData = [];
+
+  def getDateFormatForQuery(self):
+    dateFormat = "1"
+    if self.period == "weekly":
+      dateFormat = f"{self.getTimeConditionsQuery()[1:]}=DATE_FORMAT(NOW(),'%Y%u')"
+    elif self.period == "monthly":
+      pass
+    elif self.period == "yearly":
+      pass
+    elif self.period in DAYS + ["daily"]:
+      pass
+    elif self.period in MONTHS:
+      pass
+    return dateFormat
+    # PHP's substr("string", 1) returns "tring"
+
 #  private function getDateFormatForQuery(){
 #    $x = "1";
 #    switch ($this->period){
@@ -211,18 +228,18 @@ class Metaranks(object):
     elif self.period in ["monthly","yearly","january","february","march","april",
                          "may","june","july","august","september","october",
                          "november","december"]:
-      x = ", MIN(dateStamp) AS date";
+      x = ", MIN(dateStamp) AS date"
     else:
       x = ""
-    return x;
+    return x
 
 
   def setDay(self):
-   try:
-     x = DAYS.index(self.period)
-   except ValueError:
-     return ""
-   return f"WEEKDAY(dateStamp)={x}"
+    try:
+      x = DAYS.index(self.period)
+    except ValueError:
+      return ""
+    return f"WEEKDAY(dateStamp)={x}"
 
   def setMonth(self):
     try:
@@ -248,14 +265,13 @@ class Metaranks(object):
     result = self.runQuery()
     self.userRank = -1
     myrank = 0
-    date = datetime.today().strftime('%Y-%m-%d')
     # TO DO: change this to use a dict cursor or better yet, ORM
     # columns in result set: [userid, questionsAnswered, date, name, firstname, lastname]
     for row in result:
       myrank += 1
       if g.uuid == row[0]:
         if not found:
-          found == True
+          found = True
           self.userRank = myrank
         if findCurrent:
           if self.compareDateWithCurrent(row[2]):
@@ -268,19 +284,17 @@ class Metaranks(object):
   def checkWhere(self):
     if self.period not in ["daily","weekly","monthly","yearly"]:
       return " WHERE "
-    else:
-      return ""
+    return ""
 
   def checkAnd(self):
     if self.period not in ["daily","weekly","monthly","yearly"]:
       return " AND "
-    else:
-      return ""
+    return ""
 
   def compareDateWithCurrent(self, d):
-    date_in = datetime.strptime(d, '%Y-%m-%d')
-    now = datetime.now()
-    if this.period in DAYS:
+    date_in = datetime.date.strptime(d, '%Y-%m-%d')
+    now = datetime.date.now()
+    if self.period in DAYS:
       # if the date isn't a Monday, grab the previous Monday at 12 pm
       delta = relativedelta(weekday=MO(-1), hour=12, minute=0, second=0, microsecond=0)
       if date_in.weekday() != 1:
@@ -292,16 +306,15 @@ class Metaranks(object):
       else:
         last_monday = now
       return (x.date() == last_monday.date()) and (date_in.weekday() == now.weekday())
-    elif this.period in MONTHS + ["monthly"]:
+    elif self.period in MONTHS + ["monthly"]:
       return now.month == date_in.month and now.year == date_in.year
-    elif this.period == "daily":
+    elif self.period == "daily":
       return now.date() == date_in.date()
-    elif this.period == "weekly":
+    elif self.period == "weekly":
       return now.isocalendar().week == date_in.isocalendar.week() and now.year == date_in.year
-    elif this.period == "yearly":
+    elif self.period == "yearly":
       return now.year == date_in.year
-    else:
-      return False
+    return False
 
 #  private function formatDate($d){
 #    $t = strtotime($d);
