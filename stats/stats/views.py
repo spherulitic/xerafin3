@@ -136,9 +136,9 @@ class Metaranks(object):
       self.period = "daily"
     self.countUsers();
     self.findUser()
+    self.getRankingBounds()
 
    ### RESTART HERE ###
-#    $this->getRankingBounds();
 #    $this->getRankingsData();
 
   def countUsers(self):
@@ -326,32 +326,29 @@ class Metaranks(object):
 #    }
 #    return $n;
 #  }
-#  private function getRankingBounds(){
-#    if ($this->displayType == 3){
-#      $bound = $this->pageSize;
-#      if ($bound % 2 == 0) {$this->pageSize++;}
-#      if ($bound % 2 !== 0) {$bound--;}
-#      $bounds = $bound/2;
-#      if ($this->currentRank!==-1){
-#        $index = $this->currentRank;
-#      }
-#      else {$index = $this->userRank;}
-#      $this->offset = $index - $bounds -1;
-#      if ($this->offset < 0) {$this->offset = 0;}
-#      if ($index + $bounds > $this -> userCount) {
-#        $this->offset = $this->userCount - $this->pageSize;
-#      }
-#      if ($this->offset < 0) {$this->offset = 0;}
-#      $this->pagetotal = 1;
-#      $this->page = 1;
-#    }
-#    else {
-#      $this->pageTotal = ceil($this->userCount / $this->pageSize);
-#      if ($this->pageTotal===0){$this->pageTotal=1;}
-#      $this->page = min($this->pageNumber-1,$this->pageTotal);
-#      $this -> offset = $this->pageSize*($this->page);
-#    }
-#  }
+  def getRankingBounds(self):
+    if self.displayType == 3:
+      bound = self.pageSize
+      if bound % 2 == 0:
+        self.pageSize += 1
+      else:
+        bound = bound - 1
+      bounds = int(bound / 2)
+      if self.currentRank != -1:
+        index = self.currentRank
+      else:
+        index = self.userRank
+      self.offset = max(index - bounds - 1, 0)
+      if index + bounds > self.userCount:
+        self.offset = max(self.userCount - self.pageSize, 0)
+      self.pageTotal = 1
+      self.page = 1
+    else:
+      self.pageTotal = ceil(self.userCount / self.pageSize)
+      if self.pageTotal == 0:
+        self.pageTotal = 1
+      self.page = min(self.pageNumber-1,self.pageTotal)
+      self.offset = self.pageSize * self.page
 #
 #  private function getRankingsData(){
 #    $queryStart = "SELECT name, photo, countryId, SUM(questionsAnswered) AS total".$this->setDateType().", userid, firstname, lastname FROM leaderboard
