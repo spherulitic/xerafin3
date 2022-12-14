@@ -62,7 +62,8 @@ def default():
 
 @app.route("/getRankings", methods=['GET', 'POST'])
 def getRankings():
-  return jsonify(["Dummy response"])
+  # for now until all the classes are implemented
+  rank = None
   try:
     data = request.get_json(force=True)
 
@@ -78,8 +79,7 @@ def getRankings():
 
     if data.get("view", "QA") == "QA":
       if data.get("displayType", 0) in (2, 3):
-  #      rank = new Metaranks(data)
-        pass
+        rank = Metaranks(data)
       else:
   #      rank = new Rankings(data)
         pass
@@ -95,9 +95,9 @@ def getRankings():
 
   except:
     xs.errorLog()
-    error["status"] = "An error occurred. See log for more details"
 
-#  return jsonify(rank.get_data())
+  if rank:
+    return jsonify(rank.getRankings())
   return jsonify(["Dummy response"])
 
 @app.route("/getAllTimeStats", methods=['GET', 'POST'])
@@ -125,7 +125,7 @@ def getAllTimeStats():
   response = jsonify(result)
   return response
 
-class Metaranks(object):
+class Metaranks():
   def __init__(self, data):
     # default to the MySQL function curdate()
     self.curdate = data.get("curDate", "curdate()")
@@ -135,12 +135,12 @@ class Metaranks(object):
     self.period = data.get("period", "daily")
     if self.period not in PERIODS:
       self.period = "daily"
+    self.currentRank = -1
+#  private $rankData = [];
     self.countUsers()
     self.findUser()
     self.getRankingBounds()
-
-   ### RESTART HERE ###
-#    $this->getRankingsData();
+    self.getRankingsData()
 
   def countUsers(self):
     self.query = f"""SELECT COUNT(userid) FROM (
@@ -155,51 +155,17 @@ class Metaranks(object):
     for row in result:
       self.userCount = row[0]
 
-
-#<?php
-#include_once (__DIR__ ."/../PHP/config.php");
-#class Metaranks {
-#  private $curDate;
-#  private $currentRank = -1;
-#  private $userid;
-#  private $pageSize;
-#  private $pageNumber;
-#  private $pageTotal;
-#  private $page;
-#  private $displayType;
-#  private $query;
-#  private $userCount;
-#  private $userRank;
-#  private $offset;
-#  private $rankData = [];
-
   def getDateFormatForQuery(self):
     dateFormat = "1"
     if self.period == "weekly":
       dateFormat = f"{self.getTimeConditionsQuery()[1:]}=DATE_FORMAT(NOW(),'%Y%u')"
-    elif self.period == "monthly":
-      pass
+    elif self.period == MONTHS + ["monthly"]:
+      dateFormat = f"{self.getTimeConditionsQuery()[1:]}=DATE_FORMAT(NOW(),'%Y%m')"
     elif self.period == "yearly":
-      pass
+      dateFormat = f"{self.getTimeConditionsQuery()[1:]}=DATE_FORMAT(NOW(), '%Y')"
     elif self.period in DAYS + ["daily"]:
-      pass
-    elif self.period in MONTHS:
-      pass
+      dateFormat = "dateStamp=CURDATE()"
     return dateFormat
-    # PHP's substr("string", 1) returns "tring"
-
-#  private function getDateFormatForQuery(){
-#    $x = "1";
-#    switch ($this->period){
-#      case "weekly": $x=substr($this->getTimeConditionsQuery(),1)."="."DATE_FORMAT(NOW(),'%Y%u')";break;
-#      case "monthly": $x=substr($this->getTimeConditionsQuery(),1)."="."DATE_FORMAT(NOW(),'%Y%m')";break;
-#      case "yearly": $x=substr($this->getTimeConditionsQuery(),1)."="."DATE_FORMAT(NOW(),'%Y')";break;
-#      case "daily": case "monday":case "tuesday":case "wednesday":case "thursday":case "friday":case "saturday":case "sunday":$x="dateStamp=CURDATE()";break;
-#      case "january":case "february":case "march":case "april":case "may":case "june":case "july":case "august":case "september":case "october":case "november":case "december":$x=substr($this->getTimeConditionsQuery(),1)."="."DATE_FORMAT(NOW(),'%Y%m')";break;
-#      default: break;
-#    }
-#    return $x;
-#  }
 
   def getTimeConditionsQuery(self):
     x = ""
@@ -316,29 +282,22 @@ class Metaranks(object):
       return now.year == date_in.year
     return False
 
-#  private function formatDate($d){
-#    $t = strtotime($d);
-#    if (in_array($this->period,array("daily","monday","tuesday","wednesday","thursday","friday","saturday","sunday"))){
-#      $n = date("d M Y", $t);
-#    }
-#    elseif (in_array($this->period,array("yearly","january","february","march","april","may","june","july","august","september","october","november","december"))){
-#      $n = date("Y", $t);
-#    }
-#    elseif (in_array($this->period,array("monthly"))){
-#      $n = date("M Y", $t);
-#    }
-#    elseif (in_array($this->period,array("weekly"))){
-#      if (date("D", $t)!=="Sun"){
-#        $x = strtotime("next sunday, 12pm", $t);
-#        $n = date("d M Y", $x);
-#      }
-#      else {$n = date("d M Y ", $t);}
-#    }
-#    else {
-#      $n = $d;
-#    }
-#    return $n;
-#  }
+  def formatDate(self, p_date):
+    dateIn = datetime.date.strptime(p_date, '%Y-%m-%d')
+    if self.period in ["daily"] + DAYS:
+      formattedDate = dateIn.strftime("%d %b %Y")
+    elif self.period in ["yearly"] + MONTHS:
+      formattedDate = dateIn.strftime("%Y")
+    elif self.period == "monthly":
+      formattedDate = dateIn.strftime("%b %Y")
+    elif self.period == "weekly":
+      if dateIn.weekday() == 0:
+        dateIn = dateIn + datetime.timedelta(weeks=1)
+      formattedDate = dateIn.strftime("%d %b %Y")
+    else:
+      formattedDate = p_date
+    return formattedDate
+
   def getRankingBounds(self):
     if self.displayType == 3:
       bound = self.pageSize
@@ -362,100 +321,103 @@ class Metaranks(object):
         self.pageTotal = 1
       self.page = min(self.pageNumber-1,self.pageTotal)
       self.offset = self.pageSize * self.page
-#
-#  private function getRankingsData(){
-#    $queryStart = "SELECT name, photo, countryId, SUM(questionsAnswered) AS total".$this->setDateType().", userid, firstname, lastname FROM leaderboard
-#    JOIN login USING (userid)
-#    JOIN user_prefs USING (userid)";
-#    $this->query = $queryStart.$this->checkWhere().$this->setDay().$this->setMonth()."
-#    GROUP BY userid, name".$this->getTimeConditionsQuery().", photo, firstname, lastname, countryId
-#    ORDER BY total DESC, date ASC, firstname ASC, lastname ASC
-#    LIMIT ".$this->offset.",".$this->pageSize;
-#  //  echo $this->query;
-#    $res = $this->runQuery();
-#    $rank = $this->offset;
-#    $this->rankData = [];
-#    $foundMe = false;
-#    $foundCurrent = false;
-#    while ($row = $res->fetch_assoc()){
-#      $rank++;
-#      if ($row['userid'] == $this->userid) {
-#        $row['isMe']=true;
-#        if ($rank === $this->userRank){
-#          $foundMe = true;
-#        }
-#        if (($rank === $this->currentRank)  && ($this->currentRank!==-1)){
-#          $foundCurrent = true;
-#          $row['isCurrent'] = true;
-#        }
-#      }
-#      $row['rank']=$rank;
-#      $this->rankData[] = $row;
-#
-#    }
-#    if (($foundMe==false) && ($this->userRank!==-1)){
-#      $this->query = $queryStart." WHERE "." userid=".$this->userid.$this->checkAnd().$this->setDay().$this->setMonth()."
-#      GROUP BY userid, name".$this->getTimeConditionsQuery().", photo, firstname, lastname, countryId
-#      ORDER BY total DESC, date ASC, firstname ASC, lastname ASC
-#      LIMIT 1";
-#      $res = $this->runQuery();
-#      while ($row = $res->fetch_assoc()){
-#        if ($row['userid'] == $this->userid){
-#          $row['isMe']=true;
-#          if (($this->userRank === $this->currentRank)  && ($this->currentRank!==-1)){
-#            $foundCurrent = true;
-#            $row['isCurrent'] = true;
-#          }
-#          if ($this->userRank!==-1){$row['rank']=$this->userRank;}
-#          if ($row['rank'] < $this->rankData[0]['rank']){array_unshift($this->rankData, $row);}
-#          elseif (($foundCurrent===true) && ($row['rank'] < $this->rankData[1]['rank'])) {
-#            array_splice($this->rankData, 1, 0, array($row));
-#          }
-#          else {$this->rankData[] = $row;}
-#        }
-#      }
-#    }
-#    if (($foundCurrent==false) && ($this->currentRank!==-1)  && ($this->userRank!==-1)){
-#      $this->query = $queryStart." WHERE "." userid=".$this->userid.$this->checkAnd().$this->setDay().$this->setMonth()."
-#      AND ".$this->getDateFormatForQuery()."
-#      GROUP BY userid, name".$this->getTimeConditionsQuery().", photo, firstname, lastname, countryId
-#      ORDER BY total DESC, date ASC, firstname ASC, lastname ASC
-#      LIMIT 1";
-#      $res = $this->runQuery();
-#      while ($row = $res->fetch_assoc()){
-#        if ($row['userid'] == $this->userid){
-#          $row['isMe']=true;
-#          $row['isCurrent']=true;
-#          $row['rank']=$this->currentRank;
-#          if ($row['rank'] < $this->rankData[0]['rank']){array_unshift($this->rankData, $row);}
-#          elseif (($row['rank'] < $this->rankData[1]['rank']) && ($foundCurrent === false)) {
-#            array_splice($this->rankData, 1, 0, array($row));
-#          }
-#          else {$this->rankData[] = $row;}
-#        }
-#      }
-#    }
-#  }
-#  public function getRankingsJSON(){
-#    $b = [];
-#    foreach ($this->rankData as $row) {
-#      if (strlen($row['firstname'])==0){$d=$row['name'];}
-#      else {$d=$row['firstname']." ".$row['lastname'];}
-#      $c = array(
-#        'users'=> array(
-#          0 => array(
-#            'photo'=>$row['photo'], 'name'=>$d, 'answered'=> $row['total']
-#          )
-#        ),
-#        'rank'=> $row['rank'], 'countryId'=> $row['countryId'], 'date'=> $this->formatDate($row['date'])
-#      );
-#      if (isset($row['isMe'])){$c['isMe'] = $row['isMe'];}
-#      if (isset($row['isCurrent'])){$c['isCurrent'] = $row['isCurrent'];}
-#      $b[]= $c;
-#    }
-#    $a=array('rankings'=> $b, 'myRank'=> $this->userRank, 'myCurrent'=> $this->currentRank, 'period'=> $this->period, 'users' => $this->userCount, 'page' => $this->page+1);
-#    echo json_encode($a,true);
-#  }
-#
-#}
-#?>
+
+  def getRankingsData(self):
+    queryStart = f"""SELECT name, photo, countryId,
+               SUM(questionsAnswered) AS total{self.setDateType()},
+               userid, firstname, lastname
+               FROM leaderboard
+               JOIN login USING (userid)
+               JOIN user_prefs USING (userid) """
+    self.query = f"""{queryStart}{self.checkWhere()}{self.setDay()}{self.setMonth()}
+               GROUP BY userid, name{self.getTimeConditionsQuery()}, photo,
+               firstname, lastname, countryId
+               ORDER BY total DESC, date ASC, firstname ASC, lastname ASC
+               LIMIT {self.offset},{self.pageSize} """
+    result = self.runQuery()
+    rank = self.offset
+    self.rankData = [ ]
+    foundMe = False
+    foundCurrent = False
+    for row in result:
+      rank += 1
+      rowDict = { "name": row[0], "photo": row[1], "countryId": row[2],
+                  "total": row[3], "date": row[4], "userid": row[5],
+                  "firstname": row[6], "lastname": row[7] }
+      if rowDict["userid"] == g.uuid:
+        rowDict["isMe"] = True
+        if rank == self.userRank:
+          foundMe = True
+        if rank == self.currentRank and self.currentRank != -1:
+          foundCurrent = True
+          rowDict["isCurrent"] = True
+      rowDict["rank"] = rank
+      self.rankData.append(rowDict)
+    if not foundMe and self.userRank != -1:
+      self.query = f"""{queryStart} WHERE userid={g.uuid}
+                 {self.checkAnd()}{self.setDay()}{self.setMonth()}
+              GROUP BY userid, name{self.getTimeConditionsQuery()}, photo,
+               firstname, lastname, countryId
+              ORDER BY total DESC, date ASC, firstname ASC, lastname ASC
+              LIMIT 1"""
+      result = self.runQuery()
+      for row in result:
+        rowDict = { "name": row[0], "photo": row[1], "countryId": row[2],
+                    "total": row[3], "date": row[4], "userid": row[5],
+                    "firstname": row[6], "lastname": row[7] }
+        if rowDict["userid"] == g.uuid:
+          rowDict["isMe"] = True
+          if self.userRank == self.currentRank and self.currentRank != -1:
+            foundCurrent = True
+            rowDict["isCurrent"] = True
+          if self.userRank != -1:
+            rowDict["rank"] = self.userRank
+          if rowDict["rank"] < self.rankData[0]["rank"]:
+            self.rankData.insert(0, rowDict)
+          elif foundCurrent and rowDict["rank"] < self.rankData[1]["rank"]:
+            self.rankData.insert(1, rowDict)
+          else:
+            self.rankData.append(rowDict)
+    if not foundCurrent and self.currentRank != -1 and self.userRank != -1:
+      self.query = f"""{queryStart} WHERE userid={g.uuid}{self.checkAnd()}
+                       {self.setDay()}{self.setMonth()} AND {self.getDateFormatForQuery()}
+                GROUP BY userid, name{self.getTimeConditionsQuery()}, photo
+                         firstname, lastname, countryId
+                ORDER BY total DESC, date ASC, firstname ASC, lastname ASC
+                LIMIT 1 """
+      result = self.runQuery()
+      for row in result:
+        rowDict = { "name": row[0], "photo": row[1], "countryId": row[2],
+                    "total": row[3], "date": row[4], "userid": row[5],
+                    "firstname": row[6], "lastname": row[7] }
+        if rowDict["userid"] == g.uuid:
+          rowDict["isMe"] = True
+          rowDict["isCurrent"] = True
+          rowDict["rank"] = self.currentRank
+          if rowDict["rank"] < self.rankData[0]["rank"]:
+            self.rankData.insert(0, rowDict)
+          elif rowDict["rank"] < self.rankData[1]["rank"] and not foundCurrent:
+            self.rankData.insert(1, rowDict)
+          else:
+            self.rankData.append(rowDict)
+
+  def getRankings(self):
+    rankingsList = [ ]
+    for row in self.rankData:
+      if len(row["firstname"]) == 0:
+        name = row["name"]
+      else:
+        name = f"{row['firstname']} {row['lastname']}"
+      userData = { }
+      userData["users"] = [ {'photo': row["photo"], 'name': name, 'answered': row["total"]} ]
+      userData["rank"] = row['rank']
+      userData["countryId"] = row['countryId']
+      userData["date"] = self.formatDate(row["date"])
+      if 'isMe' in row:
+        userData["isMe"] = row["isMe"]
+      if 'isCurrent' in row:
+        userData["isCurrent"] = row["isCurrent"]
+      rankingsList.append(userData)
+    result = { "rankings": userData, "myRank": self.userRank, "myCurrent": self.currentRank,
+               "period": self.period, "users": self.userCount, "page": self.page+1}
+    return result
