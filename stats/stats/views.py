@@ -132,7 +132,7 @@ class Metaranks():
     self.displayType = int(data.get("displayType", 2))
     self.pageSize = max(min(int(data.get("pageSize", 10)),50),2)
     self.pageNumber = max(int(data.get("pageNumber", 1)),1)
-    self.period = data.get("period", "daily")
+    self.period = data.get("timeframe", "daily")
     if self.period not in PERIODS:
       self.period = "daily"
     self.currentRank = -1
@@ -403,6 +403,7 @@ class Metaranks():
 
   def getRankings(self):
     rankingsList = [ ]
+    userData = { }
     for row in self.rankData:
       if len(row["firstname"]) == 0:
         name = row["name"]
