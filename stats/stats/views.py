@@ -3,13 +3,12 @@ from flask import request, jsonify, g
 from stats import app
 from logging.config import dictConfig
 from dateutil.relativedelta import relativedelta, MO
+from datetime import *
 from math import ceil
 import sys
-import datetime
 import xerafinUtil.xerafinUtil as xs
 #from .rankings import Rankings
 #from .slothRankings import SlothRankings
-#from .awards import Awards
 
 DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
 MONTHS = ["january","february","march","april","may","june","july",
@@ -136,7 +135,6 @@ class Metaranks():
     if self.period not in PERIODS:
       self.period = "daily"
     self.currentRank = -1
-#  private $rankData = [];
     self.countUsers()
     self.findUser()
     self.getRankingBounds()
@@ -168,51 +166,50 @@ class Metaranks():
     return dateFormat
 
   def getTimeConditionsQuery(self):
-    x = ""
-    y = "DATE_FORMAT(dateStamp,"
-    if self.period == "daily":
-      x = ", dateStamp"
+    fragment = "DATE_FORMAT(dateStamp,"
+    if self.period in ["daily"] + DAYS:
+      result = ", dateStamp"
     elif self.period == "weekly":
-      x = f", {y}'%Y%u')"
+      result = f", {fragment}'%Y%u')"
     elif self.period == "monthly":
-      x = f", {y}'%Y%m')"
+      result = f", {fragment}'%Y%m')"
     elif self.period == "yearly":
-      x = f", {y}'%Y')"
-    elif self.period in DAYS:
-      x = ",dateStamp"
+      result = f", {fragment}'%Y')"
     elif self.period in MONTHS:
-      x = f", {y}'%Y%m')"
+      result = f", {fragment}'%Y%m')"
+    else:
+      result = ""
 
-    return x
+    return result
 
   def setDateType(self):
     if self.period in ["daily","monday","tuesday","wednesday","thursday",
                        "friday","saturday","sunday"]:
-      x = ", dateStamp AS date"
+      result = ", dateStamp AS date"
     elif self.period in ["weekly"]:
-      x = ", MIN(dateStamp) AS date"
+      result = ", MIN(dateStamp) AS date"
     elif self.period in ["monthly","yearly","january","february","march","april",
                          "may","june","july","august","september","october",
                          "november","december"]:
-      x = ", MIN(dateStamp) AS date"
+      result = ", MIN(dateStamp) AS date"
     else:
-      x = ""
-    return x
+      result = ""
+    return result
 
 
   def setDay(self):
     try:
-      x = DAYS.index(self.period)
+      dayOfWeek = DAYS.index(self.period)
     except ValueError:
       return ""
-    return f"WEEKDAY(dateStamp)={x}"
+    return f"WEEKDAY(dateStamp)={dayOfWeek}"
 
   def setMonth(self):
     try:
-      x = MONTHS.index(self.period)+1
+      month = MONTHS.index(self.period)+1
     except ValueError:
       return ""
-    return f"MONTH(dateStamp)={x}"
+    return f"MONTH(dateStamp)={month}"
 
   def runQuery(self):
     g.con.execute(self.query)
@@ -258,8 +255,8 @@ class Metaranks():
     return ""
 
   def compareDateWithCurrent(self, d):
-    date_in = datetime.date.strptime(d, '%Y-%m-%d')
-    now = datetime.date.now()
+    date_in = datetime.strptime(d, '%Y-%m-%d')
+    now = datetime.now()
     if self.period in DAYS:
       # if the date isn't a Monday, grab the previous Monday at 12 pm
       delta = relativedelta(weekday=MO(-1), hour=12, minute=0, second=0, microsecond=0)
@@ -268,10 +265,10 @@ class Metaranks():
       else:
         x = date_in
       if now.weekday() != 1:
-        last_monday = now + delta
+        lastMonday = now + delta
       else:
-        last_monday = now
-      return (x.date() == last_monday.date()) and (date_in.weekday() == now.weekday())
+        lastMonday = now
+      return (x.date() == lastMonday.date()) and (date_in.weekday() == now.weekday())
     elif self.period in MONTHS + ["monthly"]:
       return now.month == date_in.month and now.year == date_in.year
     elif self.period == "daily":
@@ -283,7 +280,7 @@ class Metaranks():
     return False
 
   def formatDate(self, p_date):
-    dateIn = datetime.date.strptime(p_date, '%Y-%m-%d')
+    dateIn = datetime.strptime(p_date, '%Y-%m-%d')
     if self.period in ["daily"] + DAYS:
       formattedDate = dateIn.strftime("%d %b %Y")
     elif self.period in ["yearly"] + MONTHS:
@@ -292,7 +289,7 @@ class Metaranks():
       formattedDate = dateIn.strftime("%b %Y")
     elif self.period == "weekly":
       if dateIn.weekday() == 0:
-        dateIn = dateIn + datetime.timedelta(weeks=1)
+        dateIn = dateIn + timedelta(weeks=1)
       formattedDate = dateIn.strftime("%d %b %Y")
     else:
       formattedDate = p_date
@@ -422,3 +419,150 @@ class Metaranks():
     result = { "rankings": userData, "myRank": self.userRank, "myCurrent": self.currentRank,
                "period": self.period, "users": self.userCount, "page": self.page+1}
     return result
+
+class Awards():
+  def __init__(self, data):
+    self.displayType = 0
+    self.offset = 0
+    self.userCount = 0
+    self.userRank = -1
+    self.inData = [ ]
+    self.outData = [ ]
+    self.type = 0
+    if "year" in data:
+      try:
+        self.year = int(data["year"])
+      except ValueError:
+        self.year = 0
+      if (datetime.now().month == 1 and datetime.now().day == 1) or self.year < 2018:
+        self.year = 0
+    else:
+      self.year = 0
+    if "type" in data:
+      if data["type"] == "most":
+        self.type = 1
+      else: # type is "top" or default
+        self.type = 0
+    else:
+      self.type = 0
+    if "pageSize" in data:
+      try:
+        self.pageSize = int(data["pageSize"])
+      except ValueError:
+        self.pageSize = 10
+      if self.pageSize < 1 or self.pageSize > 50:
+        self.pageSize = 10
+    else:
+      self.pageSize = 10
+    if "pageNumber" in data:
+      try:
+        self.pageNumber = max(int(data["pageNumber"]), 1)
+      except ValueError:
+        self.pageNumber = 1
+    else:
+      self.pageNumber = 1
+    if "displayType" in data:
+      try:
+        self.displayType = int(data["displayType"])
+      except ValueError:
+        self.displayType = 0
+    else:
+      self.displayType = 0
+
+    self.readSource()
+
+#      $this->findUserRank();
+#      $this->getUserAmount();
+#      $this->getRankingBounds();
+#      $this->extractData();
+
+
+  def readSource(self):
+    if self.type == 1:
+      file = "awardsMost"
+    if self.type == 0:
+      file = "awardsTop"
+    if self.year == 0:
+      file = f'{file}.JSON'
+    else:
+      file = f'{file}_{self.year}.JSON'
+#  need to figure out what to do about this
+#      $fname = __DIR__ ."/../JSON/rankings/".$file;
+#      $y = file_get_contents($fname);
+#      $this->inData = json_decode($y,true);
+
+
+#
+#    private function getRankingBounds(){
+#      if ($this->displayType === 1){
+#        $bound = $this->pageSize;
+#        if ($bound % 2 == 0) {$this->pageSize++;}
+#        if ($bound % 2 !== 0) {$bound--;}
+#        $bounds = $bound/2;
+#        $this->offset = $this->userRank - $bounds -1;
+#        if ($this->offset < 0) {$this->offset = 0;}
+#        if ($this->userRank + $bounds > $this -> userCount) {
+#          $this->offset = $this->userCount - $this->pageSize;
+#        }
+#        if ($this->offset < 0) {$this->offset = 0;}
+#        $this->pagetotal = 1;
+#        $this->page = 1;
+#      }
+#      else {
+#        $this->pageTotal = ceil($this->userCount / $this->pageSize);
+#        if ($this->pageTotal===0){$this->pageTotal=1;}
+#        $this->page = min($this->pageNumber-1,$this->pageTotal);
+#        $this -> offset = $this->pageSize*($this->page);
+#      }
+#    }
+#    private function findUserRank(){
+#      if ($this->userid!==-1){
+#        foreach ($this->inData['rankings'] as $row) {
+#        if ($row['id']==$this->userid) {$this->userRank = $row['rank'];return;}
+#        }
+#      }
+#      $this->userRank = -1;
+#    }
+#
+#    public function getAwardsJSON(){
+#      echo json_encode($this->outData,true);
+#    }
+#
+#    private function parseOutputParams($x){
+#      $d = array(0 => array('photo'=>$x['photo'], 'name'=>$x['name']));
+#      $outp = array('rank'=> $x['rank'], 'users'=>$d, 'countryId' => $x['countryId'], 'values'=> $x['values']);
+#      if (isset($x['isMe'])){$outp['isMe'] = 1;}
+#    return $outp;
+#    }
+#    private function extractData(){
+#      $userFound = 0;
+#      for ($v = $this->offset; ($v<($this->offset+$this->pageSize)&&($v<$this->userCount)); $v++){
+#        $x = $this->inData['rankings'][$v];
+#        if ($v == $this->userRank -1) {$x['isMe']=1;$userFound=1;}
+#        $w[] = $this->parseOutputParams($x);
+#      }
+#      if ($userFound===0){
+#        if ($this->userRank!==-1){
+#          $this->inData['rankings'][$this->userRank-1]['isMe'] = 1;
+#          if ($this->userRank < $this->offset){
+#            array_unshift($w,$this->parseOutputParams($this->inData['rankings'][$this->userRank-1]));
+#          }
+#          else {
+#            $w[] = $this->parseOutputParams($this->inData['rankings'][$this->userRank-1]);}
+#        }
+#      }
+#      $this->outData = (object) array('rankings'=>$w, 'users'=>$this->userCount, 'lastUpdate'=>$this->inData['lastUpdate'], 'page'=>$this->page+1);
+#    }
+#
+#    private function findUserRankData(){
+#      if ($this->userRank!==-1){
+#      $x = $this->inData['rankings'][$this->rank-1];
+#      $y = array('rank'=> $x['rank'], 'name'=> $x['name'], 'photo'=> $x['photo'], 'values'=> $x['values'], 'user'=>1);
+#      if (isset($x['countryId'])){$y['countryId']=$x['countryId'];}
+#      return $y;
+#      }
+#    }
+#    private function getUserAmount(){
+#      $this->userCount = count($this->inData['rankings'],0);
+#    }
+#
