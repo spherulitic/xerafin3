@@ -1,12 +1,13 @@
-import json, urllib, requests, jwt
-from flask import request, jsonify, g
-from stats import app
-from logging.config import dictConfig
-from dateutil.relativedelta import relativedelta, MO
-from datetime import *
 from math import ceil
-import sys
+from logging.config import dictConfig
+from datetime import datetime, timedelta
+import json
+import urllib
+import jwt
+from flask import request, jsonify, g
+from dateutil.relativedelta import relativedelta, MO
 import xerafinUtil.xerafinUtil as xs
+from stats import app
 #from .rankings import Rankings
 #from .slothRankings import SlothRankings
 
@@ -117,7 +118,7 @@ def getAllTimeStats():
       result["questions"] = 0
       result["users"] = 0
 
-  except Exception as ex:
+  except:
     xs.errorLog()
     error["status"] = "An error occurred. See log for more details"
 
@@ -255,28 +256,28 @@ class Metaranks():
     return ""
 
   def compareDateWithCurrent(self, d):
-    date_in = datetime.strptime(d, '%Y-%m-%d')
+    dateIn = datetime.strptime(d, '%Y-%m-%d')
     now = datetime.now()
     if self.period in DAYS:
       # if the date isn't a Monday, grab the previous Monday at 12 pm
       delta = relativedelta(weekday=MO(-1), hour=12, minute=0, second=0, microsecond=0)
-      if date_in.weekday() != 1:
-        x = date_in + delta
+      if dateIn.weekday() != 1:
+        x = dateIn + delta
       else:
-        x = date_in
+        x = dateIn
       if now.weekday() != 1:
         lastMonday = now + delta
       else:
         lastMonday = now
-      return (x.date() == lastMonday.date()) and (date_in.weekday() == now.weekday())
+      return (x.date() == lastMonday.date()) and (dateIn.weekday() == now.weekday())
     elif self.period in MONTHS + ["monthly"]:
-      return now.month == date_in.month and now.year == date_in.year
+      return now.month == dateIn.month and now.year == dateIn.year
     elif self.period == "daily":
-      return now.date() == date_in.date()
+      return now.date() == dateIn.date()
     elif self.period == "weekly":
-      return now.isocalendar().week == date_in.isocalendar.week() and now.year == date_in.year
+      return now.isocalendar().week == dateIn.isocalendar.week() and now.year == dateIn.year
     elif self.period == "yearly":
-      return now.year == date_in.year
+      return now.year == dateIn.year
     return False
 
   def formatDate(self, p_date):
@@ -307,9 +308,10 @@ class Metaranks():
         index = self.currentRank
       else:
         index = self.userRank
-      self.offset = max(index - bounds - 1, 0)
       if index + bounds > self.userCount:
         self.offset = max(self.userCount - self.pageSize, 0)
+      else:
+        self.offset = max(index - bounds - 1, 0)
       self.pageTotal = 1
       self.page = 1
     else:
@@ -426,7 +428,7 @@ class Awards():
     self.offset = 0
     self.userCount = 0
     self.userRank = -1
-    self.inData = [ ]
+    self.inData = { }
     self.outData = [ ]
     self.type = 0
     if "year" in data:
@@ -470,10 +472,10 @@ class Awards():
       self.displayType = 0
 
     self.readSource()
+    self.findUserRank()
 
-#      $this->findUserRank();
 #      $this->getUserAmount();
-#      $this->getRankingBounds();
+    self.getRankingBounds()
 #      $this->extractData();
 
 
@@ -492,38 +494,33 @@ class Awards():
 #      $this->inData = json_decode($y,true);
 
 
-#
-#    private function getRankingBounds(){
-#      if ($this->displayType === 1){
-#        $bound = $this->pageSize;
-#        if ($bound % 2 == 0) {$this->pageSize++;}
-#        if ($bound % 2 !== 0) {$bound--;}
-#        $bounds = $bound/2;
-#        $this->offset = $this->userRank - $bounds -1;
-#        if ($this->offset < 0) {$this->offset = 0;}
-#        if ($this->userRank + $bounds > $this -> userCount) {
-#          $this->offset = $this->userCount - $this->pageSize;
-#        }
-#        if ($this->offset < 0) {$this->offset = 0;}
-#        $this->pagetotal = 1;
-#        $this->page = 1;
-#      }
-#      else {
-#        $this->pageTotal = ceil($this->userCount / $this->pageSize);
-#        if ($this->pageTotal===0){$this->pageTotal=1;}
-#        $this->page = min($this->pageNumber-1,$this->pageTotal);
-#        $this -> offset = $this->pageSize*($this->page);
-#      }
-#    }
-#    private function findUserRank(){
-#      if ($this->userid!==-1){
-#        foreach ($this->inData['rankings'] as $row) {
-#        if ($row['id']==$this->userid) {$this->userRank = $row['rank'];return;}
-#        }
-#      }
-#      $this->userRank = -1;
-#    }
-#
+  def getRankingBounds(self):
+    if self.displayType == 1:
+      bound = self.pageSize
+      if bound % 2 == 0:
+        self.pageSize += 1
+      else:
+        bound = bound - 1
+      bounds = int(bound / 2)
+      if self.userRank + bounds > self.userCount:
+        self.offset = max(self.userCount - self.pageSize, 0)
+      else:
+        self.offset = max(self.userRank - bounds - 1, 0)
+      self.pagetotal = 1
+      self.page = 1
+    else:
+      self.pageTotal = ceil(self.userCount/self.pageSize)
+      if self.pageTotal == 0:
+        self.pageTotal = 1
+      self.page = min(self.pageNumber-1,self.pageTotal)
+      self.offset = self.pageSize * self.page
+
+  def findUserRank(self):
+    try:
+      self.userRank = [a["rank"] for a in self.inData["rankings"] if a["id"] == g.uuid][0]
+    except IndexError:
+      self.userRank = -1
+
 #    public function getAwardsJSON(){
 #      echo json_encode($this->outData,true);
 #    }
