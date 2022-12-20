@@ -473,11 +473,9 @@ class Awards():
 
     self.readSource()
     self.findUserRank()
-
-#      $this->getUserAmount();
+    self.getUserAmount()
     self.getRankingBounds()
-#      $this->extractData();
-
+    self.extractData()
 
   def readSource(self):
     if self.type == 1:
@@ -521,45 +519,32 @@ class Awards():
     except IndexError:
       self.userRank = -1
 
-#    public function getAwardsJSON(){
-#      echo json_encode($this->outData,true);
-#    }
-#
-#    private function parseOutputParams($x){
-#      $d = array(0 => array('photo'=>$x['photo'], 'name'=>$x['name']));
-#      $outp = array('rank'=> $x['rank'], 'users'=>$d, 'countryId' => $x['countryId'], 'values'=> $x['values']);
-#      if (isset($x['isMe'])){$outp['isMe'] = 1;}
-#    return $outp;
-#    }
-#    private function extractData(){
-#      $userFound = 0;
-#      for ($v = $this->offset; ($v<($this->offset+$this->pageSize)&&($v<$this->userCount)); $v++){
-#        $x = $this->inData['rankings'][$v];
-#        if ($v == $this->userRank -1) {$x['isMe']=1;$userFound=1;}
-#        $w[] = $this->parseOutputParams($x);
-#      }
-#      if ($userFound===0){
-#        if ($this->userRank!==-1){
-#          $this->inData['rankings'][$this->userRank-1]['isMe'] = 1;
-#          if ($this->userRank < $this->offset){
-#            array_unshift($w,$this->parseOutputParams($this->inData['rankings'][$this->userRank-1]));
-#          }
-#          else {
-#            $w[] = $this->parseOutputParams($this->inData['rankings'][$this->userRank-1]);}
-#        }
-#      }
-#      $this->outData = (object) array('rankings'=>$w, 'users'=>$this->userCount, 'lastUpdate'=>$this->inData['lastUpdate'], 'page'=>$this->page+1);
-#    }
-#
-#    private function findUserRankData(){
-#      if ($this->userRank!==-1){
-#      $x = $this->inData['rankings'][$this->rank-1];
-#      $y = array('rank'=> $x['rank'], 'name'=> $x['name'], 'photo'=> $x['photo'], 'values'=> $x['values'], 'user'=>1);
-#      if (isset($x['countryId'])){$y['countryId']=$x['countryId'];}
-#      return $y;
-#      }
-#    }
-#    private function getUserAmount(){
-#      $this->userCount = count($this->inData['rankings'],0);
-#    }
-#
+  def getRankings(self):
+    return self.outData
+
+  def parseOutputParams(self, p_row):
+    data = [{'photo':p_row['photo'], 'name':p_row['name']}]
+    outp = {'rank':p_row['rank'], 'users':data, 'countryId':p_row['countryId'], 'values':p_row['values']}
+    if 'isMe' in p_row:
+      outp['isMe'] = 1
+    return outp
+
+  def extractData(self):
+    userFound = 0
+    result = [ ]
+    for index, row in enumerate(self.inData["rankings"][self.offset:min(self.offset+self.pageSize, self.userCount)]):
+      if self.offset + index == self.userRank - 1:
+        row["isMe"] = 1
+        userFound = 1
+      result.append(self.parseOutputParams(row))
+    if userFound == 0:
+      if self.userRank != -1:
+        self.inData["rankings"][self.userRank-1]["isMe"] = 1
+        if self.userRank < self.offset:
+          result.insert(0, self.parseOutputParams(self.inData["rankings"][self.userRank-1]))
+        else:
+          result.append(self.parseOutputParams(self.inData["rankings"][self.userRank-1]))
+    self.outData = {"rankings": result, "users": self.userCount, "lateUpdate": self.inData["lastUpdate"], "page": self.page+1}
+
+  def getUserAmount(self):
+    self.userCount = len(self.inData["rankings"])
