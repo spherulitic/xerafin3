@@ -16,6 +16,8 @@ MONTHS = ["january","february","march","april","may","june","july",
           "august","september","october","november","december"]
 PERIODS = ["daily","weekly","monthly","yearly"] + DAYS + MONTHS
 
+AWARDS_DIR = '/app/awards'
+
 dictConfig({
     'version': 1,
     'formatters': {'default': {
@@ -81,16 +83,15 @@ def getRankings():
       if data.get("displayType", 0) in (2, 3):
         rank = Metaranks(data)
       else:
-  #      rank = new Rankings(data)
+  #      rank = Rankings(data)
         pass
     elif data.get("view", "QA") == "AW":
-  #    rank = new Awards(data)
-      pass
+      rank = Awards(data)
     elif data.get("view", "QA") == "SL":
-  #    rank = new SlothRankings(data)
+  #    rank = SlothRankings(data)
       pass
     else:
-  #    rank = new Rankings(data)
+  #    rank = Rankings(data)
       pass
 
   except:
@@ -486,11 +487,9 @@ class Awards():
       file = f'{file}.JSON'
     else:
       file = f'{file}_{self.year}.JSON'
-#  need to figure out what to do about this
-#      $fname = __DIR__ ."/../JSON/rankings/".$file;
-#      $y = file_get_contents($fname);
-#      $this->inData = json_decode($y,true);
-
+    fname = f'{AWARDS_DIR}/{file}'
+    with open(fname) as f:
+      self.inData = json.load(f)
 
   def getRankingBounds(self):
     if self.displayType == 1:
