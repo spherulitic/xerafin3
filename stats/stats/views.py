@@ -1,20 +1,22 @@
-import json, urllib, requests, jwt
-from flask import request, jsonify, g
-from stats import app
-from logging.config import dictConfig
-from dateutil.relativedelta import relativedelta, MO
 from math import ceil
-import sys
-import datetime
+from logging.config import dictConfig
+from datetime import datetime, timedelta
+import json
+import urllib
+import jwt
+from flask import request, jsonify, g
+from dateutil.relativedelta import relativedelta, MO
 import xerafinUtil.xerafinUtil as xs
+from stats import app
 #from .rankings import Rankings
 #from .slothRankings import SlothRankings
-#from .awards import Awards
 
 DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
 MONTHS = ["january","february","march","april","may","june","july",
           "august","september","october","november","december"]
 PERIODS = ["daily","weekly","monthly","yearly"] + DAYS + MONTHS
+
+AWARDS_DIR = '/app/awards'
 
 dictConfig({
     'version': 1,
@@ -81,16 +83,15 @@ def getRankings():
       if data.get("displayType", 0) in (2, 3):
         rank = Metaranks(data)
       else:
-  #      rank = new Rankings(data)
+  #      rank = Rankings(data)
         pass
     elif data.get("view", "QA") == "AW":
-  #    rank = new Awards(data)
-      pass
+      rank = Awards(data)
     elif data.get("view", "QA") == "SL":
-  #    rank = new SlothRankings(data)
+  #    rank = SlothRankings(data)
       pass
     else:
-  #    rank = new Rankings(data)
+  #    rank = Rankings(data)
       pass
 
   except:
@@ -118,7 +119,7 @@ def getAllTimeStats():
       result["questions"] = 0
       result["users"] = 0
 
-  except Exception as ex:
+  except:
     xs.errorLog()
     error["status"] = "An error occurred. See log for more details"
 
@@ -136,7 +137,6 @@ class Metaranks():
     if self.period not in PERIODS:
       self.period = "daily"
     self.currentRank = -1
-#  private $rankData = [];
     self.countUsers()
     self.findUser()
     self.getRankingBounds()
@@ -168,51 +168,50 @@ class Metaranks():
     return dateFormat
 
   def getTimeConditionsQuery(self):
-    x = ""
-    y = "DATE_FORMAT(dateStamp,"
-    if self.period == "daily":
-      x = ", dateStamp"
+    fragment = "DATE_FORMAT(dateStamp,"
+    if self.period in ["daily"] + DAYS:
+      result = ", dateStamp"
     elif self.period == "weekly":
-      x = f", {y}'%Y%u')"
+      result = f", {fragment}'%Y%u')"
     elif self.period == "monthly":
-      x = f", {y}'%Y%m')"
+      result = f", {fragment}'%Y%m')"
     elif self.period == "yearly":
-      x = f", {y}'%Y')"
-    elif self.period in DAYS:
-      x = ",dateStamp"
+      result = f", {fragment}'%Y')"
     elif self.period in MONTHS:
-      x = f", {y}'%Y%m')"
+      result = f", {fragment}'%Y%m')"
+    else:
+      result = ""
 
-    return x
+    return result
 
   def setDateType(self):
     if self.period in ["daily","monday","tuesday","wednesday","thursday",
                        "friday","saturday","sunday"]:
-      x = ", dateStamp AS date"
+      result = ", dateStamp AS date"
     elif self.period in ["weekly"]:
-      x = ", MIN(dateStamp) AS date"
+      result = ", MIN(dateStamp) AS date"
     elif self.period in ["monthly","yearly","january","february","march","april",
                          "may","june","july","august","september","october",
                          "november","december"]:
-      x = ", MIN(dateStamp) AS date"
+      result = ", MIN(dateStamp) AS date"
     else:
-      x = ""
-    return x
+      result = ""
+    return result
 
 
   def setDay(self):
     try:
-      x = DAYS.index(self.period)
+      dayOfWeek = DAYS.index(self.period)
     except ValueError:
       return ""
-    return f"WEEKDAY(dateStamp)={x}"
+    return f"WEEKDAY(dateStamp)={dayOfWeek}"
 
   def setMonth(self):
     try:
-      x = MONTHS.index(self.period)+1
+      month = MONTHS.index(self.period)+1
     except ValueError:
       return ""
-    return f"MONTH(dateStamp)={x}"
+    return f"MONTH(dateStamp)={month}"
 
   def runQuery(self):
     g.con.execute(self.query)
@@ -258,32 +257,32 @@ class Metaranks():
     return ""
 
   def compareDateWithCurrent(self, d):
-    date_in = datetime.date.strptime(d, '%Y-%m-%d')
-    now = datetime.date.now()
+    dateIn = datetime.strptime(d, '%Y-%m-%d')
+    now = datetime.now()
     if self.period in DAYS:
       # if the date isn't a Monday, grab the previous Monday at 12 pm
       delta = relativedelta(weekday=MO(-1), hour=12, minute=0, second=0, microsecond=0)
-      if date_in.weekday() != 1:
-        x = date_in + delta
+      if dateIn.weekday() != 1:
+        x = dateIn + delta
       else:
-        x = date_in
+        x = dateIn
       if now.weekday() != 1:
-        last_monday = now + delta
+        lastMonday = now + delta
       else:
-        last_monday = now
-      return (x.date() == last_monday.date()) and (date_in.weekday() == now.weekday())
+        lastMonday = now
+      return (x.date() == lastMonday.date()) and (dateIn.weekday() == now.weekday())
     elif self.period in MONTHS + ["monthly"]:
-      return now.month == date_in.month and now.year == date_in.year
+      return now.month == dateIn.month and now.year == dateIn.year
     elif self.period == "daily":
-      return now.date() == date_in.date()
+      return now.date() == dateIn.date()
     elif self.period == "weekly":
-      return now.isocalendar().week == date_in.isocalendar.week() and now.year == date_in.year
+      return now.isocalendar().week == dateIn.isocalendar.week() and now.year == dateIn.year
     elif self.period == "yearly":
-      return now.year == date_in.year
+      return now.year == dateIn.year
     return False
 
   def formatDate(self, p_date):
-    dateIn = datetime.date.strptime(p_date, '%Y-%m-%d')
+    dateIn = datetime.strptime(p_date, '%Y-%m-%d')
     if self.period in ["daily"] + DAYS:
       formattedDate = dateIn.strftime("%d %b %Y")
     elif self.period in ["yearly"] + MONTHS:
@@ -292,7 +291,7 @@ class Metaranks():
       formattedDate = dateIn.strftime("%b %Y")
     elif self.period == "weekly":
       if dateIn.weekday() == 0:
-        dateIn = dateIn + datetime.timedelta(weeks=1)
+        dateIn = dateIn + timedelta(weeks=1)
       formattedDate = dateIn.strftime("%d %b %Y")
     else:
       formattedDate = p_date
@@ -310,9 +309,10 @@ class Metaranks():
         index = self.currentRank
       else:
         index = self.userRank
-      self.offset = max(index - bounds - 1, 0)
       if index + bounds > self.userCount:
         self.offset = max(self.userCount - self.pageSize, 0)
+      else:
+        self.offset = max(index - bounds - 1, 0)
       self.pageTotal = 1
       self.page = 1
     else:
@@ -422,3 +422,128 @@ class Metaranks():
     result = { "rankings": userData, "myRank": self.userRank, "myCurrent": self.currentRank,
                "period": self.period, "users": self.userCount, "page": self.page+1}
     return result
+
+class Awards():
+  def __init__(self, data):
+    self.displayType = 0
+    self.offset = 0
+    self.userCount = 0
+    self.userRank = -1
+    self.inData = { }
+    self.outData = [ ]
+    self.type = 0
+    if "year" in data:
+      try:
+        self.year = int(data["year"])
+      except ValueError:
+        self.year = 0
+      if (datetime.now().month == 1 and datetime.now().day == 1) or self.year < 2018:
+        self.year = 0
+    else:
+      self.year = 0
+    if "type" in data:
+      if data["type"] == "most":
+        self.type = 1
+      else: # type is "top" or default
+        self.type = 0
+    else:
+      self.type = 0
+    if "pageSize" in data:
+      try:
+        self.pageSize = int(data["pageSize"])
+      except ValueError:
+        self.pageSize = 10
+      if self.pageSize < 1 or self.pageSize > 50:
+        self.pageSize = 10
+    else:
+      self.pageSize = 10
+    if "pageNumber" in data:
+      try:
+        self.pageNumber = max(int(data["pageNumber"]), 1)
+      except ValueError:
+        self.pageNumber = 1
+    else:
+      self.pageNumber = 1
+    if "displayType" in data:
+      try:
+        self.displayType = int(data["displayType"])
+      except ValueError:
+        self.displayType = 0
+    else:
+      self.displayType = 0
+
+    self.readSource()
+    self.findUserRank()
+    self.getUserAmount()
+    self.getRankingBounds()
+    self.extractData()
+
+  def readSource(self):
+    if self.type == 1:
+      file = "awardsMost"
+    if self.type == 0:
+      file = "awardsTop"
+    if self.year == 0:
+      file = f'{file}.JSON'
+    else:
+      file = f'{file}_{self.year}.JSON'
+    fname = f'{AWARDS_DIR}/{file}'
+    with open(fname) as f:
+      self.inData = json.load(f)
+
+  def getRankingBounds(self):
+    if self.displayType == 1:
+      bound = self.pageSize
+      if bound % 2 == 0:
+        self.pageSize += 1
+      else:
+        bound = bound - 1
+      bounds = int(bound / 2)
+      if self.userRank + bounds > self.userCount:
+        self.offset = max(self.userCount - self.pageSize, 0)
+      else:
+        self.offset = max(self.userRank - bounds - 1, 0)
+      self.pagetotal = 1
+      self.page = 1
+    else:
+      self.pageTotal = ceil(self.userCount/self.pageSize)
+      if self.pageTotal == 0:
+        self.pageTotal = 1
+      self.page = min(self.pageNumber-1,self.pageTotal)
+      self.offset = self.pageSize * self.page
+
+  def findUserRank(self):
+    try:
+      self.userRank = [a["rank"] for a in self.inData["rankings"] if a["id"] == g.uuid][0]
+    except IndexError:
+      self.userRank = -1
+
+  def getRankings(self):
+    return self.outData
+
+  def parseOutputParams(self, p_row):
+    data = [{'photo':p_row['photo'], 'name':p_row['name']}]
+    outp = {'rank':p_row['rank'], 'users':data, 'countryId':p_row['countryId'], 'values':p_row['values']}
+    if 'isMe' in p_row:
+      outp['isMe'] = 1
+    return outp
+
+  def extractData(self):
+    userFound = 0
+    result = [ ]
+    for index, row in enumerate(self.inData["rankings"][self.offset:min(self.offset+self.pageSize, self.userCount)]):
+      if self.offset + index == self.userRank - 1:
+        row["isMe"] = 1
+        userFound = 1
+      result.append(self.parseOutputParams(row))
+    if userFound == 0:
+      if self.userRank != -1:
+        self.inData["rankings"][self.userRank-1]["isMe"] = 1
+        if self.userRank < self.offset:
+          result.insert(0, self.parseOutputParams(self.inData["rankings"][self.userRank-1]))
+        else:
+          result.append(self.parseOutputParams(self.inData["rankings"][self.userRank-1]))
+    self.outData = {"rankings": result, "users": self.userCount, "lateUpdate": self.inData["lastUpdate"], "page": self.page+1}
+
+  def getUserAmount(self):
+    self.userCount = len(self.inData["rankings"])

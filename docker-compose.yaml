@@ -28,6 +28,8 @@ services:
       - MYSQL_HOST
     depends_on:
       - keycloak
+    volumes:
+      - awards:/app/awards
   cardbox:
     image: x-cardbox:latest
     volumes:
@@ -71,3 +73,6 @@ volumes:
   cardbox-data:
     external: true
   quizjson:
+    external: true
+  awards:
+    external: true
