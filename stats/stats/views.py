@@ -602,7 +602,6 @@ class Rankings():
 
   def runQuery(self):
     """Run the mysql query in self.query"""
-    xs.debug(self.query)
     g.con.execute(f'SET @datevalue = {self.curDate}')
     g.con.execute(self.query)
     return g.con.fetchall()
@@ -711,3 +710,200 @@ class Rankings():
       rankings.append(rowOut)
     result = {'rankings': rankings, 'myRank': self.userRank, 'period': self.period, 'users': self.userCount, 'page': self.page+1}
     return result
+
+class SlothRankings():
+  def __init__(self, data):
+    self.curDate = data.get('curDate', 'curdate()')
+    self.type = data.get('type', '100s')
+    self.pageSize = data.get('pageSize', 10)
+    try:
+      self.pageSize = int(self.pageSize)
+      if 1 < self.pageSize <= 50:
+        pass
+      else:
+        self.pageSize = 10
+    except ValueError:
+      self.pageSize = 10
+    self.pageNumber = data.get('pageNumber', 1)
+    try:
+      self.pageNumber = min(int(self.pageNumber), 1)
+    except ValueError:
+      self.pageSize = 1
+    self.displayType = data.get('displayType', 0)
+    try:
+      self.displayType = int(self.displayType)
+    except ValueError:
+      self.displayType = 0
+    self.period = data.get('timeframe', 'today')
+    if self.period not in RANKING_PERIODS:
+      self.period = 'today'
+
+    self.countUsers()
+    self.findUser()
+#    $this->getRankingBounds();
+#    $this->getRankingsData();
+
+  def getTimeConditionsQuery(self):
+    if self.period == 'today':
+      clause = 'date = @datevalue'
+    elif self.period == 'yesterday':
+      clause = 'date = @datevalue - INTERVAL 1 DAY'
+    elif self.period == 'thisWeek':
+      clause = 'WEEK(date, 7) = WEEK(@datevalue, 7) AND YEARWEEK(date, 7) = YEARWEEK(@datevalue, 7)'
+    elif self.period == 'lastWeek':
+      clause = 'WEEK(date,7) = WEEK(@datevalue - INTERVAL 7 DAY,7) AND YEARWEEK(date,7) = YEARWEEK(@datevalue - INTERVAL 7 DAY,7)'
+    elif self.period == 'thisMonth':
+      clause = 'MONTH(date) = MONTH(@datevalue) AND YEAR(date) = YEAR(@datevalue)'
+    elif self.period == 'lastMonth':
+      clause = 'MONTH(date) = MONTH(@datevalue - INTERVAL 1 MONTH) AND YEAR(date) = YEAR(@datevalue - INTERVAL 1 MONTH)'
+    elif self.period == 'thisYear':
+      clause = 'YEAR(date) = YEAR(@datevalue)'
+    elif self.period == 'lastYear':
+      clause = 'YEAR(date) = YEAR(@datevalue - INTERVAL 1 YEAR)'
+    elif self.period == 'eternity':
+      clause = '1'
+    else:
+      clause = ''
+    return clause
+
+  def getSlothSubFilter(self):
+    if self.type in ['unique', 'all']:
+      result = "1"
+    elif self.type in ['100s', 'all100s']:
+      result = "correct>=100"
+    elif self.type in ['perfect', 'allPerfect']:
+      result = "correct>=100 AND accuracy>=100"
+    else:
+      result = "1"
+    return result
+
+  def getSlothSubSelect(self):
+    if self.type in ['unique', '100s', 'perfect']:
+      result = "DISTINCT "
+    elif self.type in ['all', 'all100s', 'allPerfect']:
+      result = ""
+    else:
+      result = "DISTINCT "
+    return result
+
+  def runQuery(self):
+    """Run the mysql query in self.query"""
+    xs.debug(self.query)
+    g.con.execute(f'SET @datevalue = {self.curDate}')
+    g.con.execute(self.query)
+    return g.con.fetchall()
+
+  def findUser(self):
+    self.query = f'''SELECT name, photo, countryId, COUNT({self.getSlothSubSelect()} alphagram) AS total, userid, firstname, lastname
+                   FROM sloth_completed
+                   JOIN login USING (userid)
+                   JOIN user_prefs USING (userid)
+                   WHERE {this.getTimeConditionsQuery()} AND {this.getSlothSubFilter()}
+                   GROUP BY userid, name, photo, firstname, lastname, countryId
+                   ORDER BY total DESC, firstname ASC, lastname ASC'''
+    result = self.runQuery()
+    myIndex = [i for (i,j) in enumerate(result) if j[4] == g.uuid]
+    # at this point, myIndex is [<index>] where it's the index of the row matching my uuid in the result set
+    # if no match, myIndex is an empty list which is falsy
+    if bool(myIndex):
+      self.userRank = myIndex[0]+1
+    else:
+      self.userRank = -1
+
+  def checkEtern(self, insert):
+    if self.period != 'eternity':
+      return f' {insert} '
+    return ''
+
+  def countUsers(self):
+    self.query = f'''SELECT COUNT(DISTINCT userid) AS users
+                   FROM sloth_completed
+                   WHERE {self.getTimeConditionsQuery()} AND {self.getSlothSubFilter()}'''
+    result = self.runQuery()
+    for row in result:
+      self.userCount = row[0]
+
+#
+#  private function getRankingBounds(){
+#    if ($this->displayType == 1){
+#      $bound = $this->pageSize;
+#      if ($bound % 2 == 0) {$this->pageSize++;}
+#      if ($bound % 2 !== 0) {$bound--;}
+#      $bounds = $bound/2;
+#
+#      $this->offset = $this->userRank - $bounds -1;
+#      if ($this->offset < 0) {$this->offset = 0;}
+#      if ($this->userRank + $bounds > $this -> userCount) {
+#        $this->offset = $this->userCount - $this->pageSize;
+#      }
+#      if ($this->offset < 0) {$this->offset = 0;}
+#      $this->pagetotal = 1;
+#      $this->page = 1;
+#    }
+#    else {
+#      $this->pageTotal = ceil($this->userCount / $this->pageSize);
+#      if ($this->pageTotal===0){$this->pageTotal=1;}
+#      $this->page = min(($this->pageNumber-1),($this->pageTotal));
+#      $this->offset = $this->pageSize*($this->page);
+#    }
+#
+#
+#  }
+#
+#  private function getRankingsData(){
+#    $queryStart = "SELECT name, photo, countryId, COUNT(".$this->getSlothSubSelect()."alphagram) AS total, userid, firstname, lastname FROM sloth_completed
+#    JOIN login USING (userid)
+#    JOIN user_prefs USING (userid)";
+#    $this->query = $queryStart." WHERE ".$this->getTimeConditionsQuery()." AND ".$this->getSlothSubFilter()."
+#    GROUP BY userid, name, photo, firstname, lastname, countryId
+#    ORDER BY total DESC, firstname ASC, lastname ASC
+#    LIMIT ".$this->offset.",".$this->pageSize;
+#    $res = $this->runQuery();
+#    $rank = $this->offset;
+#    $this->rankData = [];
+#    $foundMe = false;
+#    while ($row = $res->fetch_assoc()){
+#      $rank++;
+#      if ($row['userid'] == $this->userid){
+#        $row['isMe']=true;
+#        $foundMe=true;
+#      }
+#      $row['rank']=$rank;
+#      $this->rankData[] = $row;
+#    }
+#    if ($foundMe==false){
+#      $this->query = $queryStart." WHERE "." userid=".$this->userid." AND ".$this->getSlothSubFilter()." AND ".$this->getTimeConditionsQuery()."
+#      GROUP BY userid, name, photo, firstname, lastname, countryId
+#      ORDER BY total DESC, firstname ASC, lastname ASC
+#      LIMIT 1";
+#      $res = $this->runQuery();
+#      while ($row = $res->fetch_assoc()){
+#        if ($row['userid'] == $this->userid){
+#          $row['isMe']=true;
+#          if ($this->userRank!==false){$row['rank']=$this->userRank;}
+#          if ($row['rank'] < $this->rankData[0]['rank']){array_unshift($this->rankData, $row);}
+#          else {$this->rankData[] = $row;}
+#        }
+#      }
+#    }
+#  }
+#  public function getRankingsJSON(){
+#    $b = [];
+#    foreach ($this->rankData as $row) {
+#      if (strlen($row['firstname'])==0){$d=$row['name'];}
+#      else {$d=$row['firstname']." ".$row['lastname'];}
+#      $c = array(
+#        'users'=> array(
+#          0 => array(
+#            'photo'=>$row['photo'], 'name'=>$d, 'answered'=> $row['total']
+#          )
+#        ),
+#        'rank'=> $row['rank'], 'countryId'=> $row['countryId']
+#      );
+#      if (isset($row['isMe'])){$c['isMe'] = $row['isMe'];}
+#      $b[]= $c;
+#    }
+#    $a=array('rankings'=> $b, 'myRank'=> $this->userRank, 'period'=> $this->period, 'users' => $this->userCount, 'page' => $this->page+1 );
+#    echo json_encode($a,true);
+#  }
+#
