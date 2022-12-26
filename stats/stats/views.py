@@ -8,13 +8,12 @@ from flask import request, jsonify, g
 from dateutil.relativedelta import relativedelta, MO
 import xerafinUtil.xerafinUtil as xs
 from stats import app
-#from .rankings import Rankings
-#from .slothRankings import SlothRankings
 
 DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
 MONTHS = ["january","february","march","april","may","june","july",
           "august","september","october","november","december"]
 PERIODS = ["daily","weekly","monthly","yearly"] + DAYS + MONTHS
+RANKING_PERIODS = ["today", "yesterday", "thisWeek", "lastWeek", "thisMonth", "lastMonth", "thisYear", "lastYear", "eternity"]
 
 AWARDS_DIR = '/app/awards'
 
@@ -83,16 +82,14 @@ def getRankings():
       if data.get("displayType", 0) in (2, 3):
         rank = Metaranks(data)
       else:
-  #      rank = Rankings(data)
-        pass
+        rank = Rankings(data)
     elif data.get("view", "QA") == "AW":
       rank = Awards(data)
     elif data.get("view", "QA") == "SL":
   #    rank = SlothRankings(data)
       pass
     else:
-  #    rank = Rankings(data)
-      pass
+      rank = Rankings(data)
 
   except:
     xs.errorLog()
@@ -218,7 +215,6 @@ class Metaranks():
     return g.con.fetchall()
 
   def findUser(self, findCurrent=True):
-    found = False
     self.query = f""" SELECT userid, SUM(questionsAnswered) AS total {self.setDateType()},
                         name, firstname, lastname
                        FROM leaderboard
@@ -227,24 +223,19 @@ class Metaranks():
                        {self.checkWhere()}{self.setDay()}{self.setMonth()}
                        GROUP BY userid{self.getTimeConditionsQuery()}, name, firstname, lastname
                        ORDER BY total DESC, date ASC, firstname ASC, lastname ASC """
-    result = self.runQuery()
-    self.userRank = -1
-    myrank = 0
-    # TO DO: change this to use a dict cursor or better yet, ORM
     # columns in result set: [userid, questionsAnswered, date, name, firstname, lastname]
-    for row in result:
-      myrank += 1
-      if g.uuid == row[0]:
-        if not found:
-          found = True
-          self.userRank = myrank
-        if findCurrent:
-          if self.compareDateWithCurrent(row[2]):
-            self.currentRank = myrank
-            break
-        else:
-          if found:
-            break
+    result = self.runQuery()
+    myResult = [(i,j[2]) for (i,j) in enumerate(result) if j[0] == g.uuid]
+    # if my uuid is in the result set, myResult is now [(<index>, <date>)]
+    # if not, myResult is an empty list, which is falsy
+    if bool(myResult):
+      myRank = myResult[0][0]+1
+      myDate = myResult[0][1]
+      self.userRank = myRank
+      if findCurrent and self.compareDateWithCurrent(myDate):
+        self.currentRank = myRank
+    else:
+      self.userRank = -1
 
   def checkWhere(self):
     if self.period not in ["daily","weekly","monthly","yearly"]:
@@ -547,3 +538,176 @@ class Awards():
 
   def getUserAmount(self):
     self.userCount = len(self.inData["rankings"])
+
+
+
+class Rankings():
+  def __init__(self, data):
+    if 'curDate' in data:
+      self.curDate = data['curDate']
+    else:
+      self.curDate = "curdate()"
+    self.pageSize = 10
+    if 'pageSize' in data:
+      try:
+        if 1 < int(data['pageSize']) <= 50:
+          self.pageSize = int(data['pageSize'])
+      except ValueError:
+        pass
+    self.pageNumber = 1
+    if 'pageNumber' in data:
+      try:
+        if int(data['pageNumber']) > 0:
+          self.pageNumber = int(data['pageNumber'])
+      except ValueError:
+        pass
+    if 'displayType' in data:
+      try:
+        self.displayType = int(data['displayType'])
+      except ValueError:
+        self.displayType = 0
+    else:
+      self.displayType = 0
+    if 'timeframe' in data:
+      if data['timeframe'] in RANKING_PERIODS:
+        self.period = data['timeframe']
+    else:
+      self.period = 'today'
+
+    self.countUsers()
+    self.findUser()
+    self.getRankingBounds()
+    self.getRankingsData()
+
+  def getTimeConditionsQuery(self):
+    if self.period == 'today':
+      clause = 'dateStamp = @datevalue'
+    elif self.period == 'yesterday':
+      clause = 'dateStamp = @datevalue - INTERVAL 1 DAY'
+    elif self.period == 'thisWeek':
+      clause = 'WEEK(dateStamp, 7) = WEEK(@datevalue, 7) AND YEARWEEK(dateStamp, 7) = YEARWEEK(@datevalue, 7)'
+    elif self.period == 'lastWeek':
+      clause = 'WEEK(dateStamp,7) = WEEK(@datevalue - INTERVAL 7 DAY,7) AND YEARWEEK(dateStamp,7) = YEARWEEK(@datevalue - INTERVAL 7 DAY,7)'
+    elif self.period == 'thisMonth':
+      clause = 'MONTH(dateStamp) = MONTH(@datevalue) AND YEAR(dateStamp) = YEAR(@datevalue)'
+    elif self.period == 'lastMonth':
+      clause = 'MONTH(dateStamp) = MONTH(@datevalue - INTERVAL 1 MONTH) AND YEAR(dateStamp) = YEAR(@datevalue - INTERVAL 1 MONTH)'
+    elif self.period == 'thisYear':
+      clause = 'YEAR(dateStamp) = YEAR(@datevalue)'
+    elif self.period == 'lastYear':
+      clause = 'YEAR(dateStamp) = YEAR(@datevalue - INTERVAL 1 YEAR)'
+    else:
+      clause = ''
+    return clause
+
+  def runQuery(self):
+    """Run the mysql query in self.query"""
+    xs.debug(self.query)
+    g.con.execute(f'SET @datevalue = {self.curDate}')
+    g.con.execute(self.query)
+    return g.con.fetchall()
+
+  def findUser(self):
+    self.query = f'''SELECT name, photo, countryId, SUM(questionsAnswered) AS total, userid, firstname, lastname
+                     FROM leaderboard
+                     JOIN login USING (userid)
+                     JOIN user_prefs USING (userid)
+                     {self.checkEtern("WHERE")}{self.getTimeConditionsQuery()}
+                     GROUP BY userid, name, photo, firstname, lastname, countryId
+                     ORDER BY total DESC, firstname ASC, lastname ASC'''
+    result = self.runQuery()
+    myIndex = [i for (i,j) in enumerate(result) if j[4] == g.uuid]
+    # at this point, myIndex is [<index>] where it's the index of the row matching my uuid in the result set
+    # if no match, myIndex is an empty list which is falsy
+    if bool(myIndex):
+      self.userRank = myIndex[0]+1
+    else:
+      self.userRank = -1
+
+  def checkEtern(self, insert):
+    """Used for query formatting that changes when certain whereclauses aren't needed"""
+    if self.period != 'eternity':
+      return f' {insert} '
+    return ''
+
+  def countUsers(self):
+    self.query = f'SELECT COUNT(DISTINCT userid) AS users FROM leaderboard{self.checkEtern("WHERE")}{self.getTimeConditionsQuery()}'
+    result = self.runQuery()
+    for row in result:
+      self.userCount = row[0]
+
+  def getRankingBounds(self):
+    if self.displayType == 1:
+      bound = self.pageSize
+      if bound % 2 == 0:
+        self.pageSize += 1
+      if bound % 2 != 0:
+        bound = bound - 1
+      bounds = int(bound / 2)
+      self.offset = min(self.userRank - bounds - 1, 0)
+      if self.userRank + bounds > self.userCount:
+        self.offset = min(self.userCount - self.pageSize, 0)
+      self.pageTotal = 1
+      self.page = 1
+    else:
+      self.pageTotal = ceil(self.userCount / self.pageSize)
+      if self.pageTotal == 0:
+        self.pageTotal = 1
+      self.page = min(self.pageNumber-1, self.pageTotal)
+      self.offset = self.pageSize * self.page
+
+  def getRankingsData(self):
+    """Process rankings data from the database"""
+    queryStart = '''SELECT name, photo, countryId, SUM(questionsAnswered) AS total, userid, firstname, lastname
+                    FROM leaderboard
+                    JOIN login USING (userid)
+                    JOIN user_prefs USING (userid)'''
+    self.query = f'''{queryStart}{self.checkEtern("WHERE")}{self.getTimeConditionsQuery()}
+                    GROUP BY userid, name, photo, firstname, lastname, countryId
+                    ORDER BY total DESC, firstname ASC
+                    LIMIT {self.offset},{self.pageSize}'''
+    result = self.runQuery()
+    self.rankData = [ ]
+    foundMe = False
+    for index, row in enumerate(result):
+      rowDict = {"name": row[0], "photo": row[1], "countryId": row[2], "total": row[3],
+                 "userid": row[4], "firstname": row[5], "lastname": row[6]}
+      if rowDict["userid"] == g.uuid:
+        rowDict['isMe'] = True
+        foundMe = True
+      rowDict['rank'] = self.offset + index + 1
+      self.rankData.append(rowDict)
+    if not foundMe:
+      self.query = f'''{queryStart} WHERE userid='{g.uuid}'{self.checkEtern('AND')}{self.getTimeConditionsQuery()}
+                    GROUP BY userid, name, photo, firstname, lastname, countryId
+                    ORDER BY total DESC, firstname ASC, lastname ASC
+                    LIMIT 1'''
+      result = self.runQuery()
+      # I think no rows returned gets me an empty list
+      if result:
+        row = result[0]
+        rowDict = {"name": row[0], "photo": row[1], "countryId": row[2], "total": row[3],
+                 "userid": row[4], "firstname": row[5], "lastname": row[6]}
+        rowDict['isMe'] = True
+        if self.userRank:
+          rowDict['rank'] = self.userRank
+        if rowDict['rank'] < self.rankData[0]['rank']:
+          self.rankData.insert(0, rowDict)
+        else:
+          self.rankData.append(rowDict)
+
+  def getRankings(self):
+    """Format the data structures to output to the client"""
+    rankings = [ ]
+    for row in self.rankData:
+      if row['firstname']:
+        displayName = f'{row["firstname"]} {row["lastname"]}'
+      else:
+        displayName = row['name']
+      rowOut = {'users': [{'photo': row['photo'], 'name': displayName, 'answered': row['total']}],
+           'rank': row['rank'], 'countryId': row['countryId']}
+      if 'isMe' in row:
+        rowOut['isMe'] = row['isMe']
+      rankings.append(rowOut)
+    result = {'rankings': rankings, 'myRank': self.userRank, 'period': self.period, 'users': self.userCount, 'page': self.page+1}
+    return result
