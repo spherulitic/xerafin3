@@ -8,8 +8,6 @@ from flask import request, jsonify, g
 from dateutil.relativedelta import relativedelta, MO
 import xerafinUtil.xerafinUtil as xs
 from stats import app
-#from .rankings import Rankings
-#from .slothRankings import SlothRankings
 
 DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
 MONTHS = ["january","february","march","april","may","june","july",
@@ -570,11 +568,11 @@ class Rankings():
         self.displayType = 0
     else:
       self.displayType = 0
-    if 'period' in data:
-      if data['period'] in RANKING_PERIODS:
-        self.period = data['period']
-      else:
-        self.period = 'today'
+    if 'timeframe' in data:
+      if data['timeframe'] in RANKING_PERIODS:
+        self.period = data['timeframe']
+    else:
+      self.period = 'today'
 
     self.countUsers()
     self.findUser()
@@ -604,6 +602,7 @@ class Rankings():
 
   def runQuery(self):
     """Run the mysql query in self.query"""
+    xs.debug(self.query)
     g.con.execute(f'SET @datevalue = {self.curDate}')
     g.con.execute(self.query)
     return g.con.fetchall()
@@ -613,7 +612,7 @@ class Rankings():
                      FROM leaderboard
                      JOIN login USING (userid)
                      JOIN user_prefs USING (userid)
-                     {self.checkEtern("WHERE")}{self.getTimeConditionsQuery}
+                     {self.checkEtern("WHERE")}{self.getTimeConditionsQuery()}
                      GROUP BY userid, name, photo, firstname, lastname, countryId
                      ORDER BY total DESC, firstname ASC, lastname ASC'''
     result = self.runQuery()
@@ -660,7 +659,7 @@ class Rankings():
   def getRankingsData(self):
     """Process rankings data from the database"""
     queryStart = '''SELECT name, photo, countryId, SUM(questionsAnswered) AS total, userid, firstname, lastname
-                    FROM leaderboard'
+                    FROM leaderboard
                     JOIN login USING (userid)
                     JOIN user_prefs USING (userid)'''
     self.query = f'''{queryStart}{self.checkEtern("WHERE")}{self.getTimeConditionsQuery()}
