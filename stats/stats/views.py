@@ -63,8 +63,6 @@ def default():
 
 @app.route("/getRankings", methods=['GET', 'POST'])
 def getRankings():
-  # for now until all the classes are implemented
-  rank = None
   try:
     data = request.get_json(force=True)
 
@@ -86,8 +84,7 @@ def getRankings():
     elif data.get("view", "QA") == "AW":
       rank = Awards(data)
     elif data.get("view", "QA") == "SL":
-  #    rank = SlothRankings(data)
-      pass
+     rank = SlothRankings(data)
     else:
       rank = Rankings(data)
 
@@ -740,8 +737,8 @@ class SlothRankings():
 
     self.countUsers()
     self.findUser()
-#    $this->getRankingBounds();
-#    $this->getRankingsData();
+    self.getRankingBounds()
+    self.getRankingsData()
 
   def getTimeConditionsQuery(self):
     if self.period == 'today':
@@ -823,87 +820,77 @@ class SlothRankings():
     for row in result:
       self.userCount = row[0]
 
-#
-#  private function getRankingBounds(){
-#    if ($this->displayType == 1){
-#      $bound = $this->pageSize;
-#      if ($bound % 2 == 0) {$this->pageSize++;}
-#      if ($bound % 2 !== 0) {$bound--;}
-#      $bounds = $bound/2;
-#
-#      $this->offset = $this->userRank - $bounds -1;
-#      if ($this->offset < 0) {$this->offset = 0;}
-#      if ($this->userRank + $bounds > $this -> userCount) {
-#        $this->offset = $this->userCount - $this->pageSize;
-#      }
-#      if ($this->offset < 0) {$this->offset = 0;}
-#      $this->pagetotal = 1;
-#      $this->page = 1;
-#    }
-#    else {
-#      $this->pageTotal = ceil($this->userCount / $this->pageSize);
-#      if ($this->pageTotal===0){$this->pageTotal=1;}
-#      $this->page = min(($this->pageNumber-1),($this->pageTotal));
-#      $this->offset = $this->pageSize*($this->page);
-#    }
-#
-#
-#  }
-#
-#  private function getRankingsData(){
-#    $queryStart = "SELECT name, photo, countryId, COUNT(".$this->getSlothSubSelect()."alphagram) AS total, userid, firstname, lastname FROM sloth_completed
-#    JOIN login USING (userid)
-#    JOIN user_prefs USING (userid)";
-#    $this->query = $queryStart." WHERE ".$this->getTimeConditionsQuery()." AND ".$this->getSlothSubFilter()."
-#    GROUP BY userid, name, photo, firstname, lastname, countryId
-#    ORDER BY total DESC, firstname ASC, lastname ASC
-#    LIMIT ".$this->offset.",".$this->pageSize;
-#    $res = $this->runQuery();
-#    $rank = $this->offset;
-#    $this->rankData = [];
-#    $foundMe = false;
-#    while ($row = $res->fetch_assoc()){
-#      $rank++;
-#      if ($row['userid'] == $this->userid){
-#        $row['isMe']=true;
-#        $foundMe=true;
-#      }
-#      $row['rank']=$rank;
-#      $this->rankData[] = $row;
-#    }
-#    if ($foundMe==false){
-#      $this->query = $queryStart." WHERE "." userid=".$this->userid." AND ".$this->getSlothSubFilter()." AND ".$this->getTimeConditionsQuery()."
-#      GROUP BY userid, name, photo, firstname, lastname, countryId
-#      ORDER BY total DESC, firstname ASC, lastname ASC
-#      LIMIT 1";
-#      $res = $this->runQuery();
-#      while ($row = $res->fetch_assoc()){
-#        if ($row['userid'] == $this->userid){
-#          $row['isMe']=true;
-#          if ($this->userRank!==false){$row['rank']=$this->userRank;}
-#          if ($row['rank'] < $this->rankData[0]['rank']){array_unshift($this->rankData, $row);}
-#          else {$this->rankData[] = $row;}
-#        }
-#      }
-#    }
-#  }
-#  public function getRankingsJSON(){
-#    $b = [];
-#    foreach ($this->rankData as $row) {
-#      if (strlen($row['firstname'])==0){$d=$row['name'];}
-#      else {$d=$row['firstname']." ".$row['lastname'];}
-#      $c = array(
-#        'users'=> array(
-#          0 => array(
-#            'photo'=>$row['photo'], 'name'=>$d, 'answered'=> $row['total']
-#          )
-#        ),
-#        'rank'=> $row['rank'], 'countryId'=> $row['countryId']
-#      );
-#      if (isset($row['isMe'])){$c['isMe'] = $row['isMe'];}
-#      $b[]= $c;
-#    }
-#    $a=array('rankings'=> $b, 'myRank'=> $this->userRank, 'period'=> $this->period, 'users' => $this->userCount, 'page' => $this->page+1 );
-#    echo json_encode($a,true);
-#  }
-#
+  def getRankingBounds(self):
+    if self.displayType == 1:
+      bound = self.pageSize
+      if bound % 2 == 0:
+        self.pageSize += 1
+      if bound % 2 != 0:
+        bound = bound - 1
+      bounds = int(bound / 2)
+      self.offset = min(self.userRank - bounds - 1, 0)
+      if self.userRank + bounds > self.userCount:
+        self.offset = min(self.userCount - self.pageSize, 0)
+      self.pageTotal = 1
+      self.page = 1
+    else:
+      self.pageTotal = ceil(self.userCount / self.pageSize)
+      if self.pageTotal == 0:
+        self.pageTotal = 1
+      self.page = min(self.pageNumber-1, self.pageTotal)
+      self.offset = self.pageSize * self.page
+
+  def getRankingsData(self):
+    queryStart = f'''SELECT name, photo, countryId, COUNT({self.getSlothSubSelect()}alphagram) AS total, userid, firstname, lastname
+                    FROM sloth_completed
+                    JOIN login USING (userid)
+                    JOIN user_prefs USING (userid)'''
+    self.query = f'''{queryStart} WHERE {self.getTimeConditionsQuery()} AND {self.getSlothSubFilter()}
+                    GROUP BY userid, name, photo, firstname, lastname, countryId
+                    ORDER BY total DESC, firstname ASC, lastname ASC
+                    LIMIT {self.offset},{self.pageSize}'''
+    result = self.runQuery
+    self.rankData = [ ]
+    foundMe = False
+    for index, row in enumerate(result):
+      rowDict = {"name": row[0], "photo": row[1], "countryId": row[2], "total": row[3],
+                 "userid": row[4], "firstname": row[5], "lastname": row[6]}
+      if rowDict["userid"] == g.uuid:
+        rowDict['isMe'] = True
+        foundMe = True
+      rowDict['rank'] = self.offset + index + 1
+      self.rankData.append(rowDict)
+    if not foundMe:
+      self.query = f'''{queryStart} WHERE userid='{g.uuid}' AND {self.getSlothSubFilter()} AND {self.getTimeConditionsQuery()}
+                    GROUP BY userid, name, photo, firstname, lastname, countryId
+                    ORDER BY total DESC, firstname ASC, lastname ASC
+                    LIMIT 1'''
+      result = self.runQuery()
+      # I think no rows returned gets me an empty list
+      if result:
+        row = result[0]
+        rowDict = {"name": row[0], "photo": row[1], "countryId": row[2], "total": row[3],
+                 "userid": row[4], "firstname": row[5], "lastname": row[6]}
+        rowDict['isMe'] = True
+        if self.userRank:
+          rowDict['rank'] = self.userRank
+        if rowDict['rank'] < self.rankData[0]['rank']:
+          self.rankData.insert(0, rowDict)
+        else:
+          self.rankData.append(rowDict)
+
+  def getRankings(self):
+    """Format the data structures to output to the client"""
+    rankings = [ ]
+    for row in self.rankData:
+      if row['firstname']:
+        displayName = f'{row["firstname"]} {row["lastname"]}'
+      else:
+        displayName = row['name']
+      rowOut = {'users': [{'photo': row['photo'], 'name': displayName, 'answered': row['total']}],
+           'rank': row['rank'], 'countryId': row['countryId']}
+      if 'isMe' in row:
+        rowOut['isMe'] = row['isMe']
+      rankings.append(rowOut)
+    result = {'rankings': rankings, 'myRank': self.userRank, 'period': self.period, 'users': self.userCount, 'page': self.page+1}
+    return result
