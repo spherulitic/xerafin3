@@ -8,6 +8,7 @@ function startQuiz() {
     $.ajax({
         type: "POST",
         data: JSON.stringify(d),
+        headers: {"Accept": "application/json", "Authorization": keycloak.token},
         url: "newQuiz",
         beforeSend: function(){$("#quizConnect").html('<img src="images/ajaxLoad.gif" style="height:0.8em"> Initializing Quiz...');},
         success: function(response, responseStatus) {
@@ -197,6 +198,7 @@ function getQuestion() {
        }
     $.ajax({
         type: "POST",
+        headers: {"Accept": "application/json", "Authorization": keycloak.token},
         url: url,
         data: JSON.stringify(d),
     beforeSend: function (){
@@ -252,6 +254,7 @@ function prepareNewWords() {
             var d = { userid: userid };
             $.ajax({
                 type: "POST",
+                headers: {"Accept": "application/json", "Authorization": keycloak.token},
                 url: "prepareNewWords.py",
                 data: JSON.stringify(d),
                 success: function(response, responseStatus) {
@@ -315,6 +318,7 @@ function initQuestionData(response, responseStatus) {
         };
         $.ajax({
             type: "POST",
+            headers: {"Accept": "application/json", "Authorization": keycloak.token},
             url: "prepareNewWords.py",
             data: JSON.stringify(d),
             success: function(response, responseStatus) {
@@ -489,6 +493,7 @@ function skipQuestion() {
     document.getElementById('skipButton').disabled = true;
     var d = {user: userid, question: alphagram};
     $.ajax({ type: "POST",
+             headers: {"Accept": "application/json", "Authorization": keycloak.token},
              url: "delayQuestion.py",
              data: JSON.stringify(d),
             success: function(response, responseStatus) {
@@ -595,6 +600,7 @@ function submitQuestion(correct) {
     };
     $.ajax({
         type: "POST",
+        headers: {"Accept": "application/json", "Authorization": keycloak.token},
         url: "submitQuestion",
         data: JSON.stringify(d),
         success: function(response, responseStatus) {
@@ -970,6 +976,7 @@ function addToCardboxFromQuiz(word) {
       var d = {user: userid, question: alpha};
       $.ajax({type: "POST",
               data: JSON.stringify(d),
+              headers: {"Accept": "application/json", "Authorization": keycloak.token},
                url: "addQuestionToCardbox.py",
            success: addedToCardboxFromQuiz,
              error:  function(jqXHR, textStatus, errorThrown) {

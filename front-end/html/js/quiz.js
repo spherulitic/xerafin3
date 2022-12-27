@@ -47,6 +47,7 @@ class QuizList {
     var d = { quizid: quizid };
     $.ajax({type: "POST",
             data: JSON.stringify(d),
+            headers: {"Accept": "application/json", "Authorization": keycloak.token},
             url: "discardBookmark.py",
             success: function(response, responseStatus) { self.refreshQuizList(self.data); },
             error: function(jqXHR, textStatus, errorThrown) {
@@ -63,6 +64,7 @@ class QuizList {
              action: action}; // action in <resetall, resetwrong>
     $.ajax({type: "POST",
             data: JSON.stringify(d),
+            headers: {"Accept": "application/json", "Authorization": keycloak.token},
             url: "resetQuiz.py",
             success: function(response, responseStatus) { //console.log("Quiz reset");
                                                           self.refreshQuizList(self.data);
@@ -87,6 +89,7 @@ class QuizList {
     let d = { quizidList: quizidList };
     $.ajax({type: "POST",
     data: JSON.stringify(d),
+    headers: {"Accept": "application/json", "Authorization": keycloak.token},
     url: "activateQuiz.py",
     success: function(response, responseStatus) {
       self.refreshQuizList(self.data);
@@ -116,6 +119,7 @@ class QuizList {
     $.ajax({
       type: "POST",
       data: JSON.stringify(d),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "addQuizToCardbox.py",
       success: function(response, responseStatus) {
         delete self.addAttempts;
@@ -151,6 +155,7 @@ class Quiz {
     };
     $.ajax({ type: "POST",
              data: JSON.stringify(d),
+             headers: {"Accept": "application/json", "Authorization": keycloak.token},
               url: "newQuiz",
      success: function(response, responseStatus) { self.initialized = true;
                                                  //console.log("New Quiz initialization done");
@@ -180,6 +185,7 @@ class Quiz {
        var d = { userid: userid };
        $.ajax({
            type: "POST",
+           headers: {"Accept": "application/json", "Authorization": keycloak.token},
            url: "prepareNewWords.py",
            data: JSON.stringify(d),
            success: function(response, responseStatus) {
@@ -214,6 +220,7 @@ class Quiz {
           d.cardbox = localStorage.cardboxCurrent;
         }
       $.ajax({ type: "POST",
+        headers: {"Accept": "application/json", "Authorization": keycloak.token},
         url: "getQuestions",
         data: JSON.stringify(d),
         success: function(response, responseStatus) {
@@ -306,6 +313,7 @@ class Quiz {
 
          $.ajax({
                type: "POST",
+               headers: {"Accept": "application/json", "Authorization": keycloak.token},
                url: "delayQuestion.py",
                data: JSON.stringify(d),
                success: function(response, responseStatus) {
@@ -479,6 +487,7 @@ class Question {
     appendDebugLog("Submitting Question " + self.alpha);
     $.ajax({
       type: "POST",
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "submitQuestion",
       data: JSON.stringify(d),
       success: function(response, responseStatus) {
@@ -539,6 +548,7 @@ class Question {
   addToCardbox() {
     let d = { user: userid, question: this.alpha };
     $.ajax({
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "addQuestionToCardbox.py",
       type: "POST",
       data: JSON.stringify(d),
