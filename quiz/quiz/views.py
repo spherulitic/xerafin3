@@ -26,9 +26,6 @@ dictConfig({
 })
 
 QUIZJSON_PATH = "/app/quizjson"
-AUTH_TOKEN = request.headers["Authorization"]
-# headers to send when calling other services
-HEADERS = {"Accept": "application/json", "Authorization": AUTH_TOKEN}
 
 @app.before_request
 def get_user():
@@ -38,13 +35,14 @@ def get_user():
     public_key = f'''-----BEGIN PUBLIC KEY-----
 {public_key}
 -----END PUBLIC KEY-----'''
-#  raw_token = request.headers["Authorization"]
-#  auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
-  decoded_token = jwt.decode(AUTH_TOKEN, public_key, audience="x-client", algorithms=['RS256'])
-  g.uuid = decoded_token["sub"]
+  raw_token = request.headers["Authorization"]
+  auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
+  g.uuid = auth_token["sub"]
 
   g.mysqlcon = xu.getMysqlCon()
   g.con = g.mysqlcon.cursor()
+  # headers to send when calling other services
+  g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
   return None
 
@@ -267,7 +265,7 @@ def newQuiz():
     if isCardbox:
       result["quizName"] = "Cardbox Quiz"
       url = 'http://cardbox:5000/newQuiz'
-      requests.get(url, headers=HEADERS)
+      requests.get(url, headers=g.headers)
     else:
       g.con.execute(f'select quiz_name from quiz_master where quiz_id = {quizid}')
       result["quizName"] = g.con.fetchone()[0]
@@ -287,7 +285,7 @@ def newQuiz():
 
     # send back cardbox info always
     url = 'http://cardbox:5000/getCardboxScore'
-    cbxResponse = requests.get(url, headers=HEADERS)
+    cbxResponse = requests.get(url, headers=g.headers).json()
     cbxScore = cbxResponse[0].get("score", 0)
 
     g.con.execute(f"select questionsAnswered, startScore from leaderboard where userid = '{g.uuid}' and dateStamp = curdate()")
