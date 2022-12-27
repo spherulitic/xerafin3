@@ -14,10 +14,11 @@ class QuizList {
   } else {
   $.ajax({ type: "POST",
            data: JSON.stringify(d),
-     url: "getQuizList",
-     success: function(response, responseStatus) { self.quizList = response;
-                                                   self.initialized = true; },
-     error: function(jqXHR, textStatus, errorThrown) {
+           headers: {"Accept": "application/json", "Authorization": keycloak.token},
+           url: "getQuizList",
+           success: function(response, responseStatus) { self.quizList = response;
+                                                         self.initialized = true; },
+           error: function(jqXHR, textStatus, errorThrown) {
            var msg = "error, status = " + textStatus + " error: " + errorThrown;
            appendDebugLog(msg); }
            });
@@ -26,15 +27,12 @@ class QuizList {
   refreshQuizList(d) {
     var self = this;
     this.initialized = false;
-  //  if (d)
-  //    d.userid = userid;
-  //  else
-  //    var d = {userid: userid };
   $.ajax({ type: "POST",
            data: JSON.stringify(d),
-     url: "getQuizList",
-     success: function(response, responseStatus) { self.quizList = response;
-                                                   self.initialized = true;
+           headers: {"Accept": "application/json", "Authorization": keycloak.token},
+           url: "getQuizList",
+           success: function(response, responseStatus) { self.quizList = response;
+                                                         self.initialized = true;
      },
      error: function(jqXHR, textStatus, errorThrown) {
            var msg = "error, status = " + textStatus + " error: " + errorThrown;
