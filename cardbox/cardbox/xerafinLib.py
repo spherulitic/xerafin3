@@ -28,15 +28,6 @@ from xerafinUtil import xerafinUtil as xs
 
 CARDBOX_DB_PATH = "cardbox-data"
 
-def getLexicon(userid):
-  ''' Returns lexicon and version for this user
-  '''
-  lexicon = "csw"
-  with xs.getMysqlCon().cursor() as con:
-    command = "select version from user_lexicon_master where userid = %s and lower(lexicon) = %s"
-    con.execute(command, (userid, lexicon))
-    version = con.fetchone()[0]
-  return f"{lexicon}{version}"
 
 def getDBFile(userid):
   ''' Return path to the user's cardbox sqlite DB file
@@ -487,23 +478,6 @@ def makeWordsAvailable (userid, cur) :
     f"where difficulty = 0 and next_scheduled < {clearedUntil}")
   cur.execute(f"update new_words_at set timeStamp = {min(newWordsAt,maxReadAhead)}")
   cur.execute(f"update cleared_until set timeStamp = {min(clearedUntil, maxReadAhead+1)}")
-
-def newQuiz (userid):
-  '''Resets the difficulty parameter in cardbox to prepare for a new quiz:
-     - puts backlog words in the backlog
-     - marks future words as either doable or undoable
-  '''
-  now = int(time.time())
-  checkCardboxDatabase(userid)
-  with lite.connect(getDBFile(userid)) as con:
-    cur = con.cursor()
-    dbClean(cur)
-    cur.execute("select * from cleared_until")
-    clearedUntil = cur.fetchone()[0]
-    closetSweep(cur, userid)
-    futureSweep(cur)
-    command = "update questions set difficulty = -1 where difficulty = 0 and next_scheduled < ?"
-    cur.execute(command, (max(now, clearedUntil),))
 
 def getBingoFromCardbox (userid, cardbox=0):
   """

@@ -74,6 +74,10 @@ def countries():
 
 @app.route("/getUserLexicons", methods=['GET', 'POST'])
 def getUserLexicons():
+  '''Returns the lexicon / version that a user is configured for.
+      Right now Xerafin only supports CSW, but (at times) multiple editions.
+      In theory someday we can support multiple languages but this may be tricky
+  '''
   result = { }
   result["status"] = "success"
   try:

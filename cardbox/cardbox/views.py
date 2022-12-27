@@ -199,27 +199,26 @@ def getCardboxScoreView():
 #    result["status"] = "An error occurred. See log for details."
 #
 #  return jsonify(result)
-#
-#@app.route("/getQuestions", methods=['GET', 'POST'])
-#def getQuestions():
-#
-#  try:
-#    userid = xu.getUseridFromCookies()
-#    result = {"getFromStudyOrder": False, "questions": [ ] }
-#
-#
-#    params = request.get_json(force=True) # returns dict
-#    numQuestions = params.get("numQuestions", 1)
-#    isCardbox = params.get("isCardbox", True)
-#    quizid = int(params.get("quizid", -1))
-#    cardbox = int(params.get("cardbox", 0))
-#    lock = params.get("lock", False)
-#    requestedAlpha = params.get("alpha", None)
-#
-#    # xerafinLib.getQuestions returns something like { "ALPHAGRAM": [WORD, WORD, WORD] }
-#    # FYI - the None here is to filter on question length, which is currently disabled
-#
-#    # Note if requestedAlpha is populated, numQuestions is ignored
+
+@app.route("/getQuestions", methods=['GET', 'POST'])
+def getQuestions():
+
+  result = {"getFromStudyOrder": False, "questions": [ ] }
+  try:
+
+    params = request.get_json(force=True) # returns dict
+    numQuestions = params.get("numQuestions", 1)
+    isCardbox = params.get("isCardbox", True)
+    quizid = int(params.get("quizid", -1))
+    cardbox = int(params.get("cardbox", 0))
+    lock = params.get("lock", False)
+    requestedAlpha = params.get("alpha", None)
+
+    # xerafinLib.getQuestions returns something like { "ALPHAGRAM": [WORD, WORD, WORD] }
+    # FYI - the None here is to filter on question length, which is currently disabled
+
+    # Note if requestedAlpha is populated, numQuestions is ignored
+
 #    if requestedAlpha:
 #      questions = {requestedAlpha: xerafinLib.getAnagrams(requestedAlpha, userid)}
 #    else:
@@ -269,11 +268,11 @@ def getCardboxScoreView():
 #                      json={"userid":userid}, timeout=.1)
 #      except requests.exceptions.ReadTimeout:
 #        pass
-#  except Exception as ex:
-#    xu.errorLog()
-#    result["status"] = "An error occurred. See log for details."
-#
-#  return jsonify(result)
+  except Exception as ex:
+    xu.errorLog()
+    result["status"] = "An error occurred. See log for details."
+
+  return jsonify(result)
 
 @app.route("/newQuiz", methods=["GET", "POST"])
 def newQuiz():
@@ -504,3 +503,14 @@ def closetSweep():
     f"cardbox < {closet} and difficulty != 1")
   g.cur.execute("update questions set difficulty = 2 " +
     f"where cardbox >= {closet} and difficulty != 1 and next_scheduled < {now}")
+
+
+#def getLexicon(userid):
+#  ''' Returns lexicon and version for this user
+#  '''
+#  lexicon = "csw"
+#  with xs.getMysqlCon().cursor() as con:
+#    command = "select version from user_lexicon_master where userid = %s and lower(lexicon) = %s"
+#    con.execute(command, (userid, lexicon))
+#    version = con.fetchone()[0]
+#  return f"{lexicon}{version}"
