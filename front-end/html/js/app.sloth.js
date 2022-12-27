@@ -115,6 +115,7 @@ SlothQuestion.prototype = {
       $.ajax({
         type: "POST",
         data: JSON.stringify({user: userid, question: this.data.alpha}),
+        headers: {"Accept": "application/json", "Authorization": keycloak.token},
         url: "addQuestionToCardbox.py",
         success: function(response,responseStatus){
           self.addDone=true;
@@ -167,6 +168,7 @@ SlothQuestion.prototype = {
     $.ajax({
     type: "POST",
     data: JSON.stringify(d),
+    headers: {"Accept": "application/json", "Authorization": keycloak.token},
     url: "submitQuestion",
     success: function(response) {
       if (i){
@@ -405,6 +407,7 @@ Sloth.prototype = {
     $.ajax({
       type: "POST",
       data: JSON.stringify({'action':'GET_STATS', 'user': userid, 'lexicon':this.lexicon}),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "/PHP/slothQuery.php",
       success: function(response,responseStatus){
         let x = JSON.parse(response);
@@ -427,6 +430,7 @@ Sloth.prototype = {
         'alpha':this.question,
         'lexicon':this.lexicon
       }),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "/PHP/slothQuery.php",
       success: function(response,responseStatus){
         let x = JSON.parse(response);
@@ -449,6 +453,7 @@ Sloth.prototype = {
         'alpha':this.question,
         'token':this.token
       }),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "/PHP/slothQuery.php",
       success: function(response,responseStatus){
         self.writeDone= true;
@@ -474,6 +479,7 @@ Sloth.prototype = {
         'correct': c,
         'lexicon':this.lexicon
       }),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "/PHP/slothQuery.php",
       success: function(response,responseStatus){
         //Returns time and rank
@@ -498,6 +504,7 @@ Sloth.prototype = {
     $.ajax({
       type: "POST",
       data: d,
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "/PHP/slothQuery.php",
       success: function(response,responseStatus){
         let x = JSON.parse(response);
@@ -598,6 +605,7 @@ Sloth.prototype = {
         'mode':'alpha',
         'checkList':[q]
       }),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "checkAlpha.py",
       success: function(response,responseStatus){
         if (response[q]){
@@ -636,6 +644,7 @@ Sloth.prototype = {
     }
     $.ajax({type: "POST",
       data: JSON.stringify(d),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "newQuiz",
       success: function(response,responseStatus){
         self.getNextBingo();
@@ -657,6 +666,7 @@ Sloth.prototype = {
     }
     $.ajax({type: "POST",
       data: JSON.stringify(d),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "getRandomBingo.py",
       success: function(response,responseStatus){
         self.question = response.alpha;
@@ -679,6 +689,7 @@ Sloth.prototype = {
     //d.lexicon = overview.data.lexicon.current;
     $.ajax({type: "POST",
       data: JSON.stringify(d),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "getNextBingo.py",
       success: function(response,responseStatus){
         self.question = response[0].alpha;
@@ -696,6 +707,7 @@ Sloth.prototype = {
     $.ajax({
       type: "POST",
       data: JSON.stringify(d),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "getSlothData.py",
       success:  function(response,responseStatus){
         self.data = response[0];
@@ -728,6 +740,7 @@ Sloth.prototype = {
     }
     $.ajax({type: "POST",
       data: JSON.stringify(d),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "newQuiz",
       success: function(response,responseStatus){
         xerafin.error.log.add("Sloth: Question locks reset","HTTP");

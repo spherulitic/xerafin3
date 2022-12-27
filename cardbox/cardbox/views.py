@@ -1,16 +1,15 @@
 '''Xerafin cardbox module'''
 
-from cardbox import app
-from flask import jsonify, request, Response, g, session
-import urllib
 import json
-import requests
-import jwt
 from logging.config import dictConfig
-import sys
+import urllib
 import time
-import xerafinUtil.xerafinUtil as xu
 import sqlite3 as lite
+#import requests
+import jwt
+from flask import jsonify, request, g
+import xerafinUtil.xerafinUtil as xu
+from cardbox import app
 
 dictConfig({
     'version': 1,
@@ -48,19 +47,26 @@ def get_user():
 
 @app.after_request
 def close_sqlite(response):
+  '''Close the cursor to the cardbox database'''
   g.con.close()
   return response
 
 @app.route("/", methods=['GET', 'POST'])
 def default():
+  '''A default service to test the container is up'''
   return "Xerafin Cardbox Service"
 
 @app.route("/getCardboxScore", methods=['GET', 'POST'])
 def getCardboxScoreView():
+  '''Returns [ result, error ]
+      result = { "score": integer }
+      error = { "status": "success"|"error" }
+  '''
 
+  error = {"status": "success"}
+  result = {"score": 0}
   try:
-    error = {"status": "success"}
-    result = {"score": getCardboxScore() }
+    result["score"] = getCardboxScore()
 
   except:
     xu.errorLog()
@@ -269,9 +275,33 @@ def getCardboxScoreView():
 #
 #  return jsonify(result)
 
+@app.route("/newQuiz", methods=["GET", "POST"])
+def newQuiz():
+  '''Resets the difficulty parameter in cardbox to prepare for a new quiz:
+     - puts backlog words in the backlog
+     - marks future words as either doable or undoable
+     NOTE this is only accessible from other services. Not exposed through nginx rev proxy
+  '''
+  result = {"result": "success"}
+  try:
+    now = int(time.time())
+    dbClean()
+    closetSweep()
+    futureSweep()
+    g.cur.execute("select * from cleared_until")
+    clearedUntil = g.cur.fetchone()[0]
+    command = f"update questions set difficulty = -1 where difficulty = 0 and next_scheduled < {max(now, clearedUntil)}"
+    g.cur.execute(command)
+  except Exception:
+    xu.errorLog()
+    result["result"] = "error"
+  return jsonify(result)
+
 
 @app.route("/getCardboxStats", methods=["GET", "POST"])
 def getCardboxStats():
+  result = { }
+  error = {"status": "success"}
   try:
 
     params = request.get_json(force=True) # returns dict
@@ -281,8 +311,6 @@ def getCardboxStats():
     overview = params.get("overview", False)
     earliest = params.get("earliest", False)
 
-    result = { }
-    error = {"status": "success"}
     now = int(time.time())
     DAY = 3600 * 24 # length of a day in seconds
 
@@ -324,7 +352,7 @@ def getCardboxStats():
         pct = (float(totalCards[box])/float(allLenFreq[box])) * 100.0
         result["coverage"][box]["percent"] = format(pct, '.2f')
 
-  except Exception as ex:
+  except Exception:
     xu.errorLog()
     error["status"] = "An error occurred. See log for details."
 
@@ -451,3 +479,28 @@ def futureSweep():
   # Anything in cardbox N; 1 <= N <= 9; we can see N days ahead of schedule
   g.cur.execute("update questions set difficulty = 4 where cardbox < 10 " +
     "and next_scheduled > ?+(cardbox*3600*24) and difficulty in (0, -1)", (now,))
+
+def dbClean():
+  ''' Make sure the database is in a good state.
+      - No overlap between questions and next_added
+      - Nothing with a difficult that's not in cardbox
+  '''
+
+  g.cur.execute('''delete from next_added where question in
+                (select question from questions where next_scheduled is not null)''')
+  g.cur.execute("update questions set difficulty = null where cardbox is null")
+
+
+def closetSweep():
+  ''' Puts backlog items in backlog status
+      Note this will unlock anything locked with difficulty 3
+  '''
+
+  now = int(time.time())
+#  closet = getPrefs("closet", userid)
+  # Dummy value for now. See issue #83
+  closet = 10
+  g.cur.execute("update questions set difficulty = 0 where " +
+    f"cardbox < {closet} and difficulty != 1")
+  g.cur.execute("update questions set difficulty = 2 " +
+    f"where cardbox >= {closet} and difficulty != 1 and next_scheduled < {now}")

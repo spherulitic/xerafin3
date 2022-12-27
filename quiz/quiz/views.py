@@ -1,9 +1,13 @@
-from quiz import app
-from flask import jsonify, request, Response, g, session
+import os
 from logging.config import dictConfig
-import urllib, requests, jwt, json
+import urllib
+import json
 from datetime import datetime
+from flask import jsonify, request, g
+import requests
+import jwt
 import xerafinUtil.xerafinUtil as xu
+from quiz import app
 
 dictConfig({
     'version': 1,
@@ -37,6 +41,8 @@ def get_user():
 
   g.mysqlcon = xu.getMysqlCon()
   g.con = g.mysqlcon.cursor()
+  # headers to send when calling other services
+  g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
   return None
 
@@ -127,7 +133,8 @@ def getQuizList():
       quizidSet = quizidSet | {x[0] for x in g.con.fetchall()}
 
       # no completed quizzes in My Quizzes. The front end wants them separate
-      stmt = "select quiz_id from quiz_user_detail where user_id = %s group by quiz_id having sum(completed) = count(*)"
+      stmt = '''select quiz_id from quiz_user_detail
+             where user_id = %s group by quiz_id having sum(completed) = count(*)'''
       g.con.execute(stmt, [g.uuid])
       completedList = [x[0] for x in g.con.fetchall()]
       for q in completedList:
@@ -139,7 +146,9 @@ def getQuizList():
       quizidList.append(-1)
 
     elif searchType == "completed":
-      stmt = "select quiz_id from quiz_user_detail where user_id = %s group by quiz_id having sum(completed) = count(*) and max(last_answered) > DATE_SUB(CURDATE(), INTERVAL %s DAY)"
+      stmt = '''select quiz_id from quiz_user_detail where user_id = %s
+             group by quiz_id having sum(completed) = count(*)
+             and max(last_answered) > DATE_SUB(CURDATE(), INTERVAL %s DAY)'''
       g.con.execute(stmt, [g.uuid, QUIZ_INACTIVE_TIMER])
       quizidList = [x[0] for x in g.con.fetchall()]
 
@@ -220,9 +229,9 @@ def getQuizList():
           if template["untried"] == 0:
             template["status"] = "Completed"
             if row[3]:
-              last_correct = row[3] # it comes out of mysql as a datetime!
+              lastCorrect = row[3] # it comes out of mysql as a datetime!
               # if it's completed more than four days ago, drop it off the list entirely
-              if (datetime.today() - last_correct).days > QUIZ_INACTIVE_TIMER:
+              if (datetime.today() - lastCorrect).days > QUIZ_INACTIVE_TIMER:
                 continue
           else:
             template["status"] = "Active"
@@ -243,52 +252,56 @@ def getQuizList():
 
   return jsonify(result)
 
+@app.route("/newQuiz", methods=["GET", "POST"])
+def newQuiz():
 
-#@app.route("/newQuiz", methods=["GET", "POST"])
-#def newQuiz():
-#
-#  result = { }
-#
-#  try:
-#    params = request.get_json(force=True) # returns dict
-#    userid = xu.getUseridFromCookies()
-#    isCardbox = params.get("isCardbox", True)
-#    quizid = params.get("quizid", -1)
-#
-#    with xu.getMysqlCon().cursor() as con:
-#      if isCardbox:
-#        result["quizName"] = "Cardbox Quiz"
-#        xl.newQuiz(userid)
-#      else:
-#        con.execute("select quiz_name from quiz_master where quiz_id = %s", (quizid,))
-#        result["quizName"] = con.fetchone()[0]
-#        con.execute("select count(*) from quiz_user_detail where quiz_id = %s and user_id = %s", (quizid, userid))
-#        c = int(con.fetchone()[0])
-#        if c > 0:
-#          con.execute("update quiz_user_detail set locked = 0 where quiz_id = %s and user_id = %s", (quizid, userid))
-#        else:
-#          # load quiz json
-#          filename = os.path.join(QUIZJSON_PATH, "{}.json".format(quizid))
-#          with open(filename, 'r') as f:
-#            data = json.load(f)
-#          # insert into quiz user detail
-#          for alpha in data["alphagrams"]:
-#            con.execute("insert into quiz_user_detail (id, quiz_id, user_id, alphagram, locked, completed, correct, incorrect) values (NULL, %s, %s, %s, 0, 0, 0, 0)", (quizid, userid, alpha))
-#
-#      # send back cardbox info always
-#      con.execute("select questionsAnswered, startScore from leaderboard where userid = %s and dateStamp = curdate()", (userid,))
-#      row = con.fetchone()
-#      if row is not None:
-#        result["qAnswered"] = row[0]
-#        result["startScore"] = row[1]
-#        result["score"] = xl.getCardboxScore(userid)
-#      else:
-#        result["qAnswered"] = 0
-#        result["startScore"] = xl.getCardboxScore(userid)
-#        result["score"] = result["startScore"]
-#
-#  except Exception as ex:
-#    xu.errorLog()
-#    result["error"] = "An error occurred. See log for details."
-#
-#  return jsonify(result)
+  result = { }
+
+  try:
+    params = request.get_json(force=True) # returns dict
+    isCardbox = params.get("isCardbox", True)
+    quizid = params.get("quizid", -1)
+
+    if isCardbox:
+      result["quizName"] = "Cardbox Quiz"
+      url = 'http://cardbox:5000/newQuiz'
+      requests.get(url, headers=g.headers)
+    else:
+      g.con.execute(f'select quiz_name from quiz_master where quiz_id = {quizid}')
+      result["quizName"] = g.con.fetchone()[0]
+      g.con.execute(f"select count(*) from quiz_user_detail where quiz_id = {quizid} and user_id = {g.uuid}")
+      c = int(g.con.fetchone()[0])
+      if c > 0:
+        g.con.execute(f"update quiz_user_detail set locked = 0 where quiz_id = {quizid} and user_id = {g.uuid}")
+      else:
+        # load quiz json
+        filename = os.path.join(QUIZJSON_PATH, f"{quizid}.json")
+        with open(filename, 'r') as f:
+          data = json.load(f)
+        # insert into quiz user detail
+        for alpha in data["alphagrams"]:
+          g.con.execute(f'''insert into quiz_user_detail (id, quiz_id, user_id, alphagram, locked, completed, correct, incorrect)
+                              values (NULL, {quizid}, "{g.uuid}", "{alpha}", 0, 0, 0, 0)''')
+
+    # send back cardbox info always
+    url = 'http://cardbox:5000/getCardboxScore'
+    cbxResponse = requests.get(url, headers=g.headers).json()
+    cbxScore = cbxResponse[0].get("score", 0)
+
+    g.con.execute(f"select questionsAnswered, startScore from leaderboard where userid = '{g.uuid}' and dateStamp = curdate()")
+    row = g.con.fetchone()
+
+    if row is not None:
+      result["qAnswered"] = row[0]
+      result["startScore"] = row[1]
+      result["score"] = cbxScore
+    else:
+      result["qAnswered"] = 0
+      result["startScore"] = cbxScore
+      result["score"] = cbxScore
+
+  except Exception:
+    xu.errorLog()
+    result["error"] = "An error occurred. See log for details."
+
+  return jsonify(result)

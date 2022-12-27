@@ -47,6 +47,7 @@ Invader.prototype = {
     $.ajax({
       type: "POST",
       data: JSON.stringify(d),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "getInvaderHighScores.py",
       success: function(response, responseStatus) {
         that.personalHighScore = response[0].personal;
@@ -321,6 +322,7 @@ Invader.prototype = {
     var d = { numQuestions: 1, user: userid, lock: true };
     var that=this;
     $.ajax({ type: "POST",
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "getQuestion.py",
       data: JSON.stringify(d),
       success: function (response, responseStatus) {
@@ -395,6 +397,7 @@ Invader.prototype = {
       var that=this;
       $.ajax({type: "POST",
         data: JSON.stringify(d),
+        headers: {"Accept": "application/json", "Authorization": keycloak.token},
         url: "setInvaderHighScores.py",
         success: function(response, responseStatus) {
           that.personalHighScore = response[0].personal;
@@ -534,6 +537,7 @@ Invader.prototype = {
     $.ajax({
       type: "POST",
       data: JSON.stringify(d),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       url: "newQuiz",
       success: function(response,responseStatus){
         gUpdateCardboxScores (response, 0);
@@ -653,6 +657,7 @@ function slothSubmitQuestion(d) {
   $.ajax({
     type: "POST",
     data: JSON.stringify(d),
+    headers: {"Accept": "application/json", "Authorization": keycloak.token},
     url: "submitQuestion",
     success: function(response) {
       if (d.incrementQ){
