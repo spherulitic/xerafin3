@@ -1,4 +1,4 @@
-data = [
+data = (
 'INQS',
 'AEINORT',
 'ANQRT',
@@ -246197,4 +246197,4 @@ data = [
 'HINOOOPPPRRRSTY',
 'IIIIINNOQSSSTTU',
 'IILLNOOORRSTTTU'
-]
+)

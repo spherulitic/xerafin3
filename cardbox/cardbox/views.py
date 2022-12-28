@@ -84,8 +84,8 @@ def getCardboxScoreView():
 
   return jsonify([result, error])
 
-#@app.route("/prepareNewWords", methods=['POST'])
 #def prepareNewWords():
+#  pass
 ## This can only be called from getQuestions()
 ## Not exposed through nginx
 #  xu.debug("Got request to prepare new words")
@@ -107,22 +107,22 @@ def getCardboxScoreView():
 #    error["status"] = "An error occurred. See log for details."
 #
 #  return jsonify(error)
-#
-#@app.route("/getAuxInfo", methods=['POST'])
-#def getAuxInfo():
-#  try:
-#    userid = xu.getUseridFromCookies()
-#    result = { }
-#    params = request.get_json(force=True) # returns dict
-#    result["alpha"] = params.get("alpha")
-#    result["aux"] = xerafinLib.getAuxInfo(result["alpha"], userid)
-#
-#  except Exception as ex:
-#    xu.errorLog()
-#    result["status"] = "An error occurred. See log for details."
-#
-#  return jsonify(result)
-#
+
+@app.route("/getAuxInfo", methods=['POST'])
+def getAuxInfoView():
+  result = { }
+  try:
+    params = request.get_json(force=True) # returns dict
+    result = getAuxInfo(params.get("alpha"))
+    result["alpha"] = params.get("alpha")
+    result["aux"] = getAuxInfo(result["alpha"])
+
+  except Exception as ex:
+    xu.errorLog()
+    result["status"] = "An error occurred. See log for details."
+
+  return jsonify(result)
+
 #@app.route("/submitQuestion", methods=['GET', 'POST'])
 #def submitQuestion():
 #
@@ -138,7 +138,7 @@ def getCardboxScoreView():
 #    increment = params.get("incrementQ") # boolean - update total questions solved?
 #    quizid = params.get("quizid", -1) # -1 is cardbox quiz
 #
-#    # increment means - add one to the question total
+#   # increment means - add one to the question total
 #    # correct means - put in currentCardbox + 1
 #    # wrong means - put in cardbox 0
 #    # to reschedule in current CB, need to pass in cardbox-1
@@ -223,46 +223,41 @@ def getQuestions():
 
     # xerafinLib.getQuestions returns something like { "ALPHAGRAM": [WORD, WORD, WORD] }
     # FYI - the None here is to filter on question length, which is currently disabled
+    questions = getQuestionsFromCardbox(numQuestions, cardbox, None)
 
-#    questions = xerafinLib.getQuestions(numQuestions, userid, cardbox, None, isCardbox, quizid)
+    # This is only used for non-cardbox quizzes
+    result["eof"] = False
 
+    lexService = 'http://lexicon:5000'
+    for alpha in questions.keys():
 
+      template = { }
+      template["alpha"] = alpha
+      template["answers"] = questions[alpha]
+      auxInfo = getAuxInfo(alpha)["aux"]
+      template["correct"] = auxInfo.get("correct")
+      template["incorrect"] = auxInfo.get("incorrect")
+      template["nextScheduled"] = auxInfo.get("nextScheduled")
+      template["cardbox"] = auxInfo.get("cardbox")
+      template["difficulty"] = auxInfo.get("difficulty")
+      template["words"] = { }
+      if lock:
+        checkOut(alpha, True)
+      for word in template["answers"]:
+         wordJSON = { "word": word }
+         wordInfo = requests.post(f'{lexService}/getWordInfo', headers=g.headers, json=wordJSON).json()
+         innerHooks = requests.post(f'{lexService}/getDots', headers=g.headers, json=wordJSON).json()
+#        [ front hooks, back hooks, definition, [innerHooks], lexicon symbols ]
+         template["words"][word] = [ wordInfo["front_hooks"], wordInfo["back_hooks"],
+                        wordInfo["definition"], innerHooks, ""]
+      result["questions"].append(template)
 
-#
-#    # This only happens for non-cardbox quizzes
-#    # Need a flag to let the interface know the quiz is over
-#    # And they're getting fewer questions than requested
-#
-#    if len(questions) != numQuestions:
-#      result["eof"] = True
-#    else:
-#      result["eof"] = False
-#
-#    for alpha in questions.keys():
-#
-#      template = { }
-#      template["alpha"] = alpha
-#      template["answers"] = questions[alpha]
-#      # NB if it's not in cardbox, these fields are missing
-#      auxInfo = xerafinLib.getAuxInfo(alpha, userid)
-#      if auxInfo:
-#        template["correct"] = auxInfo["correct"]
-#        template["incorrect"] = auxInfo["incorrect"]
-#        template["nextScheduled"] = auxInfo["nextScheduled"]
-#        template["cardbox"] = auxInfo["cardbox"]
-#        template["difficulty"] = auxInfo["difficulty"]
-#      template["words"] = { }
-#      if lock:
-#        xerafinLib.checkOut(alpha, userid, True,
-#                    isCardbox or (quizid==-1 and template["cardbox"] is not None), quizid)
-#      for word in template["answers"]:
-#        h = xerafinLib.getHooks(word, userid)
-#        defn = xerafinLib.getDef(word, userid)
-#        innerHooks = xerafinLib.getDots(word, userid)
-#        template["words"][word] = [ h[0], h[3], defn, innerHooks, h[2] ]
-#      result["questions"].append(template)
-#    if isCardbox and xerafinLib.getNextAddedCount(userid) < xerafinLib.getPrefs("newWordsAtOnce", userid):
 #      # localhost here referring to the server in this container
+       # NB: won't need to use this if study order is as quick as it should be now
+       #     Although if that's really true, there's no need to stage words at all
+#    if getNextAddedCount() < g.newWordsAtOnce:
+#      prepareNewWords()
+
 #      # This is hacky. I don't care about the response to the request --
 #      #                I just want the endpoint to do its thing
 #      # Timeout makes it not block but I have to catch the timeout exception
@@ -658,3 +653,35 @@ def getAnagrams(alpha):
 
   url = 'http://lexicon:5000/getAnagrams'
   return requests.post(url, headers=g.headers, json={'alpha': alpha}).json()
+
+def getAuxInfo (alpha):
+  '''
+  Returns dict: {"alpha": alpha,
+                 "aux": {"cardbox": x, "nextScheduled": x, "correct": x,
+                            incorrect: x, difficulty: x }
+                }
+  '''
+  auxInfo = {"alpha": alpha}
+  g.cur.execute('select cardbox, next_scheduled, correct, incorrect, difficulty ' +
+              f'from questions where question = "{alpha}" ' +
+              'and next_scheduled is not null')
+  result = g.cur.fetchone()
+  if result:
+    auxInfo["aux"] = {"cardbox": result[0], "nextScheduled": result[1],
+      "correct": result[2], "incorrect": result[3], "difficulty": result[4] }
+  else:
+    auxInfo["aux"] = { }
+  return auxInfo
+
+def checkOut (alpha, lock) :
+  """
+  if LOCK is true, set difficulty = 3 (locked)
+  if LOCK is false, set difficulty = 0
+  locks are cleared by closetSweep() and newQuiz()
+  """
+  if lock:
+    difficulty = 3
+  else:
+    difficulty = 0
+
+  g.cur.execute(f"update questions set difficulty = {difficulty} where question = '{alpha}'")
