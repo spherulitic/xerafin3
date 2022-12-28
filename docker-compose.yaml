@@ -57,18 +57,17 @@ services:
   lexicon:
     image: x-lexicon:latest
     environment:
-      - MYSQL_USER
-      - MYSQL_DB
-      - MYSQL_PWD
-      - MYSQL_HOST
+      - MONGO_INITDB_ROOT_USERNAME
+      - MONGO_INITDB_ROOT_PASSWORD
+      - MONGO_INITDB_DATABASE
     depends_on:
       - keycloak
   lexicon-db:
     image: lexicon-db:latest
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: admin
-      MONGO_INITDB_DATABASE: lexicon
+      - MONGO_INITDB_ROOT_USERNAME
+      - MONGO_INITDB_ROOT_PASSWORD
+      - MONGO_INITDB_DATABASE
 volumes:
   cardbox-data:
     external: true

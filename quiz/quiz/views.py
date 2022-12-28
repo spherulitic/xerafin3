@@ -87,6 +87,86 @@ def getSubscriptions():
 
   return jsonify(result)
 
+@app.route("/getQuestions", methods=["GET", "POST"])
+def getQuestions():
+  '''Return a list of questions to the client'''
+  params = request.get_json(force=True)
+  result = {"getFromStudyOrder": False, "questions": [ ] }
+  try:
+    isCardbox = params.get('isCardbox', True)
+
+    if isCardbox:
+      url = 'http://cardbox:5000/getQuestions'
+      response = requests.post(url, headers=g.headers, json=params).json()
+      return jsonify(response)
+    else:
+      # Build a non-cardbox quiz
+      numQuestions = params.get("numQuestions", 1)
+      quizid = int(params.get("quizid", -1))
+      lock = params.get("lock", False)
+      requestedAlpha = params.get("alpha", None)
+
+    # xerafinLib.getQuestions returns something like { "ALPHAGRAM": [WORD, WORD, WORD] }
+    # FYI - the None here is to filter on question length, which is currently disabled
+
+    # Note if requestedAlpha is populated, numQuestions is ignored
+
+#    if requestedAlpha:
+#      questions = {requestedAlpha: xerafinLib.getAnagrams(requestedAlpha, userid)}
+#    else:
+#      questions = xerafinLib.getQuestions(numQuestions, userid, cardbox, None, isCardbox, quizid)
+#
+#    # This only happens for non-cardbox quizzes
+#    # Need a flag to let the interface know the quiz is over
+#    # And they're getting fewer questions than requested
+#
+#    if len(questions) != numQuestions:
+#      result["eof"] = True
+#    else:
+#      result["eof"] = False
+#
+#    for alpha in questions.keys():
+#
+#      template = { }
+#      template["alpha"] = alpha
+#      template["answers"] = questions[alpha]
+#      # NB if it's not in cardbox, these fields are missing
+#      auxInfo = xerafinLib.getAuxInfo(alpha, userid)
+#      if auxInfo:
+#        template["correct"] = auxInfo["correct"]
+#        template["incorrect"] = auxInfo["incorrect"]
+#        template["nextScheduled"] = auxInfo["nextScheduled"]
+#        template["cardbox"] = auxInfo["cardbox"]
+#        template["difficulty"] = auxInfo["difficulty"]
+#      template["words"] = { }
+#      if lock:
+#        xerafinLib.checkOut(alpha, userid, True,
+#                    isCardbox or (quizid==-1 and template["cardbox"] is not None), quizid)
+#      for word in template["answers"]:
+#        h = xerafinLib.getHooks(word, userid)
+#        defn = xerafinLib.getDef(word, userid)
+#        innerHooks = xerafinLib.getDots(word, userid)
+#        template["words"][word] = [ h[0], h[3], defn, innerHooks, h[2] ]
+#      result["questions"].append(template)
+#    if isCardbox and xerafinLib.getNextAddedCount(userid) < xerafinLib.getPrefs("newWordsAtOnce", userid):
+#      # localhost here referring to the server in this container
+#      # This is hacky. I don't care about the response to the request --
+#      #                I just want the endpoint to do its thing
+#      # Timeout makes it not block but I have to catch the timeout exception
+#      # prepareNewWords can take several seconds, and I want to make sure
+#      #                I return immediately
+#      try:
+#        requests.post(url="http://localhost:5000/prepareNewWords",
+#                      json={"userid":userid}, timeout=.1)
+#      except requests.exceptions.ReadTimeout:
+#        pass
+
+  except:
+    xu.errorLog()
+
+  return jsonify(result)
+
+
 @app.route("/getQuizList", methods=["GET", "POST"])
 def getQuizList():
   '''Returns a dict where the quizid is the keys'''

@@ -5,10 +5,11 @@ from logging.config import dictConfig
 import urllib
 import time
 import sqlite3 as lite
-#import requests
+import requests
 import jwt
 from flask import jsonify, request, g
 import xerafinUtil.xerafinUtil as xu
+from studyOrder import studyOrder
 from cardbox import app
 
 dictConfig({
@@ -30,6 +31,7 @@ dictConfig({
 
 @app.before_request
 def get_user():
+  ''' Set up userid, DB cursor as global session variables '''
   public_key_url = 'http://keycloak:8080/auth/realms/Xerafin'
   with urllib.request.urlopen(public_key_url) as r:
     public_key = json.loads(r.read())['public_key']
@@ -39,6 +41,14 @@ def get_user():
   raw_token = request.headers["Authorization"]
   auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
   g.uuid = auth_token["sub"]
+  # eventually this will be a user attribute stored in keycloak. See issue #83
+  g.closet = 10
+  g.reschedHrs = 24
+  g.cb0max = 500
+  g.newWordsAtOnce = 10
+
+  # headers to send to other services
+  g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
   g.con = lite.connect(xu.getDBFile(g.uuid))
   g.cur = g.con.cursor()
@@ -74,8 +84,8 @@ def getCardboxScoreView():
 
   return jsonify([result, error])
 
-#@app.route("/prepareNewWords", methods=['POST'])
 #def prepareNewWords():
+#  pass
 ## This can only be called from getQuestions()
 ## Not exposed through nginx
 #  xu.debug("Got request to prepare new words")
@@ -97,22 +107,22 @@ def getCardboxScoreView():
 #    error["status"] = "An error occurred. See log for details."
 #
 #  return jsonify(error)
-#
-#@app.route("/getAuxInfo", methods=['POST'])
-#def getAuxInfo():
-#  try:
-#    userid = xu.getUseridFromCookies()
-#    result = { }
-#    params = request.get_json(force=True) # returns dict
-#    result["alpha"] = params.get("alpha")
-#    result["aux"] = xerafinLib.getAuxInfo(result["alpha"], userid)
-#
-#  except Exception as ex:
-#    xu.errorLog()
-#    result["status"] = "An error occurred. See log for details."
-#
-#  return jsonify(result)
-#
+
+@app.route("/getAuxInfo", methods=['POST'])
+def getAuxInfoView():
+  result = { }
+  try:
+    params = request.get_json(force=True) # returns dict
+    result = getAuxInfo(params.get("alpha"))
+    result["alpha"] = params.get("alpha")
+    result["aux"] = getAuxInfo(result["alpha"])
+
+  except Exception as ex:
+    xu.errorLog()
+    result["status"] = "An error occurred. See log for details."
+
+  return jsonify(result)
+
 #@app.route("/submitQuestion", methods=['GET', 'POST'])
 #def submitQuestion():
 #
@@ -128,7 +138,7 @@ def getCardboxScoreView():
 #    increment = params.get("incrementQ") # boolean - update total questions solved?
 #    quizid = params.get("quizid", -1) # -1 is cardbox quiz
 #
-#    # increment means - add one to the question total
+#   # increment means - add one to the question total
 #    # correct means - put in currentCardbox + 1
 #    # wrong means - put in cardbox 0
 #    # to reschedule in current CB, need to pass in cardbox-1
@@ -199,66 +209,55 @@ def getCardboxScoreView():
 #    result["status"] = "An error occurred. See log for details."
 #
 #  return jsonify(result)
-#
-#@app.route("/getQuestions", methods=['GET', 'POST'])
-#def getQuestions():
-#
-#  try:
-#    userid = xu.getUseridFromCookies()
-#    result = {"getFromStudyOrder": False, "questions": [ ] }
-#
-#
-#    params = request.get_json(force=True) # returns dict
-#    numQuestions = params.get("numQuestions", 1)
-#    isCardbox = params.get("isCardbox", True)
-#    quizid = int(params.get("quizid", -1))
-#    cardbox = int(params.get("cardbox", 0))
-#    lock = params.get("lock", False)
-#    requestedAlpha = params.get("alpha", None)
-#
-#    # xerafinLib.getQuestions returns something like { "ALPHAGRAM": [WORD, WORD, WORD] }
-#    # FYI - the None here is to filter on question length, which is currently disabled
-#
-#    # Note if requestedAlpha is populated, numQuestions is ignored
-#    if requestedAlpha:
-#      questions = {requestedAlpha: xerafinLib.getAnagrams(requestedAlpha, userid)}
-#    else:
-#      questions = xerafinLib.getQuestions(numQuestions, userid, cardbox, None, isCardbox, quizid)
-#
-#    # This only happens for non-cardbox quizzes
-#    # Need a flag to let the interface know the quiz is over
-#    # And they're getting fewer questions than requested
-#
-#    if len(questions) != numQuestions:
-#      result["eof"] = True
-#    else:
-#      result["eof"] = False
-#
-#    for alpha in questions.keys():
-#
-#      template = { }
-#      template["alpha"] = alpha
-#      template["answers"] = questions[alpha]
-#      # NB if it's not in cardbox, these fields are missing
-#      auxInfo = xerafinLib.getAuxInfo(alpha, userid)
-#      if auxInfo:
-#        template["correct"] = auxInfo["correct"]
-#        template["incorrect"] = auxInfo["incorrect"]
-#        template["nextScheduled"] = auxInfo["nextScheduled"]
-#        template["cardbox"] = auxInfo["cardbox"]
-#        template["difficulty"] = auxInfo["difficulty"]
-#      template["words"] = { }
-#      if lock:
-#        xerafinLib.checkOut(alpha, userid, True,
-#                    isCardbox or (quizid==-1 and template["cardbox"] is not None), quizid)
-#      for word in template["answers"]:
-#        h = xerafinLib.getHooks(word, userid)
-#        defn = xerafinLib.getDef(word, userid)
-#        innerHooks = xerafinLib.getDots(word, userid)
-#        template["words"][word] = [ h[0], h[3], defn, innerHooks, h[2] ]
-#      result["questions"].append(template)
-#    if isCardbox and xerafinLib.getNextAddedCount(userid) < xerafinLib.getPrefs("newWordsAtOnce", userid):
+
+@app.route("/getQuestions", methods=['GET', 'POST'])
+def getQuestions():
+
+  result = {"getFromStudyOrder": False, "questions": [ ] }
+  try:
+
+    params = request.get_json(force=True) # returns dict
+    numQuestions = params.get("numQuestions", 1)
+    cardbox = int(params.get("cardbox", 0))
+    lock = params.get("lock", False)
+
+    # xerafinLib.getQuestions returns something like { "ALPHAGRAM": [WORD, WORD, WORD] }
+    # FYI - the None here is to filter on question length, which is currently disabled
+    questions = getQuestionsFromCardbox(numQuestions, cardbox, None)
+
+    # This is only used for non-cardbox quizzes
+    result["eof"] = False
+
+    lexService = 'http://lexicon:5000'
+    for alpha in questions.keys():
+
+      template = { }
+      template["alpha"] = alpha
+      template["answers"] = questions[alpha]
+      auxInfo = getAuxInfo(alpha)["aux"]
+      template["correct"] = auxInfo.get("correct")
+      template["incorrect"] = auxInfo.get("incorrect")
+      template["nextScheduled"] = auxInfo.get("nextScheduled")
+      template["cardbox"] = auxInfo.get("cardbox")
+      template["difficulty"] = auxInfo.get("difficulty")
+      template["words"] = { }
+      if lock:
+        checkOut(alpha, True)
+      for word in template["answers"]:
+         wordJSON = { "word": word }
+         wordInfo = requests.post(f'{lexService}/getWordInfo', headers=g.headers, json=wordJSON).json()
+         innerHooks = requests.post(f'{lexService}/getDots', headers=g.headers, json=wordJSON).json()
+#        [ front hooks, back hooks, definition, [innerHooks], lexicon symbols ]
+         template["words"][word] = [ wordInfo["front_hooks"], wordInfo["back_hooks"],
+                        wordInfo["definition"], innerHooks, ""]
+      result["questions"].append(template)
+
 #      # localhost here referring to the server in this container
+       # NB: won't need to use this if study order is as quick as it should be now
+       #     Although if that's really true, there's no need to stage words at all
+#    if getNextAddedCount() < g.newWordsAtOnce:
+#      prepareNewWords()
+
 #      # This is hacky. I don't care about the response to the request --
 #      #                I just want the endpoint to do its thing
 #      # Timeout makes it not block but I have to catch the timeout exception
@@ -269,11 +268,11 @@ def getCardboxScoreView():
 #                      json={"userid":userid}, timeout=.1)
 #      except requests.exceptions.ReadTimeout:
 #        pass
-#  except Exception as ex:
-#    xu.errorLog()
-#    result["status"] = "An error occurred. See log for details."
-#
-#  return jsonify(result)
+  except:
+    xu.errorLog()
+    result["status"] = "An error occurred. See log for details."
+
+  return jsonify(result)
 
 @app.route("/newQuiz", methods=["GET", "POST"])
 def newQuiz():
@@ -497,10 +496,192 @@ def closetSweep():
   '''
 
   now = int(time.time())
-#  closet = getPrefs("closet", userid)
-  # Dummy value for now. See issue #83
-  closet = 10
   g.cur.execute("update questions set difficulty = 0 where " +
-    f"cardbox < {closet} and difficulty != 1")
+    f"cardbox < {g.closet} and difficulty != 1")
   g.cur.execute("update questions set difficulty = 2 " +
-    f"where cardbox >= {closet} and difficulty != 1 and next_scheduled < {now}")
+    f"where cardbox >= {g.closet} and difficulty != 1 and next_scheduled < {now}")
+
+
+#def getLexicon(userid):
+#  ''' Returns lexicon and version for this user
+#  '''
+#  lexicon = "csw"
+#  with xs.getMysqlCon().cursor() as con:
+#    command = "select version from user_lexicon_master where userid = %s and lower(lexicon) = %s"
+#    con.execute(command, (userid, lexicon))
+#    version = con.fetchone()[0]
+#  return f"{lexicon}{version}"
+
+def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None) : # pylint: disable=unused-argument
+  """
+  Returns a dict with a quiz of numNeeded questions in the format
+    { "Alphagram" -> [ Word, Word, Word ] }
+  Note questionLength is currently unused but is reserved for future functionality
+  """
+  # pylint: disable=too-many-arguments,too-many-locals
+  quiz = {}
+  allQuestions = []
+
+  # Cardbox doesn't filter, it only prioritizes one cardbox over others
+  # If you specifically ask for a cardbox in the backlog, ignore backlogging
+  if cardbox >= g.closet:
+    diffToGet = (-1,2)
+    dFormat = "?,?"
+  else:
+    diffToGet = (-1,)
+    dFormat = "?"
+
+  getCardsQry = ("select question from questions " +
+    f"where difficulty in ({dFormat}) and next_scheduled is not null " +
+     "order by case cardbox when ? then -1 else cardbox end, next_scheduled limit ?")
+  g.cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
+  result = g.cur.fetchall()
+  # run the query. If not enough results are returned, run makeWordsAvailable and then
+  #  run the whole-ass query again. Yikes. See Issue #86
+  while len(result) < numNeeded:
+ #  if questionLength is None:
+    makeWordsAvailable()
+    g.cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
+    result = g.cur.fetchall()
+ #  else:
+ #    makeWordsAvailableWithFilter(numNeeded, questionLength)
+  allQuestions = [x[0] for x in result]
+  for alpha in allQuestions:
+    quiz[alpha] = getAnagrams(alpha)
+  return quiz
+
+def makeWordsAvailable() :
+  """
+  Sets words with difficulty = -1 to be used by getQuestions
+  Used by getQuestionsFromCardbox
+  """
+  now = int(time.time())
+
+  g.cur.execute("select max(cardbox) from questions")
+  maxCardbox = g.cur.fetchone()[0]
+  if maxCardbox is None:
+    maxCardbox = 0
+  if maxCardbox >= 10:
+    maxCardbox = 30
+  soonestNewWordsAt = now + (3600*g.reschedHrs)
+  maxReadAhead = max(now + (maxCardbox*3600*24), soonestNewWordsAt+60)
+  g.cur.execute("select * from cleared_until")
+  clearedUntil = max([g.cur.fetchone()[0], now])
+  g.cur.execute("select * from new_words_at")
+  newWordsAt = max([g.cur.fetchone()[0], soonestNewWordsAt])
+  if clearedUntil < newWordsAt:
+    clearedUntil = clearedUntil + 3600
+  else:
+    g.cur.execute("select count(*) from questions where cardbox = 0")
+    cb0cnt = g.cur.fetchone()[0]
+    g.cur.execute("select count(*) from questions where difficulty != 4 " +
+      "and next_Scheduled is not null")
+    readycnt = g.cur.fetchone()[0]
+    # if readycnt = 0, there are no words available to repeat so we must add new
+    #   even overriding newWordsAtOnce = 0 or cb0max
+    if readycnt == 0:
+      addWords(max(g.newWordsAtOnce,1))
+    elif cb0cnt < g.cb0max:
+      addWords(g.newWordsAtOnce)
+    newWordsAt = newWordsAt + 3600
+  if clearedUntil > now:
+    futureSweep()
+    g.cur.execute("update questions set difficulty = -1 " +
+      "where question in (select question from questions " +
+                          "where difficulty = 2 "+
+                          "order by cardbox, next_scheduled limit 10)")
+  g.cur.execute("update questions set difficulty = -1 " +
+    f"where difficulty = 0 and next_scheduled < {clearedUntil}")
+  g.cur.execute(f"update new_words_at set timeStamp = {min(newWordsAt,maxReadAhead)}")
+  g.cur.execute(f"update cleared_until set timeStamp = {min(clearedUntil, maxReadAhead+1)}")
+  # No return; this does database operations and exits
+
+def addWord (alpha) :
+
+  '''
+  Add one word to cardbox zero - assumed to be valid
+  '''
+  now = int(time.time())
+  g.cur.execute("select count(*) from questions where question = ?", (alpha,))
+  qCount = g.cur.fetchone()[0]
+  if qCount == 0:
+    command = ("insert into questions (question, correct, incorrect, streak, " +
+      "last_correct, difficulty, cardbox, next_scheduled) " +
+      "values (?, 0, 0, 0, 0, -1, 0, ?)")
+    g.cur.execute(command, (alpha, now))
+  return qCount == 0
+
+def addWords (numWords) :
+  ''' Pull words from next_added and study_order and send each
+        to addWord (which puts it in the cardbox)
+  '''
+
+# We assume everything in next_added and study_order is valid
+
+  dbClean()
+  nextAddedCount = getNextAddedCount()
+  g.cur.execute("select question from next_added order by timeStamp limit ?", (numWords,))
+  result = g.cur.fetchall()
+  if result is not None:
+    wordsToAdd = [x[0] for x in result]
+    for word in wordsToAdd:
+      addWord(word)
+  if numWords > nextAddedCount:
+    studyOrderAlphas = getFromStudyOrder(numWords-nextAddedCount)
+    for alpha in studyOrderAlphas:
+      addWord(alpha)
+  dbClean()
+
+def getFromStudyOrder (numNeeded):
+  ''' Returns the next numNeeded alphagrams from study order. Excludes questions
+        already in cardbox or in next_added
+  '''
+  result = [ ]
+  if numNeeded < 1:
+    return result
+  # union all for speed, since we're turning this into a set
+  g.cur.execute("select question from questions where next_scheduled is not null " +
+              "union all select question from next_added")
+  allQuestions = {x[0] for x in g.cur.fetchall()}
+  unusedStudyOrder = [x for x in studyOrder.data if x not in allQuestions]
+  result = unusedStudyOrder[:numNeeded]
+  return result
+
+def getAnagrams(alpha):
+  ''' Query the lexicon service to get valid words for an alphagram
+      Should return a list of words ['baa', 'aba']'''
+
+  url = 'http://lexicon:5000/getAnagrams'
+  return requests.post(url, headers=g.headers, json={'alpha': alpha}).json()
+
+def getAuxInfo (alpha):
+  '''
+  Returns dict: {"alpha": alpha,
+                 "aux": {"cardbox": x, "nextScheduled": x, "correct": x,
+                            incorrect: x, difficulty: x }
+                }
+  '''
+  auxInfo = {"alpha": alpha}
+  g.cur.execute('select cardbox, next_scheduled, correct, incorrect, difficulty ' +
+              f'from questions where question = "{alpha}" ' +
+              'and next_scheduled is not null')
+  result = g.cur.fetchone()
+  if result:
+    auxInfo["aux"] = {"cardbox": result[0], "nextScheduled": result[1],
+      "correct": result[2], "incorrect": result[3], "difficulty": result[4] }
+  else:
+    auxInfo["aux"] = { }
+  return auxInfo
+
+def checkOut (alpha, lock) :
+  """
+  if LOCK is true, set difficulty = 3 (locked)
+  if LOCK is false, set difficulty = 0
+  locks are cleared by closetSweep() and newQuiz()
+  """
+  if lock:
+    difficulty = 3
+  else:
+    difficulty = 0
+
+  g.cur.execute(f"update questions set difficulty = {difficulty} where question = '{alpha}'")
