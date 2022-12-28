@@ -110,6 +110,9 @@ def getCardboxScoreView():
 
 @app.route("/getAuxInfo", methods=['POST'])
 def getAuxInfoView():
+  ''' Endpoint for non-cardbox quiz questions to retrieve
+      info about the question from cardbox
+  '''
   result = { }
   try:
     params = request.get_json(force=True) # returns dict
@@ -117,98 +120,20 @@ def getAuxInfoView():
     result["alpha"] = params.get("alpha")
     result["aux"] = getAuxInfo(result["alpha"])
 
-  except Exception as ex:
+  except:
     xu.errorLog()
     result["status"] = "An error occurred. See log for details."
 
   return jsonify(result)
 
-#@app.route("/submitQuestion", methods=['GET', 'POST'])
-#def submitQuestion():
-#
-#  try:
-#    userid = xu.getUseridFromCookies()
-#    result = { }
-#
-#    params = request.get_json(force=True) # returns dict
-#    alpha = params.get("question")
-#    correct = params.get("correct") # boolean
-#    currentCardbox = params.get("cardbox")
-#    xu.updateActive(userid)
-#    increment = params.get("incrementQ") # boolean - update total questions solved?
-#    quizid = params.get("quizid", -1) # -1 is cardbox quiz
-#
-#   # increment means - add one to the question total
-#    # correct means - put in currentCardbox + 1
-#    # wrong means - put in cardbox 0
-#    # to reschedule in current CB, need to pass in cardbox-1
-#
-#    with xu.getMysqlCon().cursor() as con:
-#      if increment:
-#        con.execute("update leaderboard set questionsAnswered = questionsAnswered+1 " +
-#                    "where userid = %s and dateStamp = curdate()", (userid,))
-#        if con.rowcount == 0:
-#          con.execute("insert into leaderboard (userid, dateStamp, questionsAnswered, " +
-#                      "startScore) values (%s, curdate(), 1, %s)",
-#                       (userid, xerafinLib.getCardboxScore(userid)))
-#      con.execute("select questionsAnswered, startScore from leaderboard " +
-#                  "where userid = %s and dateStamp = curdate()", (userid,))
-#      row = con.fetchone()
-#      result["qAnswered"] = row[0]
-#      result["startScore"] = row[1]
-#
-#    if currentCardbox == -2:  # this is for new Sloth, no quiz, increment only, skip reschedule
-#      pass
-#    elif correct:
-#      xerafinLib.correct(alpha, userid, currentCardbox+1, quizid)
-#    else:
-#      xerafinLib.wrong(alpha, userid, quizid)
-#
-#    result["aux"] = xerafinLib.getAuxInfo(alpha, userid)
-#    result["score"] = xerafinLib.getCardboxScore(userid)
-#######
-## This needs to be completely redone once the chat module is set up
-## Syntax for sending a request to an endpoint:
-## response = requests.post(url="http://localhost/submitChat", data=<dict>)
-#######
-##    # MILESTONE CHATS
-##    # Every 50 up to 500, every 100 up to 1000, every 200 after that
-##
-##    SYSTEM_USERID = 0 # Xerafin system uid
-##    milestone = (result["qAnswered"] < 501 and result["qAnswered"]%50==0)
-##                 or (result["qAnswered"] < 1001 and result["qAnswered"]%100==0)
-##                 or (result["qAnswered"]%200==0) or (result["qAnswered"]%500==0)
-##
-##    if milestone:
-##      with xu.getMysqlCon().cursor() as con:
-##        command = "select name, firstname, lastname from login where userid = %s"
-##        con.execute(command, (userid,))
-##        row = con.fetchone()
-##        if row[1] and row[2]:
-##          if row[2] == " ":
-##            name = "{0}".format(row[1])
-##          else:
-##            name = "{0} {1}".format(row[1], row[2])
-##        else:
-##          name = con.fetchone()[0]
-##
-##      # Find the previous milestone chat to expire
-##        try:
-##          command = "select max(timeStamp) from chat where userid = %s and message like %s"
-##          con.execute(command, (SYSTEM_USERID, "%{0} has completed %".format(name)))
-##          expiredChatTime = con.fetchone()[0]
-##          result["milestoneDelete"] = xchat.post(u'0', u'', expiredChatTime, True)
-##        except:
-##          pass
-##
-##      msg = "{0} has completed <b>{1}</b> alphagrams today!".format(name, result["qAnswered"])
-##      result["milestoneSubmit"] = xchat.post(u'0', msg)
-#
-#  except Exception as ex:
-#    xu.errorLog()
-#    result["status"] = "An error occurred. See log for details."
-#
-#  return jsonify(result)
+@app.route('/correct', methods=['POST'])
+def correct():
+  ''' Takes in an alphagram and increments the cardbox. Returns aux info and new cardbox score '''
+
+@app.route('wrong', methods=['POST'])
+def wrong():
+  ''' Takes in an alphagram and moves to the approprate cardbox based on scheduling.
+      Returns aux info and new cardbox score '''
 
 @app.route("/getQuestions", methods=['GET', 'POST'])
 def getQuestions():

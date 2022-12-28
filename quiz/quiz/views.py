@@ -166,6 +166,65 @@ def getQuestions():
 
   return jsonify(result)
 
+@app.route('/submitQuestion', methods=["GET", "POST"])
+def submitQuestion():
+
+  error = {"status": "success"}
+  result = { }
+  try:
+    params = json.load(sys.stdin)
+
+    # quiz -1 is cardbox only
+    quizid = params.get("quizid", -1)
+
+    currentCardbox = params["cardbox"]
+
+    alpha = params["question"]
+    correct = params["correct"] # boolean
+    increment = params["incrementQ"] # boolean
+
+
+# increment means - add one to the question total
+# correct means - put in currentCardbox + 1
+# wrong means - put in cardbox 0
+# to reschedule in current CB, need to pass in cardbox-1
+
+# NB if the question is a non-cardbox quiz which is ready to be
+#  rescheduled in cardbox, the front end will hit submitQuestion() twice
+#  This is crazy but a problem for another day - see issue #92
+
+    if increment:
+      # call the stats service to increment leaderboard
+      url = 'http://stats:5000/increment'
+      resp = requests.get(url, headers=g.headers).json()
+      result["qAnswered"] = resp["questionsAnswered"]
+      result["startScore"] = resp["startScore"]
+
+    # this is for new Sloth, no quiz, increment only, skip reschedule
+    if currentCardbox == -2:
+      pass
+#### some complexity here -- 'correct' and 'wrong' do different things based on quizid
+##    elif correct:
+##      xl.correct(alpha, userid, currentCardbox+1, quizid)
+##    else:
+##      xl.wrong(alpha, userid, quizid)
+#
+#  result["aux"] = xl.getAuxInfo(alpha, userid)
+#  result["score"] = xl.getCardboxScore(userid)
+#
+  # MILESTONE CHATS
+  # Every 50 up to 500, every 100 up to 1000, every 200 after that
+
+
+    milestone = (result["qAnswered"] < 501 and result["qAnswered"]%50==0) or
+                (result["qAnswered"] < 1001 and result["qAnswered"]%100==0) or
+                (result["qAnswered"]%200==0) or (result["qAnswered"]%500==0)
+    if milestone:
+      submitMilestoneChat(result["qAnswered"])
+  except:
+    xu.errorLog()
+    error = "An error occurred. See log for more details"
+  return jsonify([result, error])
 
 @app.route("/getQuizList", methods=["GET", "POST"])
 def getQuizList():
@@ -385,3 +444,29 @@ def newQuiz():
     result["error"] = "An error occurred. See log for details."
 
   return jsonify(result)
+
+def submitMilestoneChat(milestone):
+  pass
+#  SYSTEM_USERID = 0 # Xerafin system uid
+#      command = "select name, firstname, lastname from login where userid = %s"
+#      con.execute(command, (userid,))
+#      row = con.fetchone()
+#      if row[1] and row[2]:
+#        if row[2] == " ":
+#          name = "{0}".format(row[1])
+#        else:
+#          name = "{0} {1}".format(row[1], row[2])
+#      else:
+#        name = con.fetchone()[0]
+#
+#    # Find the previous milestone chat to expire
+#      try:
+#        command = "select max(timeStamp) from chat where userid = %s and message like %s"
+#        con.execute(command, (SYSTEM_USERID, "%{0} has completed %".format(name)))
+#        expiredChatTime = con.fetchone()[0]
+#        error["milestoneDelete"] = xchat.post(u'0', u'', expiredChatTime, True)
+#      except:
+#        pass
+#
+#    msg = "{0} has completed <b>{1}</b> alphagrams today!".format(name, result["qAnswered"])
+#    error["milestoneSubmit"] = xchat.post(u'0', msg)
