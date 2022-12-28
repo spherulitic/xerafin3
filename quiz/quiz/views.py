@@ -97,7 +97,8 @@ def getQuestions():
 
     if isCardbox:
       url = 'http://cardbox:5000/getQuestions'
-      return requests.post(url, headers=g.headers, json=params).text
+      response = requests.post(url, headers=g.headers, json=params).json()
+      return jsonify(response)
     else:
       # Build a non-cardbox quiz
       numQuestions = params.get("numQuestions", 1)
