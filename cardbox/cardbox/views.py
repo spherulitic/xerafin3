@@ -9,6 +9,7 @@ import requests
 import jwt
 from flask import jsonify, request, g
 import xerafinUtil.xerafinUtil as xu
+from studyOrder import studyOrder
 from cardbox import app
 
 dictConfig({
@@ -631,17 +632,29 @@ def addWords (numWords) :
     for word in wordsToAdd:
       addWord(word)
   if numWords > nextAddedCount:
-    # This rabbit hole is next
     studyOrderAlphas = getFromStudyOrder(numWords-nextAddedCount)
     for alpha in studyOrderAlphas:
       addWord(alpha)
   dbClean()
 
-def getFromStudyOrder(numWords):
-  ''' Placeholder '''
-  return [ ]
+def getFromStudyOrder (numNeeded):
+  ''' Returns the next numNeeded alphagrams from study order. Excludes questions
+        already in cardbox or in next_added
+  '''
+  result = [ ]
+  if numNeeded < 1:
+    return result
+  # union all for speed, since we're turning this into a set
+  g.cur.execute("select question from questions where next_scheduled is not null " +
+              "union all select question from next_added")
+  allQuestions = {x[0] for x in g.cur.fetchall()}
+  unusedStudyOrder = [x for x in studyOrder.data if x not in allQuestions]
+  result = unusedStudyOrder[:numNeeded]
+  return result
 
 def getAnagrams(alpha):
-  ''' Query the lexicon service to get valid words for an alphagram '''
+  ''' Query the lexicon service to get valid words for an alphagram
+      Should return a list of words ['baa', 'aba']'''
+
   url = 'http://lexicon:5000/getAnagrams'
   return requests.post(url, headers=g.headers, json={'alpha': alpha}).json()
