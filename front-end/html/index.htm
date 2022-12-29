@@ -40,8 +40,8 @@
           headers: {"Accept": "application/json", "Authorization": keycloak.token},
           success: function(response2, responseStatus2) {
             console.log("Got Cardbox Score");
-            console.log(response2[0]);
-            if (!localStorage.qQScore) {localStorage.qQScore = response2[0].score;}
+            console.log(response2);
+            if (!localStorage.qQScore) {localStorage.qQScore = response2.score;}
             if (!localStorage.qQAlpha) {localStorage.qQAlpha = 0;}
           },
           error: function(jqXHR, textStatus, errorThrown) {

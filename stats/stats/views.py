@@ -87,7 +87,7 @@ def getRankings():
     elif data.get("view", "QA") == "AW":
       rank = Awards(data)
     elif data.get("view", "QA") == "SL":
-     rank = SlothRankings(data)
+      rank = SlothRankings(data)
     else:
       rank = Rankings(data)
 
@@ -134,7 +134,7 @@ def increment():
   if g.con.rowcount == 0:
     url = 'http://cardbox:5000/getCardboxScore'
     resp = requests.get(url, headers=g.headers).json()
-    startScore = resp[0]["score"]
+    startScore = resp["score"]
     questionsAnswered = 1
     g.con.execute(f'''insert into leaderboard (userid, dateStamp, questionsAnswered, startScore)
                       values ('{g.uuid}, curdate(), {questionsAnswered}, {startScore})''')
