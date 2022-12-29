@@ -2,6 +2,7 @@ from math import ceil
 from logging.config import dictConfig
 from datetime import datetime, timedelta
 import json
+import requests
 import urllib
 import jwt
 from flask import request, jsonify, g
@@ -44,6 +45,8 @@ def get_user():
   raw_token = request.headers["Authorization"]
   g.auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
   g.uuid = g.auth_token["sub"]
+  # headers to send to other services
+  g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
   g.mysqlcon = xs.getMysqlCon()
   g.con = g.mysqlcon.cursor()
@@ -52,6 +55,7 @@ def get_user():
 
 @app.after_request
 def close_mysql(response):
+  g.mysqlcon.commit()
   g.con.close()
   g.mysqlcon.close()
   return response
@@ -84,7 +88,7 @@ def getRankings():
     elif data.get("view", "QA") == "AW":
       rank = Awards(data)
     elif data.get("view", "QA") == "SL":
-     rank = SlothRankings(data)
+      rank = SlothRankings(data)
     else:
       rank = Rankings(data)
 
@@ -119,6 +123,31 @@ def getAllTimeStats():
 
   response = jsonify(result)
   return response
+
+@app.route("/increment", methods=['GET', 'POST'])
+def increment():
+  ''' Increments the total questions solved today for the requesting user
+       in the daily leaderboard
+      Returns [qAnswered, startScore]
+  '''
+  g.con.execute(f'''update leaderboard set questionsAnswered = questionsAnswered + 1
+                    where userid = '{g.uuid}' and dateStamp = curdate()''')
+  if g.con.rowcount == 0:
+    url = 'http://cardbox:5000/getCardboxScore'
+    resp = requests.get(url, headers=g.headers).json()
+    startScore = resp["score"]
+    questionsAnswered = 1
+    g.con.execute(f'''insert into leaderboard (userid, dateStamp, questionsAnswered, startScore)
+                      values ('{g.uuid}', curdate(), {questionsAnswered}, {startScore})''')
+  else:
+    g.con.execute(f'''select questionsAnswered, startScore from leaderboard
+                    where userid = '{g.uuid}' and datestamp = curdate()''')
+    row = g.con.fetchone()
+    questionsAnswered = row[0]
+    startScore = row[1]
+  return jsonify({'questionsAnswered': questionsAnswered, 'startScore': startScore})
+
+
 
 class Metaranks():
   def __init__(self, data):
@@ -795,7 +824,7 @@ class SlothRankings():
                    FROM sloth_completed
                    JOIN login USING (userid)
                    JOIN user_prefs USING (userid)
-                   WHERE {this.getTimeConditionsQuery()} AND {this.getSlothSubFilter()}
+                   WHERE {self.getTimeConditionsQuery()} AND {self.getSlothSubFilter()}
                    GROUP BY userid, name, photo, firstname, lastname, countryId
                    ORDER BY total DESC, firstname ASC, lastname ASC'''
     result = self.runQuery()

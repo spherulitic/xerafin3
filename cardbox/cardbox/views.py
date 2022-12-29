@@ -4,6 +4,7 @@ import json
 from logging.config import dictConfig
 import urllib
 import time
+import random
 import sqlite3 as lite
 import requests
 import jwt
@@ -46,6 +47,7 @@ def get_user():
   g.reschedHrs = 24
   g.cb0max = 500
   g.newWordsAtOnce = 10
+  g.schedVersion = 1
 
   # headers to send to other services
   g.headers = {"Accept": "application/json", "Authorization": raw_token}
@@ -58,6 +60,7 @@ def get_user():
 @app.after_request
 def close_sqlite(response):
   '''Close the cursor to the cardbox database'''
+  g.con.commit()
   g.con.close()
   return response
 
@@ -68,21 +71,9 @@ def default():
 
 @app.route("/getCardboxScore", methods=['GET', 'POST'])
 def getCardboxScoreView():
-  '''Returns [ result, error ]
-      result = { "score": integer }
-      error = { "status": "success"|"error" }
-  '''
-
-  error = {"status": "success"}
-  result = {"score": 0}
-  try:
-    result["score"] = getCardboxScore()
-
-  except:
-    xu.errorLog()
-    error["status"] = "An error occurred. See log for details."
-
-  return jsonify([result, error])
+  ''' Returns the current cardbox score '''
+  result = {"score": getCardboxScore()}
+  return jsonify(result)
 
 #def prepareNewWords():
 #  pass
@@ -110,105 +101,67 @@ def getCardboxScoreView():
 
 @app.route("/getAuxInfo", methods=['POST'])
 def getAuxInfoView():
+  ''' Endpoint for non-cardbox quiz questions to retrieve
+      info about the question from cardbox
+  '''
   result = { }
-  try:
-    params = request.get_json(force=True) # returns dict
-    result = getAuxInfo(params.get("alpha"))
-    result["alpha"] = params.get("alpha")
-    result["aux"] = getAuxInfo(result["alpha"])
-
-  except Exception as ex:
-    xu.errorLog()
-    result["status"] = "An error occurred. See log for details."
+  params = request.get_json(force=True) # returns dict
+  result = getAuxInfo(params.get("alpha"))
+  result["alpha"] = params.get("alpha")
+  result["aux"] = getAuxInfo(result["alpha"])
 
   return jsonify(result)
 
-#@app.route("/submitQuestion", methods=['GET', 'POST'])
-#def submitQuestion():
-#
-#  try:
-#    userid = xu.getUseridFromCookies()
-#    result = { }
-#
-#    params = request.get_json(force=True) # returns dict
-#    alpha = params.get("question")
-#    correct = params.get("correct") # boolean
-#    currentCardbox = params.get("cardbox")
-#    xu.updateActive(userid)
-#    increment = params.get("incrementQ") # boolean - update total questions solved?
-#    quizid = params.get("quizid", -1) # -1 is cardbox quiz
-#
-#   # increment means - add one to the question total
-#    # correct means - put in currentCardbox + 1
-#    # wrong means - put in cardbox 0
-#    # to reschedule in current CB, need to pass in cardbox-1
-#
-#    with xu.getMysqlCon().cursor() as con:
-#      if increment:
-#        con.execute("update leaderboard set questionsAnswered = questionsAnswered+1 " +
-#                    "where userid = %s and dateStamp = curdate()", (userid,))
-#        if con.rowcount == 0:
-#          con.execute("insert into leaderboard (userid, dateStamp, questionsAnswered, " +
-#                      "startScore) values (%s, curdate(), 1, %s)",
-#                       (userid, xerafinLib.getCardboxScore(userid)))
-#      con.execute("select questionsAnswered, startScore from leaderboard " +
-#                  "where userid = %s and dateStamp = curdate()", (userid,))
-#      row = con.fetchone()
-#      result["qAnswered"] = row[0]
-#      result["startScore"] = row[1]
-#
-#    if currentCardbox == -2:  # this is for new Sloth, no quiz, increment only, skip reschedule
-#      pass
-#    elif correct:
-#      xerafinLib.correct(alpha, userid, currentCardbox+1, quizid)
-#    else:
-#      xerafinLib.wrong(alpha, userid, quizid)
-#
-#    result["aux"] = xerafinLib.getAuxInfo(alpha, userid)
-#    result["score"] = xerafinLib.getCardboxScore(userid)
-#######
-## This needs to be completely redone once the chat module is set up
-## Syntax for sending a request to an endpoint:
-## response = requests.post(url="http://localhost/submitChat", data=<dict>)
-#######
-##    # MILESTONE CHATS
-##    # Every 50 up to 500, every 100 up to 1000, every 200 after that
-##
-##    SYSTEM_USERID = 0 # Xerafin system uid
-##    milestone = (result["qAnswered"] < 501 and result["qAnswered"]%50==0)
-##                 or (result["qAnswered"] < 1001 and result["qAnswered"]%100==0)
-##                 or (result["qAnswered"]%200==0) or (result["qAnswered"]%500==0)
-##
-##    if milestone:
-##      with xu.getMysqlCon().cursor() as con:
-##        command = "select name, firstname, lastname from login where userid = %s"
-##        con.execute(command, (userid,))
-##        row = con.fetchone()
-##        if row[1] and row[2]:
-##          if row[2] == " ":
-##            name = "{0}".format(row[1])
-##          else:
-##            name = "{0} {1}".format(row[1], row[2])
-##        else:
-##          name = con.fetchone()[0]
-##
-##      # Find the previous milestone chat to expire
-##        try:
-##          command = "select max(timeStamp) from chat where userid = %s and message like %s"
-##          con.execute(command, (SYSTEM_USERID, "%{0} has completed %".format(name)))
-##          expiredChatTime = con.fetchone()[0]
-##          result["milestoneDelete"] = xchat.post(u'0', u'', expiredChatTime, True)
-##        except:
-##          pass
-##
-##      msg = "{0} has completed <b>{1}</b> alphagrams today!".format(name, result["qAnswered"])
-##      result["milestoneSubmit"] = xchat.post(u'0', msg)
-#
-#  except Exception as ex:
-#    xu.errorLog()
-#    result["status"] = "An error occurred. See log for details."
-#
-#  return jsonify(result)
+@app.route('/correct', methods=['POST'])
+def correct():
+  ''' Takes in an alphagram and schedules in the given cardbox.
+      If no cardbox is given it will schedule in current cardbox + 1
+      Returns aux info and new cardbox score '''
+  result = {"status": "success"}
+  params = request.get_json(force=True) # returns dict
+  alpha = params.get("alpha")
+  cardbox = params.get("cardbox")
+  if alpha is None:
+    result["status"] = "Missing alphagram"
+  else:
+    now = int(time.time())
+    if cardbox is None:
+      g.cur.execute(f"select cardbox from questions where question='{alpha}'")
+      currentCardbox = g.cur.fetchone()[0]
+      cardbox = currentCardbox + 1
+    g.cur.execute(f"update questions set cardbox = {cardbox}, " +
+      f"next_scheduled = {getNext(cardbox)}, " +
+      f"correct=correct+1, streak=streak+1, last_correct = {now}, difficulty=4 " +
+      f"where question = '{alpha}'")
+    xu.debug("Updated the cardbox")
+    xu.debug(f'{g.cur.rowcount} rows updated')
+  result["auxInfo"] = getAuxInfo(alpha)
+  result["score"] = getCardboxScore()
+  return jsonify(result)
+
+@app.route('/wrong', methods=['POST'])
+def wrong():
+  ''' Takes in an alphagram marked wrong and moves it based on scheduling.
+      Returns aux info and new cardbox score '''
+  result = {"status": "success"}
+  params = request.get_json(force=True) # returns dict
+  alpha = params.get("alpha")
+  if g.schedVersion in (1, 2, 3):
+    g.cur.execute(f"select cardbox from questions where question='{alpha}'")
+    currentCardbox = g.cur.fetchone()[0]
+  else:
+    currentCardbox = -1
+  stmt = ("update questions set cardbox = ?, next_scheduled = ?, " +
+        "incorrect = incorrect+1, streak=0, difficulty=4 where question = ?")
+  if currentCardbox < 8:
+    g.cur.execute(stmt, (0, getNext(0), alpha))
+  else:
+    g.cur.execute(stmt, (2, getNext(2), alpha))
+
+  result["auxInfo"] = getAuxInfo(alpha)
+  result["score"] = getCardboxScore()
+  return jsonify(result)
+
 
 @app.route("/getQuestions", methods=['GET', 'POST'])
 def getQuestions():
@@ -244,11 +197,11 @@ def getQuestions():
       if lock:
         checkOut(alpha, True)
       for word in template["answers"]:
-         wordJSON = { "word": word }
-         wordInfo = requests.post(f'{lexService}/getWordInfo', headers=g.headers, json=wordJSON).json()
-         innerHooks = requests.post(f'{lexService}/getDots', headers=g.headers, json=wordJSON).json()
-#        [ front hooks, back hooks, definition, [innerHooks], lexicon symbols ]
-         template["words"][word] = [ wordInfo["front_hooks"], wordInfo["back_hooks"],
+        wordJSON = { "word": word }
+        wordInfo = requests.post(f'{lexService}/getWordInfo', headers=g.headers, json=wordJSON).json()
+        innerHooks = requests.post(f'{lexService}/getDots', headers=g.headers, json=wordJSON).json()
+#       [ front hooks, back hooks, definition, [innerHooks], lexicon symbols ]
+        template["words"][word] = [ wordInfo["front_hooks"], wordInfo["back_hooks"],
                         wordInfo["definition"], innerHooks, ""]
       result["questions"].append(template)
 
@@ -685,3 +638,33 @@ def checkOut (alpha, lock) :
     difficulty = 0
 
   g.cur.execute(f"update questions set difficulty = {difficulty} where question = '{alpha}'")
+
+def getNext (newCardbox = 0) :
+
+  '''
+  If you are putting a word in cardbox newCardbox now,
+  returns the time (in Unix Epoch format) it needs to be reviewed
+  '''
+  now = int(time.time())
+  day = 24*3600  # number of seconds in a day
+
+  newCardbox = min(newCardbox, 12)
+
+  random.seed()
+  offset=random.randrange(day)
+
+# List of lists
+# cardbox x is rescheduled for a time [x,y]
+# between x and x+y days in the future
+  if g.schedVersion == 1:
+    sched = [ [.2, .3], [1, 1], [3, 3], [7, 7], [14, 14], [30,30], [60,45],
+              [120, 90], [240, 120], [430, 100], [430,100], [430,100], [430,100] ]
+
+  elif g.schedVersion == 3:
+    sched = [ [0.5,1] , [1,2] , [2,6] , [6,8] , [12,10] , [19,12] , [27,18] ,
+              [40,28] , [62,32] , [86,48] , [120,70] , [170,80] , [215,150] ]
+  else:
+    sched = [ [.5,.8], [3,2], [5,4], [11,6], [16,10], [27,14], [50,20], [80,30],
+              [130,40], [300,60], [430,100], [430,100],[430,100] ]
+
+  return int( now + (sched[newCardbox][0]*day) + (sched[newCardbox][1]*offset))

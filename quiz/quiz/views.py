@@ -166,6 +166,71 @@ def getQuestions():
 
   return jsonify(result)
 
+@app.route('/submitQuestion', methods=["GET", "POST"])
+def submitQuestion():
+
+  error = {"status": "success"}
+  result = { }
+  params = request.get_json(force=True) # returns a dict
+
+  # quiz -1 is cardbox only
+  quizid = params.get("quizid", -1)
+  currentCardbox = params.get('cardbox')
+  alpha = params.get("question")
+  correct = params.get('correct') # boolean
+  increment = params.get("incrementQ") # boolean
+
+  # increment means - add one to the question total
+  # correct means - put in currentCardbox + 1
+  # wrong means - put in cardbox 0
+  # to reschedule in current CB, need to pass in cardbox-1
+
+  # NB if the question is a non-cardbox quiz which is ready to be
+  # rescheduled in cardbox, the front end will hit submitQuestion() twice
+  # This is crazy but a problem for another day - see issue #92
+
+  if increment:
+    # call the stats service to increment leaderboard
+    url = 'http://stats:5000/increment'
+    resp = requests.get(url, headers=g.headers).json()
+    result["qAnswered"] = int(resp["questionsAnswered"])
+    result["startScore"] = resp["startScore"]
+
+    # MILESTONE CHATS
+    # Every 50 up to 500, every 100 up to 1000, every 200 after that
+
+    milestone = ((result["qAnswered"] < 501 and result["qAnswered"]%50==0) or
+                (result["qAnswered"] < 1001 and result["qAnswered"]%100==0) or
+                (result["qAnswered"]%200==0) or (result["qAnswered"]%500==0))
+    if milestone:
+      submitMilestoneChat(result["qAnswered"])
+
+  # this is for new Sloth, no quiz, increment only, skip reschedule
+  if currentCardbox == -2:
+    pass
+  elif quizid == -1:
+    data = {"alpha": alpha}
+  # send cardbox quiz results to the cardbox service to update
+    if correct:
+      url = 'http://cardbox:5000/correct'
+      data['cardbox'] = currentCardbox + 1
+    else:
+      url = 'http://cardbox:5000/wrong'
+    resp = requests.post(url, headers=g.headers, json=data).json()
+    result['aux'] = resp['auxInfo']
+    result['score'] = resp['score']
+  else: # non-cardbox quiz
+    if correct:
+      correct(alpha, quizid)
+    else:
+      wrong(alpha, quizid)
+    url = 'http://cardbox:5000/getCardboxScore'
+    resp = requests.get(url, headers=g.headers).json()
+    result['score'] = resp['score']
+    url = 'http://cardbox:5000/getAuxInfo'
+    result['aux'] = requests.post(url, headers=g.headers, json={"alpha": alpha}).json()
+
+  return jsonify(result)
 
 @app.route("/getQuizList", methods=["GET", "POST"])
 def getQuizList():
@@ -337,51 +402,88 @@ def newQuiz():
 
   result = { }
 
-  try:
-    params = request.get_json(force=True) # returns dict
-    isCardbox = params.get("isCardbox", True)
-    quizid = params.get("quizid", -1)
+  params = request.get_json(force=True) # returns dict
+  isCardbox = params.get("isCardbox", True)
+  quizid = params.get("quizid", -1)
 
-    if isCardbox:
-      result["quizName"] = "Cardbox Quiz"
-      url = 'http://cardbox:5000/newQuiz'
-      requests.get(url, headers=g.headers)
+  if isCardbox:
+    result["quizName"] = "Cardbox Quiz"
+    url = 'http://cardbox:5000/newQuiz'
+    requests.get(url, headers=g.headers)
+  else:
+    g.con.execute(f'select quiz_name from quiz_master where quiz_id = {quizid}')
+    result["quizName"] = g.con.fetchone()[0]
+    g.con.execute(f"select count(*) from quiz_user_detail where quiz_id = {quizid} and user_id = {g.uuid}")
+    c = int(g.con.fetchone()[0])
+    if c > 0:
+      g.con.execute(f"update quiz_user_detail set locked = 0 where quiz_id = {quizid} and user_id = {g.uuid}")
     else:
-      g.con.execute(f'select quiz_name from quiz_master where quiz_id = {quizid}')
-      result["quizName"] = g.con.fetchone()[0]
-      g.con.execute(f"select count(*) from quiz_user_detail where quiz_id = {quizid} and user_id = {g.uuid}")
-      c = int(g.con.fetchone()[0])
-      if c > 0:
-        g.con.execute(f"update quiz_user_detail set locked = 0 where quiz_id = {quizid} and user_id = {g.uuid}")
-      else:
-        # load quiz json
-        filename = os.path.join(QUIZJSON_PATH, f"{quizid}.json")
-        with open(filename, 'r') as f:
-          data = json.load(f)
-        # insert into quiz user detail
-        for alpha in data["alphagrams"]:
-          g.con.execute(f'''insert into quiz_user_detail (id, quiz_id, user_id, alphagram, locked, completed, correct, incorrect)
+      # load quiz json
+      filename = os.path.join(QUIZJSON_PATH, f"{quizid}.json")
+      with open(filename, 'r') as f:
+        data = json.load(f)
+      # insert into quiz user detail
+      for alpha in data["alphagrams"]:
+        g.con.execute(f'''insert into quiz_user_detail (id, quiz_id, user_id, alphagram, locked, completed, correct, incorrect)
                               values (NULL, {quizid}, "{g.uuid}", "{alpha}", 0, 0, 0, 0)''')
 
-    # send back cardbox info always
-    url = 'http://cardbox:5000/getCardboxScore'
-    cbxResponse = requests.get(url, headers=g.headers).json()
-    cbxScore = cbxResponse[0].get("score", 0)
+  # send back cardbox info always
+  url = 'http://cardbox:5000/getCardboxScore'
+  cbxResponse = requests.get(url, headers=g.headers).json()
+  cbxScore = cbxResponse.get("score", 0)
 
-    g.con.execute(f"select questionsAnswered, startScore from leaderboard where userid = '{g.uuid}' and dateStamp = curdate()")
-    row = g.con.fetchone()
+  g.con.execute(f"select questionsAnswered, startScore from leaderboard where userid = '{g.uuid}' and dateStamp = curdate()")
+  row = g.con.fetchone()
 
-    if row is not None:
-      result["qAnswered"] = row[0]
-      result["startScore"] = row[1]
-      result["score"] = cbxScore
-    else:
-      result["qAnswered"] = 0
-      result["startScore"] = cbxScore
-      result["score"] = cbxScore
-
-  except Exception:
-    xu.errorLog()
-    result["error"] = "An error occurred. See log for details."
+  if row is not None:
+    result["qAnswered"] = row[0]
+    result["startScore"] = row[1]
+    result["score"] = cbxScore
+  else:
+    result["qAnswered"] = 0
+    result["startScore"] = cbxScore
+    result["score"] = cbxScore
 
   return jsonify(result)
+
+def submitMilestoneChat(milestone):
+  pass
+#  SYSTEM_USERID = 0 # Xerafin system uid
+#      command = "select name, firstname, lastname from login where userid = %s"
+#      con.execute(command, (userid,))
+#      row = con.fetchone()
+#      if row[1] and row[2]:
+#        if row[2] == " ":
+#          name = "{0}".format(row[1])
+#        else:
+#          name = "{0} {1}".format(row[1], row[2])
+#      else:
+#        name = con.fetchone()[0]
+#
+#    # Find the previous milestone chat to expire
+#      try:
+#        command = "select max(timeStamp) from chat where userid = %s and message like %s"
+#        con.execute(command, (SYSTEM_USERID, "%{0} has completed %".format(name)))
+#        expiredChatTime = con.fetchone()[0]
+#        error["milestoneDelete"] = xchat.post(u'0', u'', expiredChatTime, True)
+#      except:
+#        pass
+#
+#    msg = "{0} has completed <b>{1}</b> alphagrams today!".format(name, result["qAnswered"])
+#    error["milestoneSubmit"] = xchat.post(u'0', msg)
+
+def correct (alpha, quizid) :
+
+  ''' Schedules a word in cardbox which has been marked correct
+  '''
+  g.con.execute("update quiz_user_detail set correct=1, incorrect=0, " +
+      "last_answered=NOW(), completed=1 where alphagram = %s and user_id = %s " +
+      "and quiz_id = %s", (alpha, g.uuid, quizid))
+
+def wrong (alpha, quizid) :
+
+  ''' Schedules a word in cardbox which has been marked wrong
+  '''
+  g.con.execute("update quiz_user_detail set incorrect=1, correct = 0, " +
+    "last_answered=NOW(), completed=1 where alphagram = %s and user_id = %s " +
+    "and quiz_id = %s", (alpha, g.uuid, quizid))
