@@ -430,7 +430,7 @@ def newQuiz():
   # send back cardbox info always
   url = 'http://cardbox:5000/getCardboxScore'
   cbxResponse = requests.get(url, headers=g.headers).json()
-  cbxScore = cbxResponse[0].get("score", 0)
+  cbxScore = cbxResponse.get("score", 0)
 
   g.con.execute(f"select questionsAnswered, startScore from leaderboard where userid = '{g.uuid}' and dateStamp = curdate()")
   row = g.con.fetchone()

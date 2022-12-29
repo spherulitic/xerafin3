@@ -55,6 +55,7 @@ def get_user():
 
 @app.after_request
 def close_mysql(response):
+  g.mysqlcon.commit()
   g.con.close()
   g.mysqlcon.close()
   return response
@@ -137,7 +138,7 @@ def increment():
     startScore = resp["score"]
     questionsAnswered = 1
     g.con.execute(f'''insert into leaderboard (userid, dateStamp, questionsAnswered, startScore)
-                      values ('{g.uuid}, curdate(), {questionsAnswered}, {startScore})''')
+                      values ('{g.uuid}', curdate(), {questionsAnswered}, {startScore})''')
   else:
     g.con.execute(f'''select questionsAnswered, startScore from leaderboard
                     where userid = '{g.uuid}' and datestamp = curdate()''')

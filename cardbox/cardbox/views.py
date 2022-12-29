@@ -60,6 +60,7 @@ def get_user():
 @app.after_request
 def close_sqlite(response):
   '''Close the cursor to the cardbox database'''
+  g.con.commit()
   g.con.close()
   return response
 
@@ -132,6 +133,8 @@ def correct():
       f"next_scheduled = {getNext(cardbox)}, " +
       f"correct=correct+1, streak=streak+1, last_correct = {now}, difficulty=4 " +
       f"where question = '{alpha}'")
+    xu.debug("Updated the cardbox")
+    xu.debug(f'{g.cur.rowcount} rows updated')
   result["auxInfo"] = getAuxInfo(alpha)
   result["score"] = getCardboxScore()
   return jsonify(result)

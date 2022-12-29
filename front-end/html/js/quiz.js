@@ -512,7 +512,7 @@ class Question {
         self.firstSubmit = false;
         self.lastSubmit = correct;
         if (typeof response.aux!=='undefined'){
-          let c = response.aux;
+          let c = response.aux.aux;
           self.nextScheduled = (((c.nextScheduled !==null) && (typeof c.nextScheduled !=='undefined')) ? c.nextScheduled : -1);
           self.cardbox = (((c.cardbox !==null) && (typeof c.cardbox !=='undefined')) ? c.cardbox : -1);
         }
