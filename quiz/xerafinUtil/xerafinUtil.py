@@ -23,23 +23,6 @@ def debug(message):
   timestamp = datetime.now().strftime("%Y %m %d %H:%M:%S")
   app.logger.info(f"{__name__} {timestamp} {message}\n")
 
-
-def updateActive (userid, timestamp=None) :
-  if timestamp is None:
-    timestamp = int(time.time())
-  mysqlcon = getMysqlCon()
-  con = mysqlcon.cursor()
-  try:
-    command = "update login set last_active = %s where userid = %s"
-    if userid != 0:  # 0 is the system user
-      con.execute(command, (timestamp, userid))
-  except mysql.Error as e:
-    debug("MySQL error %d %s " % (e.args[0], e.args[1]))
-  con.close()
-  mysqlcon.commit()
-  mysqlcon.close()
-
-
 def getMysqlCon():
   return mysql.connect(host=MYSQL_HOST, user=MYSQL_USER, passwd=MYSQL_PWD, db=MYSQL_DB)
 
