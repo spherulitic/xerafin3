@@ -18,7 +18,7 @@ Rankings.prototype = {
       },
       success: function(r, rS){
         $("#heading_text_pan_3").html("Rankings");
-        self.drawRankings(JSON.parse(r));
+        self.drawRankings(r);
       },
       error: function(jqXHR, textStatus, errorThrown) {
         $("#heading_text_pan_3").html("Rankings");
