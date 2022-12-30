@@ -82,14 +82,19 @@ def getRankings():
 
     if data.get("view", "QA") == "QA":
       if data.get("displayType", 0) in (2, 3):
+        xs.debug("creating Metaranks object")
         rank = Metaranks(data)
       else:
+        xs.debug("creating Rankings object")
         rank = Rankings(data)
     elif data.get("view", "QA") == "AW":
+      xs.debug("creating Awards object")
       rank = Awards(data)
     elif data.get("view", "QA") == "SL":
+      xs.debug("creating Sloth Rankings object")
       rank = SlothRankings(data)
     else:
+      xs.debug("creating Rankings object")
       rank = Rankings(data)
 
   except:
@@ -692,6 +697,8 @@ class Rankings():
                     ORDER BY total DESC, firstname ASC
                     LIMIT {self.offset},{self.pageSize}'''
     result = self.runQuery()
+    xs.debug(f'Rankings object ran query {self.query}')
+    xs.debug(str(result))
     self.rankData = [ ]
     foundMe = False
     for index, row in enumerate(result):
@@ -720,7 +727,8 @@ class Rankings():
           self.rankData.insert(0, rowDict)
         else:
           self.rankData.append(rowDict)
-
+    xs.debug("Finished setting up rankData")
+    xs.debug(str(self.rankData))
   def getRankings(self):
     """Format the data structures to output to the client"""
     rankings = [ ]

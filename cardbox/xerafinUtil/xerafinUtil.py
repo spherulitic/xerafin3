@@ -1,5 +1,4 @@
 from flask import request
-import MySQLdb as mysql
 import sqlite3 as lite
 import linecache
 import os, sys, traceback
@@ -7,10 +6,6 @@ import time
 from datetime import datetime
 from cardbox import app
 
-MYSQL_USER = ""
-MYSQL_DB = ""
-MYSQL_PWD = ""
-MYSQL_HOST = "172.17.0.1" # Docker alias to localhost
 cardboxDBPath = "cardbox-data"
 
 def errorLog():
@@ -64,26 +59,6 @@ def checkCardboxDatabase (userid):
 #    return False
 
   return True
-
-
-def updateActive (userid, timestamp=None) :
-  if timestamp is None:
-    timestamp = int(time.time())
-  mysqlcon = getMysqlCon()
-  con = mysqlcon.cursor()
-  try:
-    command = "update login set last_active = %s where userid = %s"
-    if (userid != 0):  # 0 is the system user
-      con.execute(command, (timestamp, userid))
-  except mysql.Error as e:
-     result["status"] = "MySQL error %d %s " % (e.args[0], e.args[1])
-  con.close()
-  mysqlcon.commit()
-  mysqlcon.close()
-
-
-def getMysqlCon():
-   return mysql.connect(host=MYSQL_HOST, user=MYSQL_USER, passwd=MYSQL_PWD, db=MYSQL_DB)
 
 def getDomain():
   return ""
