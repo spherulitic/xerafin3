@@ -45,6 +45,9 @@ def get_user():
   raw_token = request.headers["Authorization"]
   g.auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
   g.uuid = g.auth_token["sub"]
+  g.photo = 'images/unknown_player.gif'
+  g.name = g.auth_token["name"]
+  g.handle = g.auth_token["preferred_username"]
   # headers to send to other services
   g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
