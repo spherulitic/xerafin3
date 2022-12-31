@@ -2,12 +2,12 @@ from math import ceil
 from logging.config import dictConfig
 from datetime import datetime, timedelta
 import json
-import requests
 import urllib
+import requests
 import jwt
 from flask import request, jsonify, g
 from dateutil.relativedelta import relativedelta, MO
-import xerafinUtil.xerafinUtil as xs
+import xerafinUtil.xerafinUtil as xu
 from stats import app
 
 DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
@@ -35,7 +35,7 @@ dictConfig({
 })
 
 @app.before_request
-def get_user():
+def getUser():
   public_key_url = 'http://keycloak:8080/auth/realms/Xerafin'
   with urllib.request.urlopen(public_key_url) as r:
     public_key = json.loads(r.read())['public_key']
@@ -51,13 +51,14 @@ def get_user():
   # headers to send to other services
   g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
-  g.mysqlcon = xs.getMysqlCon()
+  g.mysqlcon = xu.getMysqlCon()
   g.con = g.mysqlcon.cursor()
 
   return None
 
 @app.after_request
-def close_mysql(response):
+def closeMysql(response):
+  ''' Commit and close MySQL connection before we return the response '''
   g.mysqlcon.commit()
   g.con.close()
   g.mysqlcon.close()
@@ -70,64 +71,54 @@ def default():
 
 @app.route("/getRankings", methods=['GET', 'POST'])
 def getRankings():
-  try:
-    data = request.get_json(force=True)
+  ''' Endpoint to return any sort of rankings data to the client '''
+  data = request.get_json(force=True)
 
-    # data should contain such items as:
-    #   displayType
-    #   pageSize  - int
-    #   pageNumber - int
-    #   timeframe {today, yesterday, thisWeek, lastWeek, thisMonth,
-    #              lastMonth, thisYear, lastYear, eternity}
-    #   type
-    #   year
-    #   view {QA, AW, SL}
+  # data should contain such items as:
+  #   displayType
+  #   pageSize  - int
+  #   pageNumber - int
+  #   timeframe {today, yesterday, thisWeek, lastWeek, thisMonth,
+  #              lastMonth, thisYear, lastYear, eternity}
+  #   type
+  #   year
+  #   view {QA, AW, SL}
 
-    if data.get("view", "QA") == "QA":
-      if data.get("displayType", 0) in (2, 3):
-        xs.debug("creating Metaranks object")
-        rank = Metaranks(data)
-      else:
-        xs.debug("creating Rankings object")
-        rank = Rankings(data)
-    elif data.get("view", "QA") == "AW":
-      xs.debug("creating Awards object")
-      rank = Awards(data)
-    elif data.get("view", "QA") == "SL":
-      xs.debug("creating Sloth Rankings object")
-      rank = SlothRankings(data)
+  if data.get("view", "QA") == "QA":
+    if data.get("displayType", 0) in (2, 3):
+      xu.debug("creating Metaranks object")
+      rank = Metaranks(data)
     else:
-      xs.debug("creating Rankings object")
+      xu.debug("creating Rankings object")
       rank = Rankings(data)
+  elif data.get("view", "QA") == "AW":
+    xu.debug("creating Awards object")
+    rank = Awards(data)
+  elif data.get("view", "QA") == "SL":
+    xu.debug("creating Sloth Rankings object")
+    rank = SlothRankings(data)
+  else:
+    xu.debug("creating Rankings object")
+    rank = Rankings(data)
 
-  except:
-    xs.errorLog()
-
-  if rank:
-    return jsonify(rank.getRankings())
-  return jsonify(["Dummy response"])
+  return jsonify(rank.getRankings())
 
 @app.route("/getAllTimeStats", methods=['GET', 'POST'])
 def getAllTimeStats():
+  ''' Endpoint to send sitewide all-time stats to the client '''
 
   result = { }
-  error = { }
 
-  try:
-    command = """select ifnull(sum(questionsAnswered), 0), ifnull(count(distinct userid), 0)
-               from leaderboard"""
-    g.con.execute(command)
-    row = g.con.fetchone()
-    if row:
-      result["questions"] = int(row[0])
-      result["users"] = int(row[1])
-    else:
-      result["questions"] = 0
-      result["users"] = 0
-
-  except:
-    xs.errorLog()
-    error["status"] = "An error occurred. See log for more details"
+  command = """select ifnull(sum(questionsAnswered), 0), ifnull(count(distinct userid), 0)
+             from leaderboard"""
+  g.con.execute(command)
+  row = g.con.fetchone()
+  if row:
+    result["questions"] = int(row[0])
+    result["users"] = int(row[1])
+  else:
+    result["questions"] = 0
+    result["users"] = 0
 
   response = jsonify(result)
   return response
@@ -154,8 +145,6 @@ def increment():
     questionsAnswered = row[0]
     startScore = row[1]
   return jsonify({'questionsAnswered': questionsAnswered, 'startScore': startScore})
-
-
 
 class Metaranks():
   def __init__(self, data):
@@ -245,19 +234,17 @@ class Metaranks():
     return f"MONTH(dateStamp)={month}"
 
   def runQuery(self):
+    ''' Runs the query text in self.query and returns the results '''
     g.con.execute(self.query)
     return g.con.fetchall()
 
   def findUser(self, findCurrent=True):
-    self.query = f""" SELECT userid, SUM(questionsAnswered) AS total {self.setDateType()},
-                        name, firstname, lastname
+    self.query = f""" SELECT userid, SUM(questionsAnswered) AS total {self.setDateType()}
                        FROM leaderboard
-                       JOIN login USING (userid)
-                       JOIN user_prefs USING (userid)
                        {self.checkWhere()}{self.setDay()}{self.setMonth()}
-                       GROUP BY userid{self.getTimeConditionsQuery()}, name, firstname, lastname
-                       ORDER BY total DESC, date ASC, firstname ASC, lastname ASC """
-    # columns in result set: [userid, questionsAnswered, date, name, firstname, lastname]
+                       GROUP BY userid{self.getTimeConditionsQuery()}
+                       ORDER BY total DESC, date ASC """
+    # columns in result set: [userid, questionsAnswered, date]
     result = self.runQuery()
     myResult = [(i,j[2]) for (i,j) in enumerate(result) if j[0] == g.uuid]
     # if my uuid is in the result set, myResult is now [(<index>, <date>)]
@@ -348,16 +335,11 @@ class Metaranks():
       self.offset = self.pageSize * self.page
 
   def getRankingsData(self):
-    queryStart = f"""SELECT name, photo, countryId,
-               SUM(questionsAnswered) AS total{self.setDateType()},
-               userid, firstname, lastname
-               FROM leaderboard
-               JOIN login USING (userid)
-               JOIN user_prefs USING (userid) """
+    queryStart = f"""SELECT SUM(questionsAnswered) AS total{self.setDateType()}, userid
+               FROM leaderboard"""
     self.query = f"""{queryStart}{self.checkWhere()}{self.setDay()}{self.setMonth()}
-               GROUP BY userid, name{self.getTimeConditionsQuery()}, photo,
-               firstname, lastname, countryId
-               ORDER BY total DESC, date ASC, firstname ASC, lastname ASC
+               GROUP BY userid, {self.getTimeConditionsQuery()}, countryId
+               ORDER BY total DESC, date ASC
                LIMIT {self.offset},{self.pageSize} """
     result = self.runQuery()
     rank = self.offset
@@ -366,9 +348,7 @@ class Metaranks():
     foundCurrent = False
     for row in result:
       rank += 1
-      rowDict = { "name": row[0], "photo": row[1], "countryId": row[2],
-                  "total": row[3], "date": row[4], "userid": row[5],
-                  "firstname": row[6], "lastname": row[7] }
+      rowDict = { "total": row[0], "date": row[1], "userid": row[2]}
       if rowDict["userid"] == g.uuid:
         rowDict["isMe"] = True
         if rank == self.userRank:
@@ -381,15 +361,12 @@ class Metaranks():
     if not foundMe and self.userRank != -1:
       self.query = f"""{queryStart} WHERE userid={g.uuid}
                  {self.checkAnd()}{self.setDay()}{self.setMonth()}
-              GROUP BY userid, name{self.getTimeConditionsQuery()}, photo,
-               firstname, lastname, countryId
-              ORDER BY total DESC, date ASC, firstname ASC, lastname ASC
+              GROUP BY userid, name{self.getTimeConditionsQuery()}
+              ORDER BY total DESC, date ASC
               LIMIT 1"""
       result = self.runQuery()
       for row in result:
-        rowDict = { "name": row[0], "photo": row[1], "countryId": row[2],
-                    "total": row[3], "date": row[4], "userid": row[5],
-                    "firstname": row[6], "lastname": row[7] }
+        rowDict = {"total": row[0], "date": row[1], "userid": row[2]}
         if rowDict["userid"] == g.uuid:
           rowDict["isMe"] = True
           if self.userRank == self.currentRank and self.currentRank != -1:
@@ -406,15 +383,12 @@ class Metaranks():
     if not foundCurrent and self.currentRank != -1 and self.userRank != -1:
       self.query = f"""{queryStart} WHERE userid={g.uuid}{self.checkAnd()}
                        {self.setDay()}{self.setMonth()} AND {self.getDateFormatForQuery()}
-                GROUP BY userid, name{self.getTimeConditionsQuery()}, photo
-                         firstname, lastname, countryId
-                ORDER BY total DESC, date ASC, firstname ASC, lastname ASC
+                GROUP BY userid, name{self.getTimeConditionsQuery()}
+                ORDER BY total DESC, date ASC
                 LIMIT 1 """
       result = self.runQuery()
       for row in result:
-        rowDict = { "name": row[0], "photo": row[1], "countryId": row[2],
-                    "total": row[3], "date": row[4], "userid": row[5],
-                    "firstname": row[6], "lastname": row[7] }
+        rowDict = {"total": row[0], "date": row[1], "userid": row[2]}
         if rowDict["userid"] == g.uuid:
           rowDict["isMe"] = True
           rowDict["isCurrent"] = True
@@ -428,21 +402,25 @@ class Metaranks():
 
   def getRankings(self):
     rankingsList = [ ]
-    userData = { }
     for row in self.rankData:
-      if len(row["firstname"]) == 0:
-        name = row["name"]
-      else:
-        name = f"{row['firstname']} {row['lastname']}"
       userData = { }
-      userData["users"] = [ {'photo': row["photo"], 'name': name, 'answered': row["total"]} ]
-      userData["rank"] = row['rank']
-      userData["countryId"] = row['countryId']
-      userData["date"] = self.formatDate(row["date"])
       if 'isMe' in row:
+        userData["photo"] = g.photo
+        userData["name"] = g.name
+        userData['countryId'] = g.countryId
         userData["isMe"] = row["isMe"]
+      else:
+        keycloakData = getUserData(row["userid"])
+        userData['photo'] = keycloakData.get('photo', 'images/unknown_user.gif')
+        userData['name'] = keycloakData.get('name', 'Mystery User')
+        userData['countryId'] = keycloakData.get('countryId')
+
+      userData['answered'] = row['total']
+      userData['rank'] = row['rank']
+      userData['date'] = self.formatDate(row['date'])
       if 'isCurrent' in row:
-        userData["isCurrent"] = row["isCurrent"]
+        userData['isCurrent'] = row['isCurrent']
+
       rankingsList.append(userData)
     result = { "rankings": userData, "myRank": self.userRank, "myCurrent": self.currentRank,
                "period": self.period, "users": self.userCount, "page": self.page+1}
@@ -700,8 +678,8 @@ class Rankings():
                     ORDER BY total DESC, firstname ASC
                     LIMIT {self.offset},{self.pageSize}'''
     result = self.runQuery()
-    xs.debug(f'Rankings object ran query {self.query}')
-    xs.debug(str(result))
+    xu.debug(f'Rankings object ran query {self.query}')
+    xu.debug(str(result))
     self.rankData = [ ]
     foundMe = False
     for index, row in enumerate(result):
@@ -730,8 +708,8 @@ class Rankings():
           self.rankData.insert(0, rowDict)
         else:
           self.rankData.append(rowDict)
-    xs.debug("Finished setting up rankData")
-    xs.debug(str(self.rankData))
+    xu.debug("Finished setting up rankData")
+    xu.debug(str(self.rankData))
   def getRankings(self):
     """Format the data structures to output to the client"""
     rankings = [ ]
@@ -825,7 +803,7 @@ class SlothRankings():
 
   def runQuery(self):
     """Run the mysql query in self.query"""
-    xs.debug(self.query)
+    xu.debug(self.query)
     g.con.execute(f'SET @datevalue = {self.curDate}')
     g.con.execute(self.query)
     return g.con.fetchall()
@@ -934,3 +912,10 @@ class SlothRankings():
       rankings.append(rowOut)
     result = {'rankings': rankings, 'myRank': self.userRank, 'period': self.period, 'users': self.userCount, 'page': self.page+1}
     return result
+
+def getUserInfo(uuid):
+  url = f'http://keycloak:8080/auth/admin/Xerafin/users/{uuid}'
+  resp = requests.get(url, headers=g.headers).json()
+  xu.debug(f"Getting user info from keycloak for {uuid}")
+  xu.debug(str(resp))
+  return resp
