@@ -14,7 +14,8 @@ DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
 MONTHS = ["january","february","march","april","may","june","july",
           "august","september","october","november","december"]
 PERIODS = ["daily","weekly","monthly","yearly"] + DAYS + MONTHS
-RANKING_PERIODS = ["today", "yesterday", "thisWeek", "lastWeek", "thisMonth", "lastMonth", "thisYear", "lastYear", "eternity"]
+RANKING_PERIODS = ["today", "yesterday", "thisWeek", "lastWeek", "thisMonth",
+                   "lastMonth", "thisYear", "lastYear", "eternity"]
 
 AWARDS_DIR = '/app/awards'
 
@@ -47,6 +48,7 @@ def getUser():
   g.uuid = g.auth_token["sub"]
   g.photo = 'images/unknown_player.gif'
   g.name = g.auth_token["name"]
+  g.countryId = g.auth_token.get('countryId', "")
   g.handle = g.auth_token["preferred_username"]
   # headers to send to other services
   g.headers = {"Accept": "application/json", "Authorization": raw_token}
@@ -411,25 +413,26 @@ class Metaranks():
     rankingsList = [ ]
     for row in self.rankData:
       userData = { }
+      subData = {'answered': row['total']}
       if 'isMe' in row:
-        userData["photo"] = g.photo
-        userData["name"] = g.name
+        subData["photo"] = g.photo
+        subData["name"] = g.name
         userData['countryId'] = g.countryId
         userData["isMe"] = row["isMe"]
       else:
         keycloakData = getUserData(row["userid"])
-        userData['photo'] = keycloakData.get('photo', 'images/unknown_user.gif')
-        userData['name'] = keycloakData.get('name', 'Mystery User')
+        subData['photo'] = keycloakData.get('photo', 'images/unknown_player.gif')
+        subData['name'] = keycloakData.get('name', 'Mystery User')
         userData['countryId'] = keycloakData.get('countryId')
 
-      userData['answered'] = row['total']
       userData['rank'] = row['rank']
       userData['date'] = self.formatDate(row['date'])
+      userData['users'] = [ subData ]
       if 'isCurrent' in row:
         userData['isCurrent'] = row['isCurrent']
 
       rankingsList.append(userData)
-    result = { "rankings": userData, "myRank": self.userRank, "myCurrent": self.currentRank,
+    result = { "rankings": rankingsList, "myRank": self.userRank, "myCurrent": self.currentRank,
                "period": self.period, "users": self.userCount, "page": self.page+1}
     return result
 
@@ -716,22 +719,23 @@ class Rankings():
     rankingsList = [ ]
     for row in self.rankData:
       userData = { }
+      subData = {'answered': row['total']}
       if 'isMe' in row:
-        userData["photo"] = g.photo
-        userData["name"] = g.name
+        subData["photo"] = g.photo
+        subData["name"] = g.name
         userData['countryId'] = g.countryId
         userData["isMe"] = row["isMe"]
       else:
         keycloakData = getUserData(row["userid"])
-        userData['photo'] = keycloakData.get('photo', 'images/unknown_user.gif')
-        userData['name'] = keycloakData.get('name', 'Mystery User')
+        subData['photo'] = keycloakData.get('photo', 'images/unknown_player.gif')
+        subData['name'] = keycloakData.get('name', 'Mystery User')
         userData['countryId'] = keycloakData.get('countryId')
 
-      userData['answered'] = row['total']
       userData['rank'] = row['rank']
+      userData['users'] = [ subData ]
 
       rankingsList.append(userData)
-    result = { "rankings": userData, "myRank": self.userRank,
+    result = { "rankings": rankingsList, "myRank": self.userRank,
                "period": self.period, "users": self.userCount, "page": self.page+1}
     return result
 
@@ -907,21 +911,22 @@ class SlothRankings():
     rankingsList = [ ]
     for row in self.rankData:
       userData = { }
+      subData = {'answered': row['total']}
       if 'isMe' in row:
-        userData["photo"] = g.photo
-        userData["name"] = g.name
+        subData["photo"] = g.photo
+        subData["name"] = g.name
         userData['countryId'] = g.countryId
         userData["isMe"] = row["isMe"]
       else:
         keycloakData = getUserData(row["userid"])
-        userData['photo'] = keycloakData.get('photo', 'images/unknown_user.gif')
-        userData['name'] = keycloakData.get('name', 'Mystery User')
+        subData['photo'] = keycloakData.get('photo', 'images/unknown_player.gif')
+        subData['name'] = keycloakData.get('name', 'Mystery User')
         userData['countryId'] = keycloakData.get('countryId')
 
-      userData['answered'] = row['total']
       userData['rank'] = row['rank']
+      userData['users'] = [ subData ]
 
       rankingsList.append(userData)
-    result = { "rankings": userData, "myRank": self.userRank,
+    result = { "rankings": rankingsList, "myRank": self.userRank,
                "period": self.period, "users": self.userCount, "page": self.page+1}
     return result
