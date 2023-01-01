@@ -124,3 +124,18 @@ def getDots():
   numFront = g.words.count_documents({'word': word[1:]})
   numBack = g.words.count_documents({'word': word[:-1]})
   return jsonify([numFront > 0, numBack > 0])
+
+@app.route('returnValidAlphas', methods=['POST'])
+def returnValidAlphas():
+  ''' Takes in a list of alphagrams. Returns a list of alphagrams which have
+        valid solutions in the dictionary. '''
+  params = request.get_json(force=True)
+  alphaList = params.get('alphas', [ ])
+  validAlphaList = [ ]
+  for alpha in alphaList:
+    query = {'alphagram': alpha}
+    result = g.words.count_documents(query)
+    if result > 0:
+      validAlphaList.append(alpha)
+
+  return jsonify(validAlphaList)
