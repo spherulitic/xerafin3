@@ -2,19 +2,20 @@ from math import ceil
 from logging.config import dictConfig
 from datetime import datetime, timedelta
 import json
-import requests
 import urllib
+import requests
 import jwt
 from flask import request, jsonify, g
 from dateutil.relativedelta import relativedelta, MO
-import xerafinUtil.xerafinUtil as xs
+import xerafinUtil.xerafinUtil as xu
 from stats import app
 
 DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
 MONTHS = ["january","february","march","april","may","june","july",
           "august","september","october","november","december"]
 PERIODS = ["daily","weekly","monthly","yearly"] + DAYS + MONTHS
-RANKING_PERIODS = ["today", "yesterday", "thisWeek", "lastWeek", "thisMonth", "lastMonth", "thisYear", "lastYear", "eternity"]
+RANKING_PERIODS = ["today", "yesterday", "thisWeek", "lastWeek", "thisMonth",
+                   "lastMonth", "thisYear", "lastYear", "eternity"]
 
 AWARDS_DIR = '/app/awards'
 
@@ -35,7 +36,7 @@ dictConfig({
 })
 
 @app.before_request
-def get_user():
+def getUser():
   public_key_url = 'http://keycloak:8080/auth/realms/Xerafin'
   with urllib.request.urlopen(public_key_url) as r:
     public_key = json.loads(r.read())['public_key']
@@ -47,17 +48,19 @@ def get_user():
   g.uuid = g.auth_token["sub"]
   g.photo = 'images/unknown_player.gif'
   g.name = g.auth_token["name"]
+  g.countryId = g.auth_token.get('countryId', "")
   g.handle = g.auth_token["preferred_username"]
   # headers to send to other services
   g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
-  g.mysqlcon = xs.getMysqlCon()
+  g.mysqlcon = xu.getMysqlCon()
   g.con = g.mysqlcon.cursor()
 
   return None
 
 @app.after_request
-def close_mysql(response):
+def closeMysql(response):
+  ''' Commit and close MySQL connection before we return the response '''
   g.mysqlcon.commit()
   g.con.close()
   g.mysqlcon.close()
@@ -70,64 +73,49 @@ def default():
 
 @app.route("/getRankings", methods=['GET', 'POST'])
 def getRankings():
-  try:
-    data = request.get_json(force=True)
+  ''' Endpoint to return any sort of rankings data to the client '''
+  data = request.get_json(force=True)
 
-    # data should contain such items as:
-    #   displayType
-    #   pageSize  - int
-    #   pageNumber - int
-    #   timeframe {today, yesterday, thisWeek, lastWeek, thisMonth,
-    #              lastMonth, thisYear, lastYear, eternity}
-    #   type
-    #   year
-    #   view {QA, AW, SL}
+  # data should contain such items as:
+  #   displayType
+  #   pageSize  - int
+  #   pageNumber - int
+  #   timeframe {today, yesterday, thisWeek, lastWeek, thisMonth,
+  #              lastMonth, thisYear, lastYear, eternity}
+  #   type
+  #   year
+  #   view {QA, AW, SL}
 
-    if data.get("view", "QA") == "QA":
-      if data.get("displayType", 0) in (2, 3):
-        xs.debug("creating Metaranks object")
-        rank = Metaranks(data)
-      else:
-        xs.debug("creating Rankings object")
-        rank = Rankings(data)
-    elif data.get("view", "QA") == "AW":
-      xs.debug("creating Awards object")
-      rank = Awards(data)
-    elif data.get("view", "QA") == "SL":
-      xs.debug("creating Sloth Rankings object")
-      rank = SlothRankings(data)
+  if data.get("view", "QA") == "QA":
+    if data.get("displayType", 0) in (2, 3):
+      rank = Metaranks(data)
     else:
-      xs.debug("creating Rankings object")
       rank = Rankings(data)
+  elif data.get("view", "QA") == "AW":
+    rank = Awards(data)
+  elif data.get("view", "QA") == "SL":
+    rank = SlothRankings(data)
+  else:
+    rank = Rankings(data)
 
-  except:
-    xs.errorLog()
-
-  if rank:
-    return jsonify(rank.getRankings())
-  return jsonify(["Dummy response"])
+  return jsonify(rank.getRankings())
 
 @app.route("/getAllTimeStats", methods=['GET', 'POST'])
 def getAllTimeStats():
+  ''' Endpoint to send sitewide all-time stats to the client '''
 
   result = { }
-  error = { }
 
-  try:
-    command = """select ifnull(sum(questionsAnswered), 0), ifnull(count(distinct userid), 0)
-               from leaderboard"""
-    g.con.execute(command)
-    row = g.con.fetchone()
-    if row:
-      result["questions"] = int(row[0])
-      result["users"] = int(row[1])
-    else:
-      result["questions"] = 0
-      result["users"] = 0
-
-  except:
-    xs.errorLog()
-    error["status"] = "An error occurred. See log for more details"
+  command = """select ifnull(sum(questionsAnswered), 0), ifnull(count(distinct userid), 0)
+             from leaderboard"""
+  g.con.execute(command)
+  row = g.con.fetchone()
+  if row:
+    result["questions"] = int(row[0])
+    result["users"] = int(row[1])
+  else:
+    result["questions"] = 0
+    result["users"] = 0
 
   response = jsonify(result)
   return response
@@ -155,7 +143,12 @@ def increment():
     startScore = row[1]
   return jsonify({'questionsAnswered': questionsAnswered, 'startScore': startScore})
 
-
+def getUserData(uuid):
+  url = f'http://keycloak:8080/auth/admin/Xerafin/users/{uuid}'
+  resp = requests.get(url, headers=g.headers).json()
+  xu.debug(f"Getting user info from keycloak for {uuid}")
+  xu.debug(str(resp))
+  return resp
 
 class Metaranks():
   def __init__(self, data):
@@ -245,19 +238,17 @@ class Metaranks():
     return f"MONTH(dateStamp)={month}"
 
   def runQuery(self):
+    ''' Runs the query text in self.query and returns the results '''
     g.con.execute(self.query)
     return g.con.fetchall()
 
   def findUser(self, findCurrent=True):
-    self.query = f""" SELECT userid, SUM(questionsAnswered) AS total {self.setDateType()},
-                        name, firstname, lastname
+    self.query = f""" SELECT userid, SUM(questionsAnswered) AS total {self.setDateType()}
                        FROM leaderboard
-                       JOIN login USING (userid)
-                       JOIN user_prefs USING (userid)
                        {self.checkWhere()}{self.setDay()}{self.setMonth()}
-                       GROUP BY userid{self.getTimeConditionsQuery()}, name, firstname, lastname
-                       ORDER BY total DESC, date ASC, firstname ASC, lastname ASC """
-    # columns in result set: [userid, questionsAnswered, date, name, firstname, lastname]
+                       GROUP BY userid{self.getTimeConditionsQuery()}
+                       ORDER BY total DESC, date ASC """
+    # columns in result set: [userid, questionsAnswered, date]
     result = self.runQuery()
     myResult = [(i,j[2]) for (i,j) in enumerate(result) if j[0] == g.uuid]
     # if my uuid is in the result set, myResult is now [(<index>, <date>)]
@@ -281,8 +272,7 @@ class Metaranks():
       return " AND "
     return ""
 
-  def compareDateWithCurrent(self, d):
-    dateIn = datetime.strptime(d, '%Y-%m-%d')
+  def compareDateWithCurrent(self, dateIn):
     now = datetime.now()
     if self.period in DAYS:
       # if the date isn't a Monday, grab the previous Monday at 12 pm
@@ -295,19 +285,18 @@ class Metaranks():
         lastMonday = now + delta
       else:
         lastMonday = now
-      return (x.date() == lastMonday.date()) and (dateIn.weekday() == now.weekday())
-    elif self.period in MONTHS + ["monthly"]:
+      return (datetime.date(x) == datetime.date(lastMonday)) and (dateIn.weekday() == now.weekday())
+    if self.period in MONTHS + ["monthly"]:
       return now.month == dateIn.month and now.year == dateIn.year
-    elif self.period == "daily":
-      return now.date() == dateIn.date()
-    elif self.period == "weekly":
-      return now.isocalendar().week == dateIn.isocalendar.week() and now.year == dateIn.year
-    elif self.period == "yearly":
+    if self.period == "daily":
+      return datetime.date(now) == dateIn
+    if self.period == "weekly":
+      return now.isocalendar().week == dateIn.isocalendar().week and now.year == dateIn.year
+    if self.period == "yearly":
       return now.year == dateIn.year
     return False
 
-  def formatDate(self, p_date):
-    dateIn = datetime.strptime(p_date, '%Y-%m-%d')
+  def formatDate(self, dateIn):
     if self.period in ["daily"] + DAYS:
       formattedDate = dateIn.strftime("%d %b %Y")
     elif self.period in ["yearly"] + MONTHS:
@@ -323,6 +312,7 @@ class Metaranks():
     return formattedDate
 
   def getRankingBounds(self):
+    ''' This was Rick's code. I have no idea what it does. '''
     if self.displayType == 3:
       bound = self.pageSize
       if bound % 2 == 0:
@@ -348,16 +338,11 @@ class Metaranks():
       self.offset = self.pageSize * self.page
 
   def getRankingsData(self):
-    queryStart = f"""SELECT name, photo, countryId,
-               SUM(questionsAnswered) AS total{self.setDateType()},
-               userid, firstname, lastname
-               FROM leaderboard
-               JOIN login USING (userid)
-               JOIN user_prefs USING (userid) """
+    queryStart = f"""SELECT SUM(questionsAnswered) AS total{self.setDateType()}, userid
+               FROM leaderboard"""
     self.query = f"""{queryStart}{self.checkWhere()}{self.setDay()}{self.setMonth()}
-               GROUP BY userid, name{self.getTimeConditionsQuery()}, photo,
-               firstname, lastname, countryId
-               ORDER BY total DESC, date ASC, firstname ASC, lastname ASC
+               GROUP BY userid {self.getTimeConditionsQuery()}
+               ORDER BY total DESC, date ASC
                LIMIT {self.offset},{self.pageSize} """
     result = self.runQuery()
     rank = self.offset
@@ -366,9 +351,7 @@ class Metaranks():
     foundCurrent = False
     for row in result:
       rank += 1
-      rowDict = { "name": row[0], "photo": row[1], "countryId": row[2],
-                  "total": row[3], "date": row[4], "userid": row[5],
-                  "firstname": row[6], "lastname": row[7] }
+      rowDict = { "total": row[0], "date": row[1], "userid": row[2]}
       if rowDict["userid"] == g.uuid:
         rowDict["isMe"] = True
         if rank == self.userRank:
@@ -381,15 +364,12 @@ class Metaranks():
     if not foundMe and self.userRank != -1:
       self.query = f"""{queryStart} WHERE userid={g.uuid}
                  {self.checkAnd()}{self.setDay()}{self.setMonth()}
-              GROUP BY userid, name{self.getTimeConditionsQuery()}, photo,
-               firstname, lastname, countryId
-              ORDER BY total DESC, date ASC, firstname ASC, lastname ASC
+              GROUP BY userid, name{self.getTimeConditionsQuery()}
+              ORDER BY total DESC, date ASC
               LIMIT 1"""
       result = self.runQuery()
       for row in result:
-        rowDict = { "name": row[0], "photo": row[1], "countryId": row[2],
-                    "total": row[3], "date": row[4], "userid": row[5],
-                    "firstname": row[6], "lastname": row[7] }
+        rowDict = {"total": row[0], "date": row[1], "userid": row[2]}
         if rowDict["userid"] == g.uuid:
           rowDict["isMe"] = True
           if self.userRank == self.currentRank and self.currentRank != -1:
@@ -406,15 +386,12 @@ class Metaranks():
     if not foundCurrent and self.currentRank != -1 and self.userRank != -1:
       self.query = f"""{queryStart} WHERE userid={g.uuid}{self.checkAnd()}
                        {self.setDay()}{self.setMonth()} AND {self.getDateFormatForQuery()}
-                GROUP BY userid, name{self.getTimeConditionsQuery()}, photo
-                         firstname, lastname, countryId
-                ORDER BY total DESC, date ASC, firstname ASC, lastname ASC
+                GROUP BY userid, name{self.getTimeConditionsQuery()}
+                ORDER BY total DESC, date ASC
                 LIMIT 1 """
       result = self.runQuery()
       for row in result:
-        rowDict = { "name": row[0], "photo": row[1], "countryId": row[2],
-                    "total": row[3], "date": row[4], "userid": row[5],
-                    "firstname": row[6], "lastname": row[7] }
+        rowDict = {"total": row[0], "date": row[1], "userid": row[2]}
         if rowDict["userid"] == g.uuid:
           rowDict["isMe"] = True
           rowDict["isCurrent"] = True
@@ -428,23 +405,28 @@ class Metaranks():
 
   def getRankings(self):
     rankingsList = [ ]
-    userData = { }
     for row in self.rankData:
-      if len(row["firstname"]) == 0:
-        name = row["name"]
-      else:
-        name = f"{row['firstname']} {row['lastname']}"
       userData = { }
-      userData["users"] = [ {'photo': row["photo"], 'name': name, 'answered': row["total"]} ]
-      userData["rank"] = row['rank']
-      userData["countryId"] = row['countryId']
-      userData["date"] = self.formatDate(row["date"])
+      subData = {'answered': row['total']}
       if 'isMe' in row:
+        subData["photo"] = g.photo
+        subData["name"] = g.name
+        userData['countryId'] = g.countryId
         userData["isMe"] = row["isMe"]
+      else:
+        keycloakData = getUserData(row["userid"])
+        subData['photo'] = keycloakData.get('photo', 'images/unknown_player.gif')
+        subData['name'] = keycloakData.get('name', 'Mystery User')
+        userData['countryId'] = keycloakData.get('countryId')
+
+      userData['rank'] = row['rank']
+      userData['date'] = self.formatDate(row['date'])
+      userData['users'] = [ subData ]
       if 'isCurrent' in row:
-        userData["isCurrent"] = row["isCurrent"]
+        userData['isCurrent'] = row['isCurrent']
+
       rankingsList.append(userData)
-    result = { "rankings": userData, "myRank": self.userRank, "myCurrent": self.currentRank,
+    result = { "rankings": rankingsList, "myRank": self.userRank, "myCurrent": self.currentRank,
                "period": self.period, "users": self.userCount, "page": self.page+1}
     return result
 
@@ -517,6 +499,7 @@ class Awards():
       self.inData = json.load(f)
 
   def getRankingBounds(self):
+    ''' This was Rick's code. I have no idea what it does. '''
     if self.displayType == 1:
       bound = self.pageSize
       if bound % 2 == 0:
@@ -547,8 +530,8 @@ class Awards():
     return self.outData
 
   def parseOutputParams(self, p_row):
-    data = [{'photo':p_row['photo'], 'name':p_row['name']}]
-    outp = {'rank':p_row['rank'], 'users':data, 'countryId':p_row['countryId'], 'values':p_row['values']}
+    outp = {'rank':p_row['rank'], 'photo':p_row['photo'], 'name':p_row['name'],
+            'countryId':p_row['countryId'], 'values':p_row['values']}
     if 'isMe' in p_row:
       outp['isMe'] = 1
     return outp
@@ -572,8 +555,6 @@ class Awards():
 
   def getUserAmount(self):
     self.userCount = len(self.inData["rankings"])
-
-
 
 class Rankings():
   def __init__(self, data):
@@ -614,6 +595,7 @@ class Rankings():
     self.getRankingsData()
 
   def getTimeConditionsQuery(self):
+    ''' Return a where clause appropriate for the period in self.period '''
     if self.period == 'today':
       clause = 'dateStamp = @datevalue'
     elif self.period == 'yesterday':
@@ -641,17 +623,17 @@ class Rankings():
     return g.con.fetchall()
 
   def findUser(self):
-    self.query = f'''SELECT name, photo, countryId, SUM(questionsAnswered) AS total, userid, firstname, lastname
+    ''' Find the rank of me in today's leaderboard
+        There's got to be an easy way to do this in MySQL: see issue #100 '''
+    self.query = f'''SELECT SUM(questionsAnswered) AS total, userid
                      FROM leaderboard
-                     JOIN login USING (userid)
-                     JOIN user_prefs USING (userid)
                      {self.checkEtern("WHERE")}{self.getTimeConditionsQuery()}
-                     GROUP BY userid, name, photo, firstname, lastname, countryId
-                     ORDER BY total DESC, firstname ASC, lastname ASC'''
+                     GROUP BY userid
+                     ORDER BY total DESC'''
     result = self.runQuery()
-    myIndex = [i for (i,j) in enumerate(result) if j[4] == g.uuid]
+    myIndex = [i for (i,j) in enumerate(result) if j[1] == g.uuid]
     # at this point, myIndex is [<index>] where it's the index of the row matching my uuid in the result set
-    # if no match, myIndex is an empty list which is falsy
+    # if no match, myIndex is an empty list which is falsy -- note bool([0]) is True
     if bool(myIndex):
       self.userRank = myIndex[0]+1
     else:
@@ -664,12 +646,14 @@ class Rankings():
     return ''
 
   def countUsers(self):
+    ''' Return number of users in leaderboard for the given period '''
     self.query = f'SELECT COUNT(DISTINCT userid) AS users FROM leaderboard{self.checkEtern("WHERE")}{self.getTimeConditionsQuery()}'
     result = self.runQuery()
     for row in result:
       self.userCount = row[0]
 
   def getRankingBounds(self):
+    ''' This was Rick's code. I have no idea what it does. '''
     if self.displayType == 1:
       bound = self.pageSize
       if bound % 2 == 0:
@@ -677,9 +661,9 @@ class Rankings():
       if bound % 2 != 0:
         bound = bound - 1
       bounds = int(bound / 2)
-      self.offset = min(self.userRank - bounds - 1, 0)
+      self.offset = max(self.userRank - bounds - 1, 0)
       if self.userRank + bounds > self.userCount:
-        self.offset = min(self.userCount - self.pageSize, 0)
+        self.offset = max(self.userCount - self.pageSize, 0)
       self.pageTotal = 1
       self.page = 1
     else:
@@ -691,22 +675,15 @@ class Rankings():
 
   def getRankingsData(self):
     """Process rankings data from the database"""
-    queryStart = '''SELECT name, photo, countryId, SUM(questionsAnswered) AS total, userid, firstname, lastname
-                    FROM leaderboard
-                    JOIN login USING (userid)
-                    JOIN user_prefs USING (userid)'''
+    queryStart = 'SELECT SUM(questionsAnswered) AS total, userid FROM leaderboard '
     self.query = f'''{queryStart}{self.checkEtern("WHERE")}{self.getTimeConditionsQuery()}
-                    GROUP BY userid, name, photo, firstname, lastname, countryId
-                    ORDER BY total DESC, firstname ASC
+                    GROUP BY userid ORDER BY total DESC
                     LIMIT {self.offset},{self.pageSize}'''
     result = self.runQuery()
-    xs.debug(f'Rankings object ran query {self.query}')
-    xs.debug(str(result))
     self.rankData = [ ]
     foundMe = False
     for index, row in enumerate(result):
-      rowDict = {"name": row[0], "photo": row[1], "countryId": row[2], "total": row[3],
-                 "userid": row[4], "firstname": row[5], "lastname": row[6]}
+      rowDict = {"total": row[0], "userid": row[1]}
       if rowDict["userid"] == g.uuid:
         rowDict['isMe'] = True
         foundMe = True
@@ -714,15 +691,12 @@ class Rankings():
       self.rankData.append(rowDict)
     if not foundMe:
       self.query = f'''{queryStart} WHERE userid='{g.uuid}'{self.checkEtern('AND')}{self.getTimeConditionsQuery()}
-                    GROUP BY userid, name, photo, firstname, lastname, countryId
-                    ORDER BY total DESC, firstname ASC, lastname ASC
-                    LIMIT 1'''
+                    GROUP BY userid ORDER BY total DESC LIMIT 1'''
       result = self.runQuery()
       # I think no rows returned gets me an empty list
       if result:
         row = result[0]
-        rowDict = {"name": row[0], "photo": row[1], "countryId": row[2], "total": row[3],
-                 "userid": row[4], "firstname": row[5], "lastname": row[6]}
+        rowDict = {"total": row[0], "userid": row[1]}
         rowDict['isMe'] = True
         if self.userRank:
           rowDict['rank'] = self.userRank
@@ -730,23 +704,33 @@ class Rankings():
           self.rankData.insert(0, rowDict)
         else:
           self.rankData.append(rowDict)
-    xs.debug("Finished setting up rankData")
-    xs.debug(str(self.rankData))
+
   def getRankings(self):
     """Format the data structures to output to the client"""
-    rankings = [ ]
+    rankingsList = [ ]
     for row in self.rankData:
-      if row['firstname']:
-        displayName = f'{row["firstname"]} {row["lastname"]}'
-      else:
-        displayName = row['name']
-      rowOut = {'users': [{'photo': row['photo'], 'name': displayName, 'answered': row['total']}],
-           'rank': row['rank'], 'countryId': row['countryId']}
+      userData = { }
+      subData = {'answered': row['total']}
       if 'isMe' in row:
-        rowOut['isMe'] = row['isMe']
-      rankings.append(rowOut)
-    result = {'rankings': rankings, 'myRank': self.userRank, 'period': self.period, 'users': self.userCount, 'page': self.page+1}
+        subData["photo"] = g.photo
+        subData["name"] = g.name
+        userData['countryId'] = g.countryId
+        userData["isMe"] = row["isMe"]
+      else:
+        keycloakData = getUserData(row["userid"])
+        subData['photo'] = keycloakData.get('photo', 'images/unknown_player.gif')
+        subData['name'] = keycloakData.get('name', 'Mystery User')
+        userData['countryId'] = keycloakData.get('countryId')
+
+      userData['rank'] = row['rank']
+      userData['users'] = [ subData ]
+
+      rankingsList.append(userData)
+    result = { "rankings": rankingsList, "myRank": self.userRank,
+               "period": self.period, "users": self.userCount, "page": self.page+1}
     return result
+
+
 
 class SlothRankings():
   def __init__(self, data):
@@ -825,21 +809,18 @@ class SlothRankings():
 
   def runQuery(self):
     """Run the mysql query in self.query"""
-    xs.debug(self.query)
     g.con.execute(f'SET @datevalue = {self.curDate}')
     g.con.execute(self.query)
     return g.con.fetchall()
 
   def findUser(self):
-    self.query = f'''SELECT name, photo, countryId, COUNT({self.getSlothSubSelect()} alphagram) AS total, userid, firstname, lastname
+    self.query = f'''SELECT COUNT({self.getSlothSubSelect()} alphagram) AS total, userid
                    FROM sloth_completed
-                   JOIN login USING (userid)
-                   JOIN user_prefs USING (userid)
                    WHERE {self.getTimeConditionsQuery()} AND {self.getSlothSubFilter()}
-                   GROUP BY userid, name, photo, firstname, lastname, countryId
-                   ORDER BY total DESC, firstname ASC, lastname ASC'''
+                   GROUP BY userid
+                   ORDER BY total DESC'''
     result = self.runQuery()
-    myIndex = [i for (i,j) in enumerate(result) if j[4] == g.uuid]
+    myIndex = [i for (i,j) in enumerate(result) if j[1] == g.uuid]
     # at this point, myIndex is [<index>] where it's the index of the row matching my uuid in the result set
     # if no match, myIndex is an empty list which is falsy
     if bool(myIndex):
@@ -861,6 +842,7 @@ class SlothRankings():
       self.userCount = row[0]
 
   def getRankingBounds(self):
+    ''' This was Rick's code. I have no idea what it does. '''
     if self.displayType == 1:
       bound = self.pageSize
       if bound % 2 == 0:
@@ -868,9 +850,9 @@ class SlothRankings():
       if bound % 2 != 0:
         bound = bound - 1
       bounds = int(bound / 2)
-      self.offset = min(self.userRank - bounds - 1, 0)
+      self.offset = max(self.userRank - bounds - 1, 0)
       if self.userRank + bounds > self.userCount:
-        self.offset = min(self.userCount - self.pageSize, 0)
+        self.offset = max(self.userCount - self.pageSize, 0)
       self.pageTotal = 1
       self.page = 1
     else:
@@ -881,36 +863,33 @@ class SlothRankings():
       self.offset = self.pageSize * self.page
 
   def getRankingsData(self):
-    queryStart = f'''SELECT name, photo, countryId, COUNT({self.getSlothSubSelect()}alphagram) AS total, userid, firstname, lastname
-                    FROM sloth_completed
-                    JOIN login USING (userid)
-                    JOIN user_prefs USING (userid)'''
-    self.query = f'''{queryStart} WHERE {self.getTimeConditionsQuery()} AND {self.getSlothSubFilter()}
-                    GROUP BY userid, name, photo, firstname, lastname, countryId
-                    ORDER BY total DESC, firstname ASC, lastname ASC
+    ''' Query the rankings data and load it into self.rankData '''
+    queryStart = f'''SELECT COUNT({self.getSlothSubSelect()}alphagram) AS total, userid
+                    FROM sloth_completed'''
+    self.query = f'''{queryStart}
+                    WHERE {self.getTimeConditionsQuery()} AND {self.getSlothSubFilter()}
+                    GROUP BY userid
+                    ORDER BY total DESC
                     LIMIT {self.offset},{self.pageSize}'''
     result = self.runQuery
     self.rankData = [ ]
     foundMe = False
     for index, row in enumerate(result):
-      rowDict = {"name": row[0], "photo": row[1], "countryId": row[2], "total": row[3],
-                 "userid": row[4], "firstname": row[5], "lastname": row[6]}
+      rowDict = {"total": row[0], "userid": row[1]}
       if rowDict["userid"] == g.uuid:
         rowDict['isMe'] = True
         foundMe = True
       rowDict['rank'] = self.offset + index + 1
       self.rankData.append(rowDict)
     if not foundMe:
-      self.query = f'''{queryStart} WHERE userid='{g.uuid}' AND {self.getSlothSubFilter()} AND {self.getTimeConditionsQuery()}
-                    GROUP BY userid, name, photo, firstname, lastname, countryId
-                    ORDER BY total DESC, firstname ASC, lastname ASC
-                    LIMIT 1'''
+      self.query = f'''{queryStart} WHERE userid='{g.uuid}'
+                       AND {self.getSlothSubFilter()} AND {self.getTimeConditionsQuery()}
+                       GROUP BY userid ORDER BY total DESC LIMIT 1'''
       result = self.runQuery()
       # I think no rows returned gets me an empty list
       if result:
         row = result[0]
-        rowDict = {"name": row[0], "photo": row[1], "countryId": row[2], "total": row[3],
-                 "userid": row[4], "firstname": row[5], "lastname": row[6]}
+        rowDict = {"total": row[0], "userid": row[1]}
         rowDict['isMe'] = True
         if self.userRank:
           rowDict['rank'] = self.userRank
@@ -921,16 +900,25 @@ class SlothRankings():
 
   def getRankings(self):
     """Format the data structures to output to the client"""
-    rankings = [ ]
+    rankingsList = [ ]
     for row in self.rankData:
-      if row['firstname']:
-        displayName = f'{row["firstname"]} {row["lastname"]}'
-      else:
-        displayName = row['name']
-      rowOut = {'users': [{'photo': row['photo'], 'name': displayName, 'answered': row['total']}],
-           'rank': row['rank'], 'countryId': row['countryId']}
+      userData = { }
+      subData = {'answered': row['total']}
       if 'isMe' in row:
-        rowOut['isMe'] = row['isMe']
-      rankings.append(rowOut)
-    result = {'rankings': rankings, 'myRank': self.userRank, 'period': self.period, 'users': self.userCount, 'page': self.page+1}
+        subData["photo"] = g.photo
+        subData["name"] = g.name
+        userData['countryId'] = g.countryId
+        userData["isMe"] = row["isMe"]
+      else:
+        keycloakData = getUserData(row["userid"])
+        subData['photo'] = keycloakData.get('photo', 'images/unknown_player.gif')
+        subData['name'] = keycloakData.get('name', 'Mystery User')
+        userData['countryId'] = keycloakData.get('countryId')
+
+      userData['rank'] = row['rank']
+      userData['users'] = [ subData ]
+
+      rankingsList.append(userData)
+    result = { "rankings": rankingsList, "myRank": self.userRank,
+               "period": self.period, "users": self.userCount, "page": self.page+1}
     return result
