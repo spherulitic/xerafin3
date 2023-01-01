@@ -88,19 +88,14 @@ def getRankings():
 
   if data.get("view", "QA") == "QA":
     if data.get("displayType", 0) in (2, 3):
-      xu.debug("creating Metaranks object")
       rank = Metaranks(data)
     else:
-      xu.debug("creating Rankings object")
       rank = Rankings(data)
   elif data.get("view", "QA") == "AW":
-    xu.debug("creating Awards object")
     rank = Awards(data)
   elif data.get("view", "QA") == "SL":
-    xu.debug("creating Sloth Rankings object")
     rank = SlothRankings(data)
   else:
-    xu.debug("creating Rankings object")
     rank = Rankings(data)
 
   return jsonify(rank.getRankings())
@@ -277,8 +272,7 @@ class Metaranks():
       return " AND "
     return ""
 
-  def compareDateWithCurrent(self, d):
-    dateIn = datetime.strptime(d, '%Y-%m-%d')
+  def compareDateWithCurrent(self, dateIn):
     now = datetime.now()
     if self.period in DAYS:
       # if the date isn't a Monday, grab the previous Monday at 12 pm
@@ -291,19 +285,18 @@ class Metaranks():
         lastMonday = now + delta
       else:
         lastMonday = now
-      return (x.date() == lastMonday.date()) and (dateIn.weekday() == now.weekday())
-    elif self.period in MONTHS + ["monthly"]:
+      return (datetime.date(x) == datetime.date(lastMonday)) and (dateIn.weekday() == now.weekday())
+    if self.period in MONTHS + ["monthly"]:
       return now.month == dateIn.month and now.year == dateIn.year
-    elif self.period == "daily":
-      return now.date() == dateIn.date()
-    elif self.period == "weekly":
-      return now.isocalendar().week == dateIn.isocalendar.week() and now.year == dateIn.year
-    elif self.period == "yearly":
+    if self.period == "daily":
+      return datetime.date(now) == dateIn
+    if self.period == "weekly":
+      return now.isocalendar().week == dateIn.isocalendar().week and now.year == dateIn.year
+    if self.period == "yearly":
       return now.year == dateIn.year
     return False
 
-  def formatDate(self, p_date):
-    dateIn = datetime.strptime(p_date, '%Y-%m-%d')
+  def formatDate(self, dateIn):
     if self.period in ["daily"] + DAYS:
       formattedDate = dateIn.strftime("%d %b %Y")
     elif self.period in ["yearly"] + MONTHS:
@@ -319,6 +312,7 @@ class Metaranks():
     return formattedDate
 
   def getRankingBounds(self):
+    ''' This was Rick's code. I have no idea what it does. '''
     if self.displayType == 3:
       bound = self.pageSize
       if bound % 2 == 0:
@@ -347,7 +341,7 @@ class Metaranks():
     queryStart = f"""SELECT SUM(questionsAnswered) AS total{self.setDateType()}, userid
                FROM leaderboard"""
     self.query = f"""{queryStart}{self.checkWhere()}{self.setDay()}{self.setMonth()}
-               GROUP BY userid, {self.getTimeConditionsQuery()}, countryId
+               GROUP BY userid {self.getTimeConditionsQuery()}
                ORDER BY total DESC, date ASC
                LIMIT {self.offset},{self.pageSize} """
     result = self.runQuery()
@@ -505,6 +499,7 @@ class Awards():
       self.inData = json.load(f)
 
   def getRankingBounds(self):
+    ''' This was Rick's code. I have no idea what it does. '''
     if self.displayType == 1:
       bound = self.pageSize
       if bound % 2 == 0:
@@ -666,9 +661,9 @@ class Rankings():
       if bound % 2 != 0:
         bound = bound - 1
       bounds = int(bound / 2)
-      self.offset = min(self.userRank - bounds - 1, 0)
+      self.offset = max(self.userRank - bounds - 1, 0)
       if self.userRank + bounds > self.userCount:
-        self.offset = min(self.userCount - self.pageSize, 0)
+        self.offset = max(self.userCount - self.pageSize, 0)
       self.pageTotal = 1
       self.page = 1
     else:
@@ -685,8 +680,6 @@ class Rankings():
                     GROUP BY userid ORDER BY total DESC
                     LIMIT {self.offset},{self.pageSize}'''
     result = self.runQuery()
-    xu.debug(f'Rankings object ran query {self.query}')
-    xu.debug(str(result))
     self.rankData = [ ]
     foundMe = False
     for index, row in enumerate(result):
@@ -711,8 +704,6 @@ class Rankings():
           self.rankData.insert(0, rowDict)
         else:
           self.rankData.append(rowDict)
-    xu.debug("Finished setting up rankData")
-    xu.debug(str(self.rankData))
 
   def getRankings(self):
     """Format the data structures to output to the client"""
@@ -818,7 +809,6 @@ class SlothRankings():
 
   def runQuery(self):
     """Run the mysql query in self.query"""
-    xu.debug(self.query)
     g.con.execute(f'SET @datevalue = {self.curDate}')
     g.con.execute(self.query)
     return g.con.fetchall()
@@ -852,6 +842,7 @@ class SlothRankings():
       self.userCount = row[0]
 
   def getRankingBounds(self):
+    ''' This was Rick's code. I have no idea what it does. '''
     if self.displayType == 1:
       bound = self.pageSize
       if bound % 2 == 0:
@@ -859,9 +850,9 @@ class SlothRankings():
       if bound % 2 != 0:
         bound = bound - 1
       bounds = int(bound / 2)
-      self.offset = min(self.userRank - bounds - 1, 0)
+      self.offset = max(self.userRank - bounds - 1, 0)
       if self.userRank + bounds > self.userCount:
-        self.offset = min(self.userCount - self.pageSize, 0)
+        self.offset = max(self.userCount - self.pageSize, 0)
       self.pageTotal = 1
       self.page = 1
     else:
@@ -875,7 +866,8 @@ class SlothRankings():
     ''' Query the rankings data and load it into self.rankData '''
     queryStart = f'''SELECT COUNT({self.getSlothSubSelect()}alphagram) AS total, userid
                     FROM sloth_completed'''
-    self.query = f'''{queryStart} WHERE {self.getTimeConditionsQuery()} AND {self.getSlothSubFilter()}
+    self.query = f'''{queryStart}
+                    WHERE {self.getTimeConditionsQuery()} AND {self.getSlothSubFilter()}
                     GROUP BY userid
                     ORDER BY total DESC
                     LIMIT {self.offset},{self.pageSize}'''
