@@ -1,16 +1,14 @@
 '''Xerafin lexicon module'''
 
-from flask import jsonify, request, Response, g, session
 import os
 import urllib
 import json
-import requests
-import jwt
+#import requests
 from logging.config import dictConfig
-from pymongo import MongoClient
-import sys
-import time
-import xerafinUtil.xerafinUtil as xu
+import jwt # pylint: disable=E0401
+from pymongo import MongoClient # pylint: disable=E0401
+from flask import jsonify, request, g # pylint: disable=E0401
+#import xerafinUtil.xerafinUtil as xu
 from lexicon import app
 
 dictConfig({
@@ -31,7 +29,7 @@ dictConfig({
 
 
 @app.before_request
-def get_user():
+def getUser():
   public_key_url = 'http://keycloak:8080/auth/realms/Xerafin'
   with urllib.request.urlopen(public_key_url) as r:
     public_key = json.loads(r.read())['public_key']
@@ -51,7 +49,7 @@ def get_user():
   return None
 
 @app.after_request
-def close_mongo(response):
+def closeMongo(response):
   g.client.close()
   return response
 
@@ -70,30 +68,22 @@ def default():
 @app.route("/getAlphagramCounts", methods=['GET'])
 def getAlphagramCounts():
   ''' need to rewrite this using mongodb '''
-  try:
-    result = { }
-#    stmt = "select length(alphagram), count(distinct alphagram) from words group by length(alphagram)"
+  result = { }
+#    stmt = "select length(alphagram), count(distinct alphagram)
+#             from words group by length(alphagram)"
 #    g.con.execute(stmt)
 #    result = dict([(row[0], row[1]) for row in g.con.fetchall()])
-  except:
-    xu.errorLog()
-    result = { }
   return jsonify(result)
 
 @app.route("/getAnagrams", methods=['GET', 'POST'])
 def getAnagrams():
   '''Take in one alphagram and return the valid words associated.'''
   # Someday may want to implement this with the DAWG
-  result = [ ]
-  try:
-    params = request.get_json(force=True)
-    alpha = params.get('alpha')
-    query = {"alphagram": alpha}
-    result = g.words.find(query)
-    return [x["word"] for x in result]
-  except:
-    xu.errorLog()
-  return jsonify(result)
+  params = request.get_json(force=True)
+  alpha = params.get('alpha')
+  query = {"alphagram": alpha}
+  result = g.words.find(query)
+  return jsonify([x["word"] for x in result])
 
 @app.route("/getWordInfo", methods=['GET', 'POST'])
 def getWordInfo() :
@@ -102,14 +92,10 @@ def getWordInfo() :
   Returns a dict representing that word document in the DB
   '''
   params = request.get_json(force=True)
-  result = { }
-  try:
-    word = params.get('word')
-    query = {'word': word}
-    result = g.words.find_one(query)
-    del result['_id']
-  except:
-    xu.errorLog()
+  word = params.get('word')
+  query = {'word': word}
+  result = g.words.find_one(query)
+  del result['_id']
   return jsonify(result)
 
 @app.route("/getDots",  methods=['GET', 'POST'])
@@ -120,12 +106,11 @@ def getDots():
   '''
   params = request.get_json(force=True)
   word = params.get('word')
-  query = {'word': word}
   numFront = g.words.count_documents({'word': word[1:]})
   numBack = g.words.count_documents({'word': word[:-1]})
   return jsonify([numFront > 0, numBack > 0])
 
-@app.route('returnValidAlphas', methods=['POST'])
+@app.route('/returnValidAlphas', methods=['POST'])
 def returnValidAlphas():
   ''' Takes in a list of alphagrams. Returns a list of alphagrams which have
         valid solutions in the dictionary. '''
