@@ -75,30 +75,6 @@ def getCardboxScoreView():
   result = {"score": getCardboxScore()}
   return jsonify(result)
 
-#def prepareNewWords():
-#  pass
-## This can only be called from getQuestions()
-## Not exposed through nginx
-#  xu.debug("Got request to prepare new words")
-#  time.sleep(3) # latency test
-#  try:
-#    params = request.get_json(force=True)
-#    userid = params.get("userid", -1)
-#
-#    numNeeded = xerafinLib.getPrefs("newWordsAtOnce", userid)
-#    error = {"status": "success"}
-#
-#    with lite.connect(xerafinLib.getDBFile(userid)) as con:
-#      cur = con.cursor()
-#      wordsToAdd = xerafinLib.getFromStudyOrder(numNeeded, userid, cur)
-#      xerafinLib.insertIntoNextAdded(wordsToAdd, userid, cur)
-#
-#  except Exception as ex:
-#    xu.errorLog()
-#    error["status"] = "An error occurred. See log for details."
-#
-#  return jsonify(error)
-
 @app.route("/getAuxInfo", methods=['POST'])
 def getAuxInfoView():
   ''' Endpoint for non-cardbox quiz questions to retrieve
@@ -140,12 +116,15 @@ def correct():
   return jsonify(result)
 
 @app.route('/wrong', methods=['POST'])
-def wrong():
-  ''' Takes in an alphagram marked wrong and moves it based on scheduling.
-      Returns aux info and new cardbox score '''
-  result = {"status": "success"}
+def wrongView():
   params = request.get_json(force=True) # returns dict
   alpha = params.get("alpha")
+  return jsonify(wrong(alpha))
+
+def wrong(alpha):
+  ''' Takes in an alphagram marked wrong and moves it based on scheduling.
+      Returns aux info and new cardbox score '''
+  result = { }
   if g.schedVersion in (1, 2, 3):
     g.cur.execute(f"select cardbox from questions where question='{alpha}'")
     currentCardbox = g.cur.fetchone()[0]
@@ -160,7 +139,7 @@ def wrong():
 
   result["auxInfo"] = getAuxInfo(alpha)
   result["score"] = getCardboxScore()
-  return jsonify(result)
+  return result
 
 
 @app.route("/getQuestions", methods=['GET', 'POST'])
@@ -254,61 +233,80 @@ def newQuiz():
 def getCardboxStats():
   result = { }
   error = {"status": "success"}
-  try:
 
-    params = request.get_json(force=True) # returns dict
+  params = request.get_json(force=True) # returns dict
 
-    due = params.get("due", False)
-    coverage = params.get("coverage", False)
-    overview = params.get("overview", False)
-    earliest = params.get("earliest", False)
+  due = params.get("due", False)
+  coverage = params.get("coverage", False)
+  overview = params.get("overview", False)
+  earliest = params.get("earliest", False)
 
-    now = int(time.time())
-    DAY = 3600 * 24 # length of a day in seconds
+  now = int(time.time())
+  DAY = 3600 * 24 # length of a day in seconds
 
-    if earliest:
-      earliestDueDate = getEarliestDueDate()
-      result["earliestDueDate"] = earliestDueDate
+  if earliest:
+    earliestDueDate = getEarliestDueDate()
+    result["earliestDueDate"] = earliestDueDate
 
-    if overview:
-      dueNow = getCurrentDue(True) # summarize=True to get total w/ no cardbox breakout
-      totalCards = getTotal()
-      result["totalCards"] = totalCards
-      result["totalDue"] = dueNow["total"]
+  if overview:
+    dueNow = getCurrentDue(True) # summarize=True to get total w/ no cardbox breakout
+    totalCards = getTotal()
+    result["totalCards"] = totalCards
+    result["totalDue"] = dueNow["total"]
 
-    if due:
-      dueNow = getCurrentDue()
-      overdue = getDueInRange(0, now)
-      dueToday = getDueInRange(now, now+DAY)
-      dueThisWeek = getDueInRange(now, now+(DAY*7))
-      dueByCardbox = {"dueNow": dueNow, "overdue": overdue, "dueToday": dueToday,
-                      "dueThisWeek": dueThisWeek}
-      totalCards = getTotalByCardbox()
-      result["totalCards"] = totalCards
-      result["score"] = getCardboxScore()
-      result["queueLength"] = getNextAddedCount()
-      result["totalDue"] = sum(dueNow.values())
-      result["dueByCardbox"] = dueByCardbox
+  if due:
+    dueNow = getCurrentDue()
+    overdue = getDueInRange(0, now)
+    dueToday = getDueInRange(now, now+DAY)
+    dueThisWeek = getDueInRange(now, now+(DAY*7))
+    dueByCardbox = {"dueNow": dueNow, "overdue": overdue, "dueToday": dueToday,
+                    "dueThisWeek": dueThisWeek}
+    totalCards = getTotalByCardbox()
+    result["totalCards"] = totalCards
+    result["score"] = getCardboxScore()
+    result["queueLength"] = getNextAddedCount()
+    result["totalDue"] = sum(dueNow.values())
+    result["dueByCardbox"] = dueByCardbox
 
-    if coverage:
-    ## get these values from the lexicon service (issue #51)
-      allLenFreq = {2: 93, 3: 879, 4: 3484, 5: 8647, 6: 17011, 7: 27485, 8: 36497,
-                    9: 39317, 10: 35415, 11: 28237, 12: 20669, 13: 14211, 14: 9334,
-                    15: 5889}
-       # probably from prefs service -- issue #52
-#      lexicon = getLexicon(userid)
-      result["coverage"] = { }
-      totalCards = getTotalByLength()
-      for box in totalCards:
-        result["coverage"][box] = {"cardbox": totalCards[box], "total": allLenFreq[box]}
-        pct = (float(totalCards[box])/float(allLenFreq[box])) * 100.0
-        result["coverage"][box]["percent"] = format(pct, '.2f')
-
-  except Exception:
-    xu.errorLog()
-    error["status"] = "An error occurred. See log for details."
+  if coverage:
+  ## get these values from the lexicon service (issue #51)
+    allLenFreq = {2: 93, 3: 879, 4: 3484, 5: 8647, 6: 17011, 7: 27485, 8: 36497,
+                  9: 39317, 10: 35415, 11: 28237, 12: 20669, 13: 14211, 14: 9334,
+                  15: 5889}
+     # probably from prefs service -- issue #52
+#    lexicon = getLexicon(userid)
+    result["coverage"] = { }
+    totalCards = getTotalByLength()
+    for box in totalCards:
+      result["coverage"][box] = {"cardbox": totalCards[box], "total": allLenFreq[box]}
+      pct = (float(totalCards[box])/float(allLenFreq[box])) * 100.0
+      result["coverage"][box]["percent"] = format(pct, '.2f')
 
   return jsonify([result, error])
+
+@app.route('/shameList', methods=['POST'])
+def shameList():
+  ''' The List of Shame: Takes in a list of alphagrams.
+        Any alphagrams in cardbox are marked wrong.
+        Any alphagrams not in cardbox are queued to be added. '''
+  params = request.get_json(force=True) # returns dict
+  questions = params.get('questions', [ ])
+  url = 'http://lexicon:5000/returnValidAlphas'
+  resp = requests.post(url, headers=g.headers, json={'alphas': questions})
+  validAlphas = resp.json()
+
+  alphasToAdd = [ ]
+  for alpha in validAlphas:
+
+    if isInCardbox(alpha):
+      wrong(alpha)
+    else:
+      alphasToAdd.append(alpha)
+
+  insertIntoNextAdded(alphasToAdd)
+# let's deal with this later
+#  return jsonify(getCardboxStats())
+  return jsonify({"status": "success"})
 
 # Library functions
 
@@ -668,3 +666,19 @@ def getNext (newCardbox = 0) :
               [130,40], [300,60], [430,100], [430,100],[430,100] ]
 
   return int( now + (sched[newCardbox][0]*day) + (sched[newCardbox][1]*offset))
+
+def isInCardbox(alpha):
+  g.cur.execute(f'SELECT count(*) FROM questions WHERE question = "{alpha}"')
+  return g.cur.fetchone()[0] > 0
+
+def insertIntoNextAdded(alphagrams):
+  '''
+  Takes in a list of alphagrams to add to next_added
+  Does not check to make sure it's valid -- check before you send here
+  '''
+
+  now = int(time.time())
+  command = "insert into next_added (question, timeStamp) values (?, ?)"
+  for alpha in alphagrams:
+    g.cur.execute(command, (alpha, now))
+  dbClean()
