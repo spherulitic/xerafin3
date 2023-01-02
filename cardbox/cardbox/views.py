@@ -305,7 +305,7 @@ def uploadCardbox():
 def downloadCardbox():
   ''' Presents the user's cardbox for download '''
   filename = getDBFile()
-  send_file(filename, as_attachment=True, attachment_filename="cardbox.db")
+  return send_file(filename, as_attachment=True, download_name="cardbox.db")
 
 @app.route('/shameList', methods=['POST'])
 def shameList():

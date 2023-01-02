@@ -216,7 +216,8 @@ function manageDatabaseFile(){
     $('#cboxFile').prop('type','file');
     $('#cboxFile').prop('accept','.db');
     $('#uploadButton').on('click', function(){uploadCardbox();});
-    $('#manageBoxDiv').append('<div class="prefPar"><a href="downloadCardbox">Download Cardbox Here</a> <br> (Right Click and Save As...)</div>');
+    $('#manageBoxDiv').append('<div class="prefPar"><a onclick="downloadCardbox()">Download Cardbox Here</a></div>');
+
 
 }
 function manageListOfShame(){
@@ -288,6 +289,45 @@ function generateCardboxSettings(response,responseStatus){
   $('#prefSaveButton').on('click',function(){setPrefs();});
 
 }
+
+function downloadCardbox() {
+// https://stackoverflow.com/questions/16086162/handle-file-download-from-ajax-post
+  $.ajax({
+    type: "POST",
+    headers: {"Accept": "application/json", "Authorization": keycloak.token},
+    url: 'downloadCardbox',
+    xhrFields: { responseType: 'blob' },
+    success: function(blob, status, xhr) {
+      var filename = "";
+      var disposition = xhr.getResponseHeader('Content-Disposition');
+      alert("disposition: " + disposition);
+      if (disposition && disposition.indexOf('attachment') !== -1) {
+        filename = "cardbox.db";
+      }
+    if (typeof window.navigator.msSaveBlob !== 'undefined') {
+      // IE workaround for HTML7007
+      window.navigator.msSaveBlob(blob, filename);
+    } else {
+      var URL = window.URL || window.webkitURL;
+      var downloadUrl = URL.createObjectURL(blob);
+      if (filename) {
+        var a = document.createElement("a");
+        if (typeof a.download === 'undefined') {
+        // Safari
+        window.location.href = downloadUrl;
+        } else {
+          a.href = downloadUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+        }
+      } else { window.location.href = downloadUrl; }
+    setTimeout(function () {URL.revokeObjectURL(downloadUrl); }, 100); // cleanup
+    }
+  }
+   });
+}
+
 function manageCardboxSettings(){
   var d = { userid: userid };
   $.ajax({
