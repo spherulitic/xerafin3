@@ -216,11 +216,8 @@ function manageDatabaseFile(){
     $('#cboxFile').prop('type','file');
     $('#cboxFile').prop('accept','.db');
     $('#uploadButton').on('click', function(){uploadCardbox();});
-    if (URLExists('cardboxes/' + userid + '.db')) {
-      $('#manageBoxDiv').append('<div class="prefPar"><a href="cardboxes/' + userid + '.db">Download Cardbox Here</a> <br> (Right Click and Save As...)</div>');
-        } else {
-      $('#manageBoxDiv').append('<div class="prefPar"><a href="downloadCardbox.py">Download Cardbox Here</a> <br> (Right Click and Save As...)</div>');
-        }
+    $('#manageBoxDiv').append('<div class="prefPar"><a onclick="downloadCardbox()">Download Cardbox Here</a></div>');
+
 
 }
 function manageListOfShame(){
@@ -292,11 +289,51 @@ function generateCardboxSettings(response,responseStatus){
   $('#prefSaveButton').on('click',function(){setPrefs();});
 
 }
+
+function downloadCardbox() {
+// https://stackoverflow.com/questions/16086162/handle-file-download-from-ajax-post
+  $.ajax({
+    type: "POST",
+    headers: {"Accept": "application/json", "Authorization": keycloak.token},
+    url: 'downloadCardbox',
+    xhrFields: { responseType: 'blob' },
+    success: function(blob, status, xhr) {
+      var filename = "";
+      var disposition = xhr.getResponseHeader('Content-Disposition');
+      alert("disposition: " + disposition);
+      if (disposition && disposition.indexOf('attachment') !== -1) {
+        filename = "cardbox.db";
+      }
+    if (typeof window.navigator.msSaveBlob !== 'undefined') {
+      // IE workaround for HTML7007
+      window.navigator.msSaveBlob(blob, filename);
+    } else {
+      var URL = window.URL || window.webkitURL;
+      var downloadUrl = URL.createObjectURL(blob);
+      if (filename) {
+        var a = document.createElement("a");
+        if (typeof a.download === 'undefined') {
+        // Safari
+        window.location.href = downloadUrl;
+        } else {
+          a.href = downloadUrl;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+        }
+      } else { window.location.href = downloadUrl; }
+    setTimeout(function () {URL.revokeObjectURL(downloadUrl); }, 100); // cleanup
+    }
+  }
+   });
+}
+
 function manageCardboxSettings(){
   var d = { userid: userid };
   $.ajax({
     type: "POST",
     url: "getUserPrefs.py",
+    headers: {"Accept": "application/json", "Authorization": keycloak.token},
     data: JSON.stringify(d),
     success: generateCardboxSettings,
     error: function(jqXHR, textStatus, errorThrown) {
@@ -351,10 +388,12 @@ function uploadCardbox() {
     $( "#uploadButton" ).prop("disabled", true);
     $( "#uploadButton" ).val("Uploading...");
     var formdata = new FormData();
-    formdata.append(userid, file, 'cardbox.db');
+    formdata.append('cardbox', file, 'cardbox.db');
     $.ajax({
   type: 'POST',
-  url: 'uploadCardbox.py',
+  method: 'POST',
+  url: 'uploadCardbox',
+  headers: {"Accept": "application/json", "Authorization": keycloak.token},
   data: formdata,
   processData: false,
   contentType: false,
@@ -480,6 +519,7 @@ function setPrefs() {
   $.ajax({
     type: "POST",
     url: "setUserPrefs.py",
+    headers: {"Accept": "application/json", "Authorization": keycloak.token},
     data: JSON.stringify(d),
     success: function(response) {
       if (response.status == "success") {
