@@ -236,8 +236,8 @@ function manageListOfShame(){
     $('#shameList').css('textTransform','uppercase');
     $('#shameButton').click(function() { submitShameList($("#shameList").val()); });
 }
-function generateCardboxSettings(response,responseStatus){
-  var prefs=response[0];
+function generateCardboxSettings(){
+  var prefs=keycloak.tokenParsed.cardboxPrefs;
   gCreateElemArray([
       ['a0','div','pre-scrollable','prefContent','manageParams',''],
       ['a1','div','prefContent','prefCardboxDiv','a0',''],
@@ -328,24 +328,10 @@ function downloadCardbox() {
    });
 }
 
-function manageCardboxSettings(){
-  var d = { userid: userid };
-  $.ajax({
-    type: "POST",
-    url: "getUserPrefs.py",
-    headers: {"Accept": "application/json", "Authorization": keycloak.token},
-    data: JSON.stringify(d),
-    success: generateCardboxSettings,
-    error: function(jqXHR, textStatus, errorThrown) {
-      console.log("Error retrieving user prefs. Status: " + textStatus + "  Error: " + errorThrown);
-    }
-  });
-
-}
 function manageCardboxExchange(value){
   $('#manageParams').html("");
   switch(Number(value)) {
-    case 1:manageCardboxSettings();break;
+    case 1:generateCardboxSettings();break;
     case 2:manageDatabaseFile();break;
     case 3:manageUploadList();break;
     case 4:manageListOfShame();break;
