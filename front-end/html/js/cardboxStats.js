@@ -216,7 +216,7 @@ function manageDatabaseFile(){
     $('#cboxFile').prop('type','file');
     $('#cboxFile').prop('accept','.db');
     $('#uploadButton').on('click', function(){uploadCardbox();});
-    $('#manageBoxDiv').append('<div class="prefPar"><a href="downloadCardbox.py">Download Cardbox Here</a> <br> (Right Click and Save As...)</div>');
+    $('#manageBoxDiv').append('<div class="prefPar"><a href="downloadCardbox">Download Cardbox Here</a> <br> (Right Click and Save As...)</div>');
 
 }
 function manageListOfShame(){

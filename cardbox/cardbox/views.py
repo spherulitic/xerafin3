@@ -11,7 +11,7 @@ import sys
 import sqlite3 as lite
 import requests
 import jwt
-from flask import jsonify, request, g
+from flask import jsonify, request, send_file, g
 import xerafinUtil.xerafinUtil as xu
 from studyOrder import studyOrder
 from cardbox import app
@@ -55,7 +55,7 @@ def get_user():
   # headers to send to other services
   g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
-  g.con = lite.connect(getDBFile(g.uuid))
+  g.con = lite.connect(getDBFile())
   g.cur = g.con.cursor()
 
   return None
@@ -291,15 +291,21 @@ def uploadCardbox():
   ''' Replaces a user's cardbox with the uploaded sqlite database '''
 
   file = request.files.get('cardbox')
-  filename = getTempFile(g.uuid)
+  filename = getTempFile()
   file.save(filename)
   if checkCardboxDatabase(filename):
-    shutil.move(filename, getDBFile(g.uuid))
+    shutil.move(filename, getDBFile())
     result = {"status": "success"}
   else:
     result = {"status": "Invalid Cardbox"}
 
   return jsonify(result)
+
+@app.route('/downloadCardbox', methods=['GET', 'POST'])
+def downloadCardbox():
+  ''' Presents the user's cardbox for download '''
+  filename = getDBFile()
+  send_file(filename, as_attachment=True, attachment_filename="cardbox.db")
 
 @app.route('/shameList', methods=['POST'])
 def shameList():
@@ -705,14 +711,14 @@ def insertIntoNextAdded(alphagrams):
       pass # duplicate tried to be inserted
   dbClean()
 
-def getDBFile(userid):
+def getDBFile():
   ''' Return the path to a user's cardbox '''
-  filename = os.path.join(sys.path[0], 'cardbox-data', userid + ".db")
+  filename = os.path.join(sys.path[0], 'cardbox-data', f'{g.uuid}.db')
   return filename
 
-def getTempFile(userid):
+def getTempFile():
   ''' Return the path to a user's temporary cardbox, used during upload '''
-  filename = os.path.join(sys.path[0], "temp-data", f'{userid}.db')
+  filename = os.path.join(sys.path[0], "temp-data", f'{g.uuid}.db')
   return filename
 
 def checkCardboxDatabase (filename):
