@@ -16,7 +16,6 @@ function showCardboxStats (value) {
     beforeSend: function(){$("#heading_text_pan_4").html('Cardbox <img src="images/ajaxLoad.gif" style="height:0.8em">');},
     success:  function(response,responseStatus){
         $("#heading_text_pan_4").html("Cardbox");
-        //console.log("Cardbox Data: "+JSON.stringify(response));
         switch (value) {
           case 1: displayCardboxDue(response,responseStatus);break;
           case 2: displayCardboxCoverage(response,responseStatus);break;
@@ -161,7 +160,6 @@ function displayCardboxCoverage(response,responseStatus){
   document.getElementById('coverageBody').innerHTML="";
   var arrayOfLengths = Object.keys(cover).sort(function(a,b) {
       return parseInt(a) - parseInt(b); });
-  console.log(arrayOfLengths);
   for (var x=0;x<arrayOfLengths.length;x++){
     values= cover[arrayOfLengths[x]];
     leng = arrayOfLengths[x];
@@ -172,7 +170,6 @@ function displayCardboxCoverage(response,responseStatus){
   [leng,"", values.total, values.cardbox, values.percent+"%"],
   "coverageBody","cardboxCoverRow"+leng);
   };
-  console.log(response[0]);
   gGenerateTableRow ([null,null,null,null],['Total','',availTotal,alphaTotal,(((alphaTotal/availTotal)*100).toFixed(2))+'%'],"coverageBody","coverageFoot");
   $('#coverageTable').css('visibility','visible');
   $('#cardboxUpdateTimeBox').html(gReturnUpdateTime());
@@ -195,6 +192,8 @@ function manageUploadList(){
 
   $('#wlistFile').prop('type','file');
     $('#wlistFile').prop('accept','.txt');
+  // upload element needs a name to upload to a Flask service
+  $('#wlistFile').attr('name', 'wlistFile');
   $('#listUploadButton').on('click', function(){uploadNewWordList();});
 }
 function manageDatabaseFile(){
@@ -381,9 +380,11 @@ function uploadNewWordList() {
   }
   else {
   var formdata = new FormData();
-  formdata.append(userid, file, 'list.txt');
+  formdata.append('uploadFile', file, 'list.txt');
   $.ajax({ type: 'POST',
-     url: 'uploadNewWordList.py',
+     method: 'POST',
+     url: 'uploadNewWordList',
+     headers: {"Accept": "application/json", "Authorization": keycloak.token},
           data: formdata,
           processData: false,
           contentType: false,
@@ -442,7 +443,6 @@ function writeSchedInfo(schedInfo){
   var comment = document.createElement('div');
   comment.id = 'schedComment';
   comment.className+=" italNote";
-  console.log(schedInfo[1]);
   $(comment).html(schedInfo[1]);
   $('#prefScheduleType').append(comment);
 }
