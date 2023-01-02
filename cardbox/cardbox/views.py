@@ -5,6 +5,9 @@ from logging.config import dictConfig
 import urllib
 import time
 import random
+import os
+import shutil
+import sys
 import sqlite3 as lite
 import requests
 import jwt
@@ -52,7 +55,7 @@ def get_user():
   # headers to send to other services
   g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
-  g.con = lite.connect(xu.getDBFile(g.uuid))
+  g.con = lite.connect(getDBFile(g.uuid))
   g.cur = g.con.cursor()
 
   return None
@@ -146,63 +149,42 @@ def wrong(alpha):
 def getQuestions():
 
   result = {"getFromStudyOrder": False, "questions": [ ] }
-  try:
 
-    params = request.get_json(force=True) # returns dict
-    numQuestions = params.get("numQuestions", 1)
-    cardbox = int(params.get("cardbox", 0))
-    lock = params.get("lock", False)
+  params = request.get_json(force=True) # returns dict
+  numQuestions = params.get("numQuestions", 1)
+  cardbox = int(params.get("cardbox", 0))
+  lock = params.get("lock", False)
 
-    # xerafinLib.getQuestions returns something like { "ALPHAGRAM": [WORD, WORD, WORD] }
-    # FYI - the None here is to filter on question length, which is currently disabled
-    questions = getQuestionsFromCardbox(numQuestions, cardbox, None)
+  # xerafinLib.getQuestions returns something like { "ALPHAGRAM": [WORD, WORD, WORD] }
+  # FYI - the None here is to filter on question length, which is currently disabled
+  questions = getQuestionsFromCardbox(numQuestions, cardbox, None)
 
-    # This is only used for non-cardbox quizzes
-    result["eof"] = False
+  # This is only used for non-cardbox quizzes
+  result["eof"] = False
 
-    lexService = 'http://lexicon:5000'
-    for alpha in questions.keys():
+  lexService = 'http://lexicon:5000'
+  for alpha in questions.keys():
 
-      template = { }
-      template["alpha"] = alpha
-      template["answers"] = questions[alpha]
-      auxInfo = getAuxInfo(alpha)["aux"]
-      template["correct"] = auxInfo.get("correct")
-      template["incorrect"] = auxInfo.get("incorrect")
-      template["nextScheduled"] = auxInfo.get("nextScheduled")
-      template["cardbox"] = auxInfo.get("cardbox")
-      template["difficulty"] = auxInfo.get("difficulty")
-      template["words"] = { }
-      if lock:
-        checkOut(alpha, True)
-      for word in template["answers"]:
-        wordJSON = { "word": word }
-        wordInfo = requests.post(f'{lexService}/getWordInfo', headers=g.headers, json=wordJSON).json()
-        innerHooks = requests.post(f'{lexService}/getDots', headers=g.headers, json=wordJSON).json()
-#       [ front hooks, back hooks, definition, [innerHooks], lexicon symbols ]
-        template["words"][word] = [ wordInfo["front_hooks"], wordInfo["back_hooks"],
-                        wordInfo["definition"], innerHooks, ""]
-      result["questions"].append(template)
-
-#      # localhost here referring to the server in this container
-       # NB: won't need to use this if study order is as quick as it should be now
-       #     Although if that's really true, there's no need to stage words at all
-#    if getNextAddedCount() < g.newWordsAtOnce:
-#      prepareNewWords()
-
-#      # This is hacky. I don't care about the response to the request --
-#      #                I just want the endpoint to do its thing
-#      # Timeout makes it not block but I have to catch the timeout exception
-#      # prepareNewWords can take several seconds, and I want to make sure
-#      #                I return immediately
-#      try:
-#        requests.post(url="http://localhost:5000/prepareNewWords",
-#                      json={"userid":userid}, timeout=.1)
-#      except requests.exceptions.ReadTimeout:
-#        pass
-  except:
-    xu.errorLog()
-    result["status"] = "An error occurred. See log for details."
+    template = { }
+    template["alpha"] = alpha
+    template["answers"] = questions[alpha]
+    auxInfo = getAuxInfo(alpha)["aux"]
+    template["correct"] = auxInfo.get("correct")
+    template["incorrect"] = auxInfo.get("incorrect")
+    template["nextScheduled"] = auxInfo.get("nextScheduled")
+    template["cardbox"] = auxInfo.get("cardbox")
+    template["difficulty"] = auxInfo.get("difficulty")
+    template["words"] = { }
+    if lock:
+      checkOut(alpha, True)
+    for word in template["answers"]:
+      wordJSON = { "word": word }
+      wordInfo = requests.post(f'{lexService}/getWordInfo', headers=g.headers, json=wordJSON).json()
+      innerHooks = requests.post(f'{lexService}/getDots', headers=g.headers, json=wordJSON).json()
+#     [ front hooks, back hooks, definition, [innerHooks], lexicon symbols ]
+      template["words"][word] = [ wordInfo["front_hooks"], wordInfo["back_hooks"],
+                      wordInfo["definition"], innerHooks, ""]
+    result["questions"].append(template)
 
   return jsonify(result)
 
@@ -214,18 +196,14 @@ def newQuiz():
      NOTE this is only accessible from other services. Not exposed through nginx rev proxy
   '''
   result = {"result": "success"}
-  try:
-    now = int(time.time())
-    dbClean()
-    closetSweep()
-    futureSweep()
-    g.cur.execute("select * from cleared_until")
-    clearedUntil = g.cur.fetchone()[0]
-    command = f"update questions set difficulty = -1 where difficulty = 0 and next_scheduled < {max(now, clearedUntil)}"
-    g.cur.execute(command)
-  except Exception:
-    xu.errorLog()
-    result["result"] = "error"
+  now = int(time.time())
+  dbClean()
+  closetSweep()
+  futureSweep()
+  g.cur.execute("select * from cleared_until")
+  clearedUntil = g.cur.fetchone()[0]
+  command = f"update questions set difficulty = -1 where difficulty = 0 and next_scheduled < {max(now, clearedUntil)}"
+  g.cur.execute(command)
   return jsonify(result)
 
 
@@ -306,6 +284,21 @@ def uploadNewWordList():
   insertIntoNextAdded(validAlphas)
 
   result = {"added": validAlphas}
+  return jsonify(result)
+
+@app.route('/uploadCardbox', methods=['POST'])
+def uploadCardbox():
+  ''' Replaces a user's cardbox with the uploaded sqlite database '''
+
+  file = request.files.get('cardbox')
+  filename = getTempFile(g.uuid)
+  file.save(filename)
+  if checkCardboxDatabase(filename):
+    shutil.move(filename, getDBFile(g.uuid))
+    result = {"status": "success"}
+  else:
+    result = {"status": "Invalid Cardbox"}
+
   return jsonify(result)
 
 @app.route('/shameList', methods=['POST'])
@@ -711,3 +704,52 @@ def insertIntoNextAdded(alphagrams):
     except lite.IntegrityError:
       pass # duplicate tried to be inserted
   dbClean()
+
+def getDBFile(userid):
+  ''' Return the path to a user's cardbox '''
+  filename = os.path.join(sys.path[0], 'cardbox-data', userid + ".db")
+  return filename
+
+def getTempFile(userid):
+  ''' Return the path to a user's temporary cardbox, used during upload '''
+  filename = os.path.join(sys.path[0], "temp-data", f'{userid}.db')
+  return filename
+
+def checkCardboxDatabase (filename):
+  ''' Does this database have a questions table? If not return false. If so, return true.
+        If other aux tables are missing, create them. This could be a Zyzzyva cardbox uploaded '''
+  now = int(time.time())
+  try:
+    with lite.connect(filename) as con:
+      cur = con.cursor()
+      cur.execute("select name from sqlite_master where type='table'")
+      tables = [x[0] for x in cur.fetchall()]
+      if 'questions' not in tables:
+        return False
+      ### For reference:
+      ###  create table questions (question varchar(16), correct integer, incorrect integer,
+      ###                          streak integer, last_correct integer, difficulty integer,
+      ###                          cardbox integer, next_scheduled integer)")
+      if 'cleared_until' not in tables:
+        cur.execute("create table cleared_until (timeStamp integer)")
+      if 'new_words_at' not in tables:
+        cur.execute("create table new_words_at (timeStamp integer)")
+      if 'next_Added' not in tables:
+        cur.execute("create table next_Added (question varchar(16), timeStamp integer)")
+      cur.execute("create unique index if not exists question_index on questions(question)")
+      cur.execute("create unique index if not exists next_added_question_idx on next_added(question)")
+
+      cur.execute("select * from cleared_until")
+      row = cur.fetchone()
+      if row is None:
+        cur.execute("insert into cleared_until values (?)", (now,))
+
+      cur.execute("select * from new_words_at")
+      row = cur.fetchone()
+      if row is None:
+        cur.execute("insert into new_words_at values (?)", (now+1,))
+
+  except:
+    return False
+
+  return True

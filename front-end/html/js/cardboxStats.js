@@ -216,11 +216,7 @@ function manageDatabaseFile(){
     $('#cboxFile').prop('type','file');
     $('#cboxFile').prop('accept','.db');
     $('#uploadButton').on('click', function(){uploadCardbox();});
-    if (URLExists('cardboxes/' + userid + '.db')) {
-      $('#manageBoxDiv').append('<div class="prefPar"><a href="cardboxes/' + userid + '.db">Download Cardbox Here</a> <br> (Right Click and Save As...)</div>');
-        } else {
-      $('#manageBoxDiv').append('<div class="prefPar"><a href="downloadCardbox.py">Download Cardbox Here</a> <br> (Right Click and Save As...)</div>');
-        }
+    $('#manageBoxDiv').append('<div class="prefPar"><a href="downloadCardbox.py">Download Cardbox Here</a> <br> (Right Click and Save As...)</div>');
 
 }
 function manageListOfShame(){
@@ -297,6 +293,7 @@ function manageCardboxSettings(){
   $.ajax({
     type: "POST",
     url: "getUserPrefs.py",
+    headers: {"Accept": "application/json", "Authorization": keycloak.token},
     data: JSON.stringify(d),
     success: generateCardboxSettings,
     error: function(jqXHR, textStatus, errorThrown) {
@@ -351,10 +348,12 @@ function uploadCardbox() {
     $( "#uploadButton" ).prop("disabled", true);
     $( "#uploadButton" ).val("Uploading...");
     var formdata = new FormData();
-    formdata.append(userid, file, 'cardbox.db');
+    formdata.append('cardbox', file, 'cardbox.db');
     $.ajax({
   type: 'POST',
-  url: 'uploadCardbox.py',
+  method: 'POST',
+  url: 'uploadCardbox',
+  headers: {"Accept": "application/json", "Authorization": keycloak.token},
   data: formdata,
   processData: false,
   contentType: false,
@@ -480,6 +479,7 @@ function setPrefs() {
   $.ajax({
     type: "POST",
     url: "setUserPrefs.py",
+    headers: {"Accept": "application/json", "Authorization": keycloak.token},
     data: JSON.stringify(d),
     success: function(response) {
       if (response.status == "success") {
