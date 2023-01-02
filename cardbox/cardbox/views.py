@@ -284,6 +284,30 @@ def getCardboxStats():
 
   return jsonify([result, error])
 
+@app.route('/uploadNewWordList', methods=['POST'])
+def uploadNewWordList():
+  ''' Takes in a text file containing alphagrams. Adds the alphagrams to the
+       user's next_added table. '''
+
+  file = request.files.get('uploadFile')
+  alphaSet = set()
+  if file is not None:
+    file.seek(0)
+    for bLine in file:
+      line = bLine.decode('utf-8')
+      for word in line.split():
+        alpha = ''.join(sorted(word.upper()))
+        alphaSet.add(alpha)
+
+  url = 'http://lexicon:5000/returnValidAlphas'
+  resp = requests.post(url, headers=g.headers, json={'alphas': list(alphaSet)})
+  validAlphas = resp.json()
+
+  insertIntoNextAdded(validAlphas)
+
+  result = {"added": validAlphas}
+  return jsonify(result)
+
 @app.route('/shameList', methods=['POST'])
 def shameList():
   ''' The List of Shame: Takes in a list of alphagrams.
@@ -679,6 +703,11 @@ def insertIntoNextAdded(alphagrams):
 
   now = int(time.time())
   command = "insert into next_added (question, timeStamp) values (?, ?)"
+  added = [ ]
   for alpha in alphagrams:
-    g.cur.execute(command, (alpha, now))
+    try:
+      g.cur.execute(command, (alpha, now))
+      added.append(alpha)
+    except lite.IntegrityError:
+      pass # duplicate tried to be inserted
   dbClean()
