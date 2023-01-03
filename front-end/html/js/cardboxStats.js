@@ -236,8 +236,8 @@ function manageListOfShame(){
     $('#shameList').css('textTransform','uppercase');
     $('#shameButton').click(function() { submitShameList($("#shameList").val()); });
 }
-function generateCardboxSettings(response,responseStatus){
-  var prefs=response[0];
+function generateCardboxSettings(){
+  var prefs=keycloak.tokenParsed.cardboxPrefs;
   gCreateElemArray([
       ['a0','div','pre-scrollable','prefContent','manageParams',''],
       ['a1','div','prefContent','prefCardboxDiv','a0',''],
@@ -328,24 +328,10 @@ function downloadCardbox() {
    });
 }
 
-function manageCardboxSettings(){
-  var d = { userid: userid };
-  $.ajax({
-    type: "POST",
-    url: "getUserPrefs.py",
-    headers: {"Accept": "application/json", "Authorization": keycloak.token},
-    data: JSON.stringify(d),
-    success: generateCardboxSettings,
-    error: function(jqXHR, textStatus, errorThrown) {
-      console.log("Error retrieving user prefs. Status: " + textStatus + "  Error: " + errorThrown);
-    }
-  });
-
-}
 function manageCardboxExchange(value){
   $('#manageParams').html("");
   switch(Number(value)) {
-    case 1:manageCardboxSettings();break;
+    case 1:generateCardboxSettings();break;
     case 2:manageDatabaseFile();break;
     case 3:manageUploadList();break;
     case 4:manageListOfShame();break;
@@ -508,7 +494,6 @@ function generateSchedInfo(sched){
 
 function setPrefs() {
   var d = {
-    user: userid,
     newWordsAtOnce: $('#newWordsAtOnceInput').val(),
     reschedHrs: $('#reschedHrsInput').val(),
     cb0max: $('#cb0maxInput').val(),
@@ -518,14 +503,14 @@ function setPrefs() {
   appendDebugLog(d);
   $.ajax({
     type: "POST",
-    url: "setUserPrefs.py",
+    url: "setCardboxPrefs",
     headers: {"Accept": "application/json", "Authorization": keycloak.token},
     data: JSON.stringify(d),
     success: function(response) {
-      if (response.status == "success") {
+      // update token with the new attributes
+      keycloak.updateToken(-1).then(function() {
         gFloatingAlert("cardboxUploadAlert",3000,"Cardbox Settings", "Cardbox Settings Saved!",500);
-      }
-      else alert("Error setting user prefs: " + response.status);
+      });
     },
     error: function(jqXHR, textStatus, errorThrown) {
       console.log("Error setting user prefs. Status: " + textStatus + "  Error: " + errorThrown);
