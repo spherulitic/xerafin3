@@ -4,3 +4,6 @@ bcrypt>=3.2.0
 mysqlclient==2.1.0
 pre-commit
 requests
+python-keycloak
+python-jose
+urllib3

@@ -4,8 +4,8 @@ services:
     volumes:
       - /var/opt/keycloak:/opt/jboss/keycloak/standalone/data
     environment:
-#      KEYCLOAK_USER: "admin"
-#      KEYCLOAK_PASSWORD: "admin"
+#      KEYCLOAK_USER:
+#      KEYCLOAK_PASSWORD:
       PROXY_ADDRESS_FORWARDING: "true"
 #      KEYCLOAK_LOGLEVEL: "DEBUG"
   frontend:
@@ -30,6 +30,8 @@ services:
       - keycloak
     volumes:
       - awards:/app/awards
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   cardbox:
     image: x-cardbox:latest
     volumes:
@@ -44,6 +46,8 @@ services:
       - MYSQL_DB
       - MYSQL_PWD
       - MYSQL_HOST
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - keycloak
     volumes:
@@ -55,6 +59,10 @@ services:
       - MYSQL_DB
       - MYSQL_PWD
       - MYSQL_HOST
+      - KEYCLOAK_USER
+      - KEYCLOAK_PASSWORD
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
   lexicon:
     image: x-lexicon:latest
     environment:

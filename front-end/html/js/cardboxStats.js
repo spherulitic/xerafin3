@@ -494,7 +494,6 @@ function generateSchedInfo(sched){
 
 function setPrefs() {
   var d = {
-    user: userid,
     newWordsAtOnce: $('#newWordsAtOnceInput').val(),
     reschedHrs: $('#reschedHrsInput').val(),
     cb0max: $('#cb0maxInput').val(),
@@ -504,14 +503,14 @@ function setPrefs() {
   appendDebugLog(d);
   $.ajax({
     type: "POST",
-    url: "setUserPrefs.py",
+    url: "setCardboxPrefs",
     headers: {"Accept": "application/json", "Authorization": keycloak.token},
     data: JSON.stringify(d),
     success: function(response) {
-      if (response.status == "success") {
+      // update token with the new attributes
+      keycloak.updateToken(-1).then(function() {
         gFloatingAlert("cardboxUploadAlert",3000,"Cardbox Settings", "Cardbox Settings Saved!",500);
-      }
-      else alert("Error setting user prefs: " + response.status);
+      });
     },
     error: function(jqXHR, textStatus, errorThrown) {
       console.log("Error setting user prefs. Status: " + textStatus + "  Error: " + errorThrown);

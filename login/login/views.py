@@ -1,9 +1,14 @@
-from login import app
-from flask import Flask, request, jsonify, Response, g
 from logging.config import dictConfig
-import urllib, json, jwt, requests
+from keycloak import KeycloakAdmin
+import urllib
+import json
+import jwt
+import requests
+import os
 import datetime
 import time
+from flask import Flask, request, jsonify, Response, g
+from login import app
 import xerafinUtil.xerafinUtil as xu
 
 dictConfig({
@@ -30,9 +35,13 @@ def get_user():
     public_key = f'''-----BEGIN PUBLIC KEY-----
 {public_key}
 -----END PUBLIC KEY-----'''
-  raw_token = request.headers["Authorization"]
-  g.auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
+  g.raw_token = request.headers["Authorization"]
+  g.auth_token = jwt.decode(g.raw_token, public_key, audience="x-client", algorithms=['RS256'])
   g.uuid = g.auth_token["sub"]
+
+  # headers to send to keycloak
+  g.headers = {"Accept": "application/json", "Authorization": g.raw_token}
+
 
   g.mysqlcon = xu.getMysqlCon()
   g.con = g.mysqlcon.cursor()
@@ -51,24 +60,47 @@ def close_mysql(response):
 def index():
   return "Xerafin Login Service"
 
+@app.route('/setCardboxPrefs', methods=['POST'])
+def setCardboxPrefs():
+  ''' Take cardbox prefs from the client and update keycloak attributes '''
+  xu.debug(os.environ.get('KEYCLOAK_USER'))
+  xu.debug(os.environ.get('KEYCLOAK_PASSWORD'))
+  keycloak_admin = KeycloakAdmin(server_url="http://keycloak:8080/auth/",
+                      username=os.environ.get('KEYCLOAK_USER'),
+                      password=os.environ.get('KEYCLOAK_PASSWORD'),
+                      realm_name='Xerafin',
+                      client_id='admin-cli'
+                      )
+  user = keycloak_admin.get_user(g.uuid)
+
+  params = request.get_json(force=True)
+  att = user['attributes']
+  if 'cb0max' in params:
+    att['cb0max'] = [ params.get('cb0max') ]
+  if 'closet' in params:
+    att['closet'] = [ params.get('closet') ]
+  if 'newWordsAtOnce' in params:
+    att['newWordsAtOnce'] = [ params.get('newWordsAtOnce') ]
+  if 'reschedHrs' in params:
+    att['reschedHrs'] = [ params.get('reschedHrs') ]
+  if 'schedVersion' in params:
+    att['schedVersion'] = [ params.get('schedVersion') ]
+
+  resp = keycloak_admin.update_user(g.uuid, user)
+  return jsonify(resp)
+
 @app.route("/getCountries", methods=['GET', 'POST'])
 def countries():
   result = { }
-  result["status"] = "success"
-  try:
-    query = "SELECT countryid, name, short from countries"
+  query = "SELECT countryid, name, short from countries"
 # I think this query was going to be used for country-level aggregation metrics
 #   unusedquery = """SELECT countrid, name, short, count(distinct countryId) as most from countries, user_prefs
 #                   WHERE countrid = countryId GROUP BY countryid ORDER BY most DESC, LIMIT 5"""
-    g.con.execute(query)
-    rows = g.con.fetchall()
-    rows = [{"id": r[0], "name": r[1], "short": r[2]} for r in rows]
-    result["byId"] = sorted(rows, key = lambda d: d["id"])
-    result["byName"] = sorted(rows, key = lambda d: d["name"])
-
-  except:
-    xu.errorLog()
-    result["status"] = "error"
+  g.con.execute(query)
+  rows = g.con.fetchall()
+  rows = [{"id": r[0], "name": r[1], "short": r[2]} for r in rows]
+  result["byId"] = sorted(rows, key = lambda d: d["id"])
+  result["byName"] = sorted(rows, key = lambda d: d["name"])
 
   return jsonify(result)
 
@@ -170,49 +202,8 @@ def getNavbar():
 
 @app.route("/login", methods=['GET', 'POST'])
 def web_login():
-
-  try:
-    result = { }
-    result["status"] = "success"
-    now = int(time.time())
-
-  # get attributes from keycloak. If they don't exist, set defaults
-  #
-  # studyOrderIndex  0
-  # closet    20
-  # newWordsAtOnce  4
-  # reschedHrs    24
-  # showNumSolutions  'Y' <-- currently ununsed I think
-  # cb0max    200
-  # schedVersion  0
-  # secLevel    1 <-- actual access level, replaced by roles?
-  # isTD    0 <-- also currently unused I think
-  # firstLogin    CURDATE <-- account creation time?
-  # countryId    0
-  # lexicon    'csw'
-  # lexiconVersion  21
-
-  # firstname, lastname, photo
-
-  # will keycloak keep a log of user logins?
-
-  # check that the cardbox database is set up
-  # this needs to be moved to the cardbox service and called there
-
-#  if not xu.checkCardboxDatabase(userid):
-#     result["status"] = "Corrupted Cardbox Database Detected!"
-#
-#      else:
-#        result["status"] = "mismatch"
-#    except:
-#      result["status"] = "mismatch"
-#      xu.errorLog()
-
-  except:
-    xu.errorLog()
-    result["status"] = "An error occurred. See log for more details"
-
-  return jsonify(result)
+  ''' to be removed by issue #109 '''
+  return jsonify({"status": "success"})
 
 def navbarCreateElement(arr, nest):
   # eventually privLevel will be replaced with mapping navbar items to keycloak roles
