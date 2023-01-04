@@ -19,6 +19,7 @@ services:
       - cardbox
       - login
       - quiz
+      - chat
   stats:
     image: x-stats:latest
     environment:
@@ -77,10 +78,24 @@ services:
       - MONGO_INITDB_ROOT_USERNAME
       - MONGO_INITDB_ROOT_PASSWORD
       - MONGO_INITDB_DATABASE
+  chat:
+    image: x-chat:latest
+    environment:
+      - MYSQL_USER
+      - MYSQL_DB
+      - MYSQL_PWD
+      - MYSQL_HOST
+    volumes:
+      - temp-chat-data:/app/chatdata
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - keycloak
 volumes:
   cardbox-data:
     external: true
   temp-cardbox-data:
+  temp-chat-data:
   quizjson:
     external: true
   awards:
