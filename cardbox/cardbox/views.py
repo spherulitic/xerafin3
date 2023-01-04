@@ -45,12 +45,13 @@ def get_user():
   raw_token = request.headers["Authorization"]
   auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
   g.uuid = auth_token["sub"]
-  # eventually this will be a user attribute stored in keycloak. See issue #83
-  g.closet = 10
-  g.reschedHrs = 24
-  g.cb0max = 500
-  g.newWordsAtOnce = 10
-  g.schedVersion = 1
+
+  cardboxPrefs = auth_token.get('cardboxPrefs', { })
+  g.closet = cardboxPrefs.get('closet', 10)
+  g.reschedHrs = cardboxPrefs.get('reschedHrs', 24)
+  g.cb0max = cardboxPrefs.get('cb0max', 500)
+  g.newWordsAtOnce = cardboxPrefs.get('newWordsAtOnce', 10)
+  g.schedVersion = cardboxPrefs.get('schedVersion', 0)
 
   # headers to send to other services
   g.headers = {"Accept": "application/json", "Authorization": raw_token}
