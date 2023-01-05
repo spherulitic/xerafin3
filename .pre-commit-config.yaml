@@ -16,3 +16,11 @@ repos:
           [
             "--rcfile=/home/spherulitic/xerafin3/.pylintrc"
           ]
+-   repo: local
+    hooks:
+      - id: trufflehog
+        name: TruffleHog
+        description: Detect secrets in your data.
+        entry: bash -c 'docker run -v "/home/spherulitic/xerafin3:/repo" -i --rm trufflesecurity/trufflehog:latest git file:///repo'
+        language: system
+        stages: ["commit"]
