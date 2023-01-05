@@ -73,7 +73,8 @@ function startChat () {
 
 function getLoggedInUsers() {
   $.ajax({type: "GET",
-          url: "getLoggedInUsers.py",
+          headers: {"Accept": "application/json", "Authorization": keycloak.token},
+          url: "getLoggedInUsers",
           success: displayLoggedInUsers,
           error: function(jqXHR, textStatus, errorThrown) {
           console.log("Error getting users, status = " + textStatus + " error: " + errorThrown);
@@ -146,7 +147,8 @@ function displayUserArray (userList) {
 }
 function displayLoggedInUsers(response, responseStatus) {
    //console.log("Logged in users:");
-   if (response) {usersArray = response[0];}
+   usersArray = [ ]
+   if (response) {usersArray = response;}
    //console.log(response);
    displayUserArray(usersArray);
 }

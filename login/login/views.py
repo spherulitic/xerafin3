@@ -63,8 +63,6 @@ def index():
 @app.route('/setCardboxPrefs', methods=['POST'])
 def setCardboxPrefs():
   ''' Take cardbox prefs from the client and update keycloak attributes '''
-  xu.debug(os.environ.get('KEYCLOAK_USER'))
-  xu.debug(os.environ.get('KEYCLOAK_PASSWORD'))
   keycloak_admin = KeycloakAdmin(server_url="http://keycloak:8080/auth/",
                       username=os.environ.get('KEYCLOAK_USER'),
                       password=os.environ.get('KEYCLOAK_PASSWORD'),
@@ -101,6 +99,28 @@ def countries():
   rows = [{"id": r[0], "name": r[1], "short": r[2]} for r in rows]
   result["byId"] = sorted(rows, key = lambda d: d["id"])
   result["byName"] = sorted(rows, key = lambda d: d["name"])
+
+  return jsonify(result)
+
+@app.route("/getLoggedInUsers", methods=['GET', 'POST'])
+def getLoggedInUsers():
+  ' Called via AJAX and returns photo URL, name, and last active time of all logged in users '
+  result = [ ]
+  keycloak_admin = KeycloakAdmin(server_url="http://keycloak:8080/auth/",
+                      username=os.environ.get('KEYCLOAK_USER'),
+                      password=os.environ.get('KEYCLOAK_PASSWORD'),
+                      realm_name='Xerafin',
+                      client_id='admin-cli'
+                      )
+
+  clientId = keycloak_admin.get_client_id('x-client')
+  sessions = keycloak_admin.get_client_all_sessions(clientId)
+  sessionList = [{"userId": x["userId"], "lastAccess": x["lastAccess"]} for x in sessions]
+  for row in sessionList:
+    userInfo = keycloak_admin.get_user(row["userId"])
+    row["name"] = f'{userInfo["firstName"]} {userInfo["lastName"]}'
+    row["photo"] = userInfo['attributes'].get('photo', 'images/unknown_player.gif')
+    result.append(row)
 
   return jsonify(result)
 
