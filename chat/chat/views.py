@@ -26,6 +26,8 @@ dictConfig({
     }
 })
 
+CHAT_DIR = '/app/chatdata'
+
 @app.before_request
 def get_user():
   public_key_url = 'http://keycloak:8080/auth/realms/Xerafin'
@@ -55,3 +57,34 @@ def close_mysql(response):
 @app.route("/", methods=['POST'])
 def index():
   return "Xerafin Chat Service"
+
+@app.route('/getChatsInit', methods=['GET', 'POST'])
+def getChatsInit():
+
+  params = request.get_json(force=True) # returns dict
+  error = {"status": "success"}
+  result = [ ]
+  now = int(params.get('mostRecent', time.time()))
+
+  chatFile = os.path.join(CHAT_DIR, f'{g.uuid}.chat')
+  open(chatFile, 'w').close()
+  command = """SELECT timeStamp, message, chat.userid
+               FROM chat
+               WHERE timeStamp > %s
+               ORDER BY timeStamp ASC"""
+
+  g.con.execute(command, (now,))
+  queryResult = g.con.fetchall()
+  url = 'http://login:5000/getUserNamesAndPhotos'
+  data = { 'userList': [ x[2] for x in queryResult ] } # list of userids
+  response = requests.post(url, headers=g.headers, json=data).json()
+
+  for row in queryResult:
+    myInfo = [x for x in response if x["userid"] == row[2]]
+    photo = myInfo['photo']
+    name = myInfo['name']
+    outRow = {"chatDate": row[0], 'photo': photo, 'name': name, 'chatText': row[1],
+              'chatUser': row[2], 'expire': False}
+    result.append(outRow)
+
+  return jsonify([result, 0, int(time.time()), error])

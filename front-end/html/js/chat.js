@@ -152,9 +152,10 @@ function displayLoggedInUsers(response, responseStatus) {
 }
 
 function getInitChats () {
-  var d = { mostRecent: mostRecent, userid: userid } ;
+  var d = { mostRecent: mostRecent } ;
   $.ajax({type: "POST",
-         url: "getChatsInit.py",
+        headers: {"Accept": "application/json", "Authorization": keycloak.token},
+         url: "getChatsInit",
         data: JSON.stringify(d),
      success: displayChats,
        error: function(jqXHR, textStatus, errorThrown) {
@@ -168,6 +169,7 @@ function updateChats () {
   var d = { userid: userid, rownum: lastReadRow } ;
   getLoggedInUsers();
   $.ajax({type: "POST",
+        headers: {"Accept": "application/json", "Authorization": keycloak.token},
          url: "getChats.py",
         data: JSON.stringify(d),
      success: displayChats,
@@ -325,6 +327,7 @@ function submitChat(message, isSystemGenerated, systemUserid) {
 
 function submitChat2(d) {
    $.ajax({type: "POST",
+     headers: {"Accept": "application/json", "Authorization": keycloak.token},
             url: "submitChat.py",
            data: JSON.stringify(d),
         success: function (response, responseStatus) {
