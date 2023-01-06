@@ -481,10 +481,10 @@ class Question {
     };
     //this was moved from the top of the function and incrementQ gained new condition to stop double increments.
     this.submitted = true;
-    //appendDebugLog("Current Cardbox is "+cardbox);
-    //xerafin.error.log.add(d,"JSON");
     let self = this;
-    appendDebugLog("Submitting Question " + self.alpha);
+    // refresh token if it's in its last 30 seconds of validity.
+    // "refreshed" is a boolean indicating if the token was actually refreshed
+    keycloak.updateToken(30).then(function(refreshed) {
     $.ajax({
       type: "POST",
       headers: {"Accept": "application/json", "Authorization": keycloak.token},
@@ -492,7 +492,6 @@ class Question {
       data: JSON.stringify(d),
       success: function(response, responseStatus) {
         self.hasHTTPError = false;
-        //xerafin.error.log.add(response[0],"JSON");
         if (self.firstSubmit){
           self.onFirstSubmit(response.qAnswered, correct);
         }
@@ -517,12 +516,9 @@ class Question {
           self.cardbox = (((c.cardbox !==null) && (typeof c.cardbox !=='undefined')) ? c.cardbox : -1);
         }
         else {
-        //if these values show up, we know that aux is a problem;
-          appendDebugLog("Aux did not return");
           self.nextScheduled = -1;
           self.cardbox = -1;
         }
-        appendDebugLog("Next Scheduled: "+self.nextScheduled+" Cardbox: "+self.cardbox);
         if (typeof overview.data.activeList!=='undefined'){
           if (isCardbox) {
             overview.fetchCardboxSummary();
@@ -538,8 +534,10 @@ class Question {
       error: function(jqXHR, textStatus, errorThrown) {
         self.retrySubmit(jqXHR.status, correct, cardbox, isCardbox);
       }
-    });
-  }
+    }); // end ajax call
+   }).catch(function() { console.log("Failed to refresh token."); }); // end token refresh promise
+  } // end submitQuestion function
+
   retrySubmit(code, correct, cardbox, isCardbox){
     this.hasHTTPError = true;
     appendDebugLog("Question Submit -> Http Error Code: "+code);

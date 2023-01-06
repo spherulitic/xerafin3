@@ -4,3 +4,4 @@ front-end/html/vendor
 front-end/localhost*
 lexicon-db/*.js
 .env
+.scannerwork
