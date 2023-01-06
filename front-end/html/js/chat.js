@@ -160,22 +160,24 @@ function getInitChats () {
      success: displayChats,
        error: function(jqXHR, textStatus, errorThrown) {
            console.log("Error: chats could not be updated.");
-// disabled until chat is reimplemented
-//           setTimeout(updateChats, 3000);
+           setTimeout(updateChats, 3000);
        } } );
 }
 
 function updateChats () {
-  var d = { userid: userid, rownum: lastReadRow } ;
-  getLoggedInUsers();
-  $.ajax({type: "POST",
-        headers: {"Accept": "application/json", "Authorization": keycloak.token},
-         url: "getChats.py",
-        data: JSON.stringify(d),
-     success: displayChats,
-       error: function(jqXHR, textStatus, errorThrown) {
+  keycloak.updateToken(30).then(function() {
+    var d = { rownum: lastReadRow } ;
+    getLoggedInUsers();
+    $.ajax({type: "POST",
+         headers: {"Accept": "application/json", "Authorization": keycloak.token},
+             url: "getChats",
+            data: JSON.stringify(d),
+         success: displayChats,
+           error: function(jqXHR, textStatus, errorThrown) {
            console.log("Error: chats could not be updated.");
            setTimeout(updateChats, 5000); } } );
+
+  }).catch(function() { console.log('Failed to refresh token'); });
 }
 
 function createPicCol (data, ident, pare){
@@ -259,7 +261,6 @@ function displayChats (response, responseStatus) {
   $('#chatServerTime').html("Server Time:"+ timeOutput);
   lastReadRow = response[1];
 
-  //console.log(JSON.stringify(response));
   document.getElementById('chatTable').innerHTML="";
   $('#chatDisplayBox').css('border', '1px solid #000');
   for (var x=0; x<newChats.length;x++) {

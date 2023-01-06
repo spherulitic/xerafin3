@@ -88,3 +88,52 @@ def getChatsInit():
     result.append(outRow)
 
   return jsonify([result, 0, int(time.time()), error])
+
+@app.route('/getChats', methods=['GET', 'POST'])
+def getChats():
+  ''' Long poll request to monitor for new chats. Returns after 45 seconds
+       or when a new chat comes in. '''
+
+  params = request.get_json(force=True) # returns dict
+  lastReadRow = params.get('rownum')
+
+  error = {"status": "success"}
+  result = [ ]
+  MAX_TRIES = 45
+  TRY_DELAY = 1.0 # in seconds
+  tries = 0
+  time.sleep(4)
+  chatFile = os.path.join(CHAT_DIR, f'{g.uuid}.chat')
+  with open(chatFile, 'r') as f:
+    lineCounter = 0
+    while lineCounter < lastReadRow:
+      f.readline()
+      lineCounter = lineCounter + 1
+    while tries < MAX_TRIES:
+      line = f.readline()
+      if line:
+        while line:
+          result.append(appendChatToResult(line))
+          line = f.readline()
+          lastReadRow = lastReadRow + 1
+        break
+      time.sleep(TRY_DELAY)
+      tries = tries + 1
+
+  return jsonify([result, lastReadRow, int(time.time()), error])
+
+def appendChatToResult(line):
+  temp = line.split(',')
+  userid = temp[0]
+  timeStamp = temp[1]
+  message = ','.join(temp[2:]).strip()
+  expire = not message
+
+  url = 'http://login:5000/getUserNamesAndPhotos'
+  data = { 'userList': [ userid ] }
+  response = requests.post(url, headers=g.headers, json=data).json()
+  photo = response[0].get('photo', 'images/unknown_player.gif')
+  name = response[0].get('name')
+
+  return {"chatDate": int(timeStamp), "photo": row[0], "name": row[1],
+          "chatText": message, "chatUser": userid, "expire": expire}
