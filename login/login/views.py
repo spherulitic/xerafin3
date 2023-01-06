@@ -42,7 +42,6 @@ def get_user():
   # headers to send to keycloak
   g.headers = {"Accept": "application/json", "Authorization": g.raw_token}
 
-
   g.mysqlcon = xu.getMysqlCon()
   g.con = g.mysqlcon.cursor()
 
@@ -53,8 +52,6 @@ def close_mysql(response):
   g.con.close()
   g.mysqlcon.close()
   return response
-
-
 
 @app.route("/", methods=['POST'])
 def index():
@@ -121,6 +118,30 @@ def getLoggedInUsers():
     row["name"] = f'{userInfo["firstName"]} {userInfo["lastName"]}'
     row["photo"] = userInfo['attributes'].get('photo', 'images/unknown_player.gif')
     result.append(row)
+
+  return jsonify(result)
+
+@app.route('/getUserNamesAndPhotos', methods=['GET', 'POST'])
+def getUserNamesAndPhotos():
+  ''' Takes in a list of uuids
+      Returns a list of dicts
+      [ {"userid": uuid, "name": name, "photo": photo}, { .... } ]
+  '''
+  result = [ ]
+  params = request.get_json(force=True) # returns dict
+  uuidList = params.get('userList', [ ])
+  keycloak_admin = KeycloakAdmin(server_url="http://keycloak:8080/auth/",
+                      username=os.environ.get('KEYCLOAK_USER'),
+                      password=os.environ.get('KEYCLOAK_PASSWORD'),
+                      realm_name='Xerafin',
+                      client_id='admin-cli'
+                      )
+  for uuid in uuidList:
+    userInfo = keycloak_admin.get_user(uuid)
+    userDict = {'userid': uuid}
+    userDict["name"] = f'{userInfo["firstName"]} {userInfo["lastName"]}'
+    userDict["photo"] = userInfo['attributes'].get('photo', 'images/unknown_player.gif')
+    result.append(userDict)
 
   return jsonify(result)
 
