@@ -59,7 +59,7 @@ function startChat () {
         if (e.which === 13 && $(this).val().trim()) {
            var chatContent = parseEmoji($(this).val());
            //console.log(chatContent);
-           submitChat(chatContent, false);
+           submitChat(chatContent);
            $(this).val("");
         } });
     $('#chatBox').keypress("m",function(e) {
@@ -292,44 +292,11 @@ chatQueueLoop:
   updateChats();
 }
 
-function submitChat(message, isSystemGenerated, systemUserid) {
-  if (typeof systemUserid=="undefined"){systemUserid=0;}
-   d = { chatText: message, userid: userid, chatTime: new Date().getTime() };
-   if (isSystemGenerated) d.userid = systemUserid;
-   //console.log ("sending chat:");
-   //console.log(JSON.stringify(d));
-   if (d.userid===0) { // system generated chat sent by Xerafin user
-     $.ajax({type: "POST",
-              url: "expireLastMilestoneChat.py",
-            data: JSON.stringify({userid: userid}),
-         success: function(response, responseStatus) {
-              console.log("Last milestone chat expired " + response);
-              submitChat2(d);
-              },
-          error: function(jqXHR, textStatus, errorThrown) {
-              console.log("Error: milestone chat could not be expired.");
-              submitChat2(d);}
-      });
-   } else if (d.userid==2) {
-  $.ajax({type: "POST",
-              url: "expireLastInvaderChat.py",
-    success: function(response, responseStatus) {
-      console.log("Last invader chat expired " + response);
-      submitChat2(d);
-        },
-    error: function(jqXHR, textStatus, errorThrown) {
-      console.log("Error: invader chat could not be expired.");
-      submitChat2(d);
-    }
-  });
-   }
-  else submitChat2(d);
-    }
-
-function submitChat2(d) {
+function submitChat(message) {
+   d = { chatText: message, chatTime: new Date().getTime() };
    $.ajax({type: "POST",
      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-            url: "submitChat.py",
+            url: "submitChat",
            data: JSON.stringify(d),
         success: function (response, responseStatus) {
            console.log(JSON.stringify(response)); },
