@@ -1,14 +1,17 @@
+''' Xerafin Chat service. This contains endpoints relating the to chat widget on the site.
+    Includes access to the chat-related tables in the MySQL database and chat spool files
+     which are used for long polling.
+'''
 from logging.config import dictConfig
 import urllib
 import json
-import jwt
-import requests
 import os
-import datetime
 import time
-from flask import Flask, request, jsonify, Response, g
-from chat import app
+import requests
+import jwt
+from flask import request, jsonify, g
 import xerafinUtil.xerafinUtil as xu
+from chat import app
 
 dictConfig({
     'version': 1,
@@ -30,6 +33,9 @@ CHAT_DIR = '/app/chatdata'
 
 @app.before_request
 def get_user():
+  ''' Validate the user token signature. Put the requestor uuid in a global.
+      Open a MySQL connection as a global for the session.
+  '''
   public_key_url = 'http://keycloak:8080/auth/realms/Xerafin'
   with urllib.request.urlopen(public_key_url) as r:
     public_key = json.loads(r.read())['public_key']
@@ -50,6 +56,7 @@ def get_user():
 
 @app.after_request
 def close_mysql(response):
+  ' Close database connection after satisfying the request. '
   g.con.close()
   g.mysqlcon.close()
   return response
@@ -99,8 +106,8 @@ def getChats():
 
   error = {"status": "success"}
   result = [ ]
-  MAX_TRIES = 45
-  TRY_DELAY = 1.0 # in seconds
+  maxTries = 45
+  tryDelay = 1.0 # in seconds
   tries = 0
   time.sleep(4)
   chatFile = os.path.join(CHAT_DIR, f'{g.uuid}.chat')
@@ -109,7 +116,7 @@ def getChats():
     while lineCounter < lastReadRow:
       f.readline()
       lineCounter = lineCounter + 1
-    while tries < MAX_TRIES:
+    while tries < maxTries:
       line = f.readline()
       if line:
         while line:
@@ -117,10 +124,24 @@ def getChats():
           line = f.readline()
           lastReadRow = lastReadRow + 1
         break
-      time.sleep(TRY_DELAY)
+      time.sleep(tryDelay)
       tries = tries + 1
 
   return jsonify([result, lastReadRow, int(time.time()), error])
+
+@app.route('/submitChat', methods=['GET', 'POST'])
+def submitChat():
+  ''' submits a chat '''
+
+  params = request.get_json(force=True) # returns dict
+  result = { }
+  userid = params.get('userid', g.uuid)
+  message = params.get('chatText', '')
+  chatTime = int(params.get('chatTime', time.time()))
+  expire = params.get('expire', False)
+
+  result = post(userid, message, chatTime, expire)
+  return jsonify(result)
 
 def appendChatToResult(line):
   temp = line.split(',')
@@ -135,5 +156,39 @@ def appendChatToResult(line):
   photo = response[0].get('photo', 'images/unknown_player.gif')
   name = response[0].get('name')
 
-  return {"chatDate": int(timeStamp), "photo": row[0], "name": row[1],
+  return {"chatDate": int(timeStamp), "photo": photo, "name": name,
           "chatText": message, "chatUser": userid, "expire": expire}
+
+def post(userid, message, chatTime=None, expire=False):
+  ''' posts a chat. chatTime is in milliseconds -- epoch*1000 '''
+  result = { }
+
+  # this is a little kludgy
+  # bad data spooled to the chat file hoses everything
+  if userid is None:
+    return {"status": "Chat Missing Userid"}
+  if not expire and message is None:
+    return {"status": "Chat Missing Message"}
+
+  if expire:
+    command = "delete from chat where userid = %s and timeStamp = %s"
+    g.con.execute(command, (userid, chatTime))
+    msg = userid+','+str(chatTime)+','+'\n'
+    result["msg"] = msg
+  else:
+    command = 'insert into chat (userid, timeStamp, message) values (%s, %s, %s)'
+    g.con.execute(command, (userid, chatTime, message))
+    msg = userid+','+str(chatTime)+','+message+'\n'
+    result["msg"] = msg
+
+  # get all active userid sessions here
+  url = 'http://login:5000/getLoggedInUsers'
+  resp = requests.get(url, headers=g.headers).json()
+  loggedInUsers = [ x['userId'] for x in resp ]
+  for user in loggedInUsers:
+    filename = os.path.join(CHAT_DIR, f'{user}.chat')
+    with open(filename, 'a') as f:
+      f.write(msg)
+  result["status"] = "success"
+
+  return result
