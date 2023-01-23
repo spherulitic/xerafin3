@@ -202,7 +202,8 @@ def submitQuestion():
     milestone = ((result["qAnswered"] < 501 and result["qAnswered"]%50==0) or
                 (result["qAnswered"] < 1001 and result["qAnswered"]%100==0) or
                 (result["qAnswered"]%200==0) or (result["qAnswered"]%500==0))
-    if milestone:
+#    if milestone:
+    if result["qAnswered"] % 5 == 0:
       submitMilestoneChat(result["qAnswered"])
 
   # this is for new Sloth, no quiz, increment only, skip reschedule
@@ -447,30 +448,14 @@ def newQuiz():
   return jsonify(result)
 
 def submitMilestoneChat(milestone):
-  pass
-#  SYSTEM_USERID = 0 # Xerafin system uid
-#      command = "select name, firstname, lastname from login where userid = %s"
-#      con.execute(command, (userid,))
-#      row = con.fetchone()
-#      if row[1] and row[2]:
-#        if row[2] == " ":
-#          name = "{0}".format(row[1])
-#        else:
-#          name = "{0} {1}".format(row[1], row[2])
-#      else:
-#        name = con.fetchone()[0]
-#
-#    # Find the previous milestone chat to expire
-#      try:
-#        command = "select max(timeStamp) from chat where userid = %s and message like %s"
-#        con.execute(command, (SYSTEM_USERID, "%{0} has completed %".format(name)))
-#        expiredChatTime = con.fetchone()[0]
-#        error["milestoneDelete"] = xchat.post(u'0', u'', expiredChatTime, True)
-#      except:
-#        pass
-#
-#    msg = "{0} has completed <b>{1}</b> alphagrams today!".format(name, result["qAnswered"])
-#    error["milestoneSubmit"] = xchat.post(u'0', msg)
+  name = 'Space Moose'
+  url = 'http://chat:5000/submitChat'
+  data = {'userid': 0,
+          'milestoneType': 'user questions',
+          'milestoneOf': g.uuid,
+          'chatText': f'{name} has completed {milestone} questions today.',
+          'expire': True}
+  requests.post(url, headers=g.headers, json=data)
 
 def correct (alpha, quizid) :
 
