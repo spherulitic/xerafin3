@@ -38,6 +38,7 @@ def get_user():
   raw_token = request.headers["Authorization"]
   auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
   g.uuid = auth_token["sub"]
+  g.name = auth_token["name"]
 
   g.mysqlcon = xu.getMysqlCon()
   g.con = g.mysqlcon.cursor()
@@ -202,8 +203,7 @@ def submitQuestion():
     milestone = ((result["qAnswered"] < 501 and result["qAnswered"]%50==0) or
                 (result["qAnswered"] < 1001 and result["qAnswered"]%100==0) or
                 (result["qAnswered"]%200==0) or (result["qAnswered"]%500==0))
-#    if milestone:
-    if result["qAnswered"] % 5 == 0:
+    if milestone:
       submitMilestoneChat(result["qAnswered"])
 
   # this is for new Sloth, no quiz, increment only, skip reschedule
@@ -448,12 +448,11 @@ def newQuiz():
   return jsonify(result)
 
 def submitMilestoneChat(milestone):
-  name = 'Space Moose'
   url = 'http://chat:5000/submitChat'
   data = {'userid': 0,
           'milestoneType': 'user questions',
           'milestoneOf': g.uuid,
-          'chatText': f'{name} has completed {milestone} questions today.',
+          'chatText': f'{g.name} has completed {milestone} questions today.',
           'expire': True}
   requests.post(url, headers=g.headers, json=data)
 

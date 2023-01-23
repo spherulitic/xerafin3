@@ -181,7 +181,6 @@ def post(userid, message, **kwargs):
     return {"status": "Chat Missing Userid"}
 
   msg = [ ]
-  xu.debug(str(kwargs))
 
   if expire:
     # These lines will tell the front end to delete from display
@@ -197,7 +196,6 @@ def post(userid, message, **kwargs):
   g.con.execute(command, (userid, kwargs['chatTime'], message, kwargs['milestoneType'], kwargs['milestoneOf']))
   msg.append(f'{userid},{str(kwargs["chatTime"])},{message}\n')
   result["msg"] = msg
-  xu.debug(str(msg))
 
   # get all active userid sessions here
   url = 'http://login:5000/getLoggedInUsers'

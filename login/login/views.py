@@ -137,7 +137,6 @@ def getUserNamesAndPhotos():
                       client_id='admin-cli'
                       )
   for uuid in uuidList:
-    xu.debug(f'Getting info for {uuid}')
     userDict = {'userid': uuid}
     if uuid == '0': # System user -- not in keycloak
       userDict["name"] = 'Xerafin'
