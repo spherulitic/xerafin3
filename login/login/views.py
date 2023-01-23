@@ -137,10 +137,14 @@ def getUserNamesAndPhotos():
                       client_id='admin-cli'
                       )
   for uuid in uuidList:
-    userInfo = keycloak_admin.get_user(uuid)
     userDict = {'userid': uuid}
-    userDict["name"] = f'{userInfo["firstName"]} {userInfo["lastName"]}'
-    userDict["photo"] = userInfo['attributes'].get('photo', 'images/unknown_player.gif')
+    if uuid == '0': # System user -- not in keycloak
+      userDict["name"] = 'Xerafin'
+      userDict['photo'] = 'images/unknown_player.gif'
+    else:
+      userInfo = keycloak_admin.get_user(uuid)
+      userDict["name"] = f'{userInfo["firstName"]} {userInfo["lastName"]}'
+      userDict["photo"] = userInfo['attributes'].get('photo', 'images/unknown_player.gif')
     result.append(userDict)
 
   return jsonify(result)

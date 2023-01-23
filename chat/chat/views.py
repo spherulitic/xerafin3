@@ -57,6 +57,7 @@ def get_user():
 @app.after_request
 def close_mysql(response):
   ' Close database connection after satisfying the request. '
+  g.mysqlcon.commit()
   g.con.close()
   g.mysqlcon.close()
   return response
@@ -71,7 +72,7 @@ def getChatsInit():
   params = request.get_json(force=True) # returns dict
   error = {"status": "success"}
   result = [ ]
-  now = int(params.get('mostRecent', time.time()))
+  now = int(params.get('mostRecent', time.time() * 1000))
 
   chatFile = os.path.join(CHAT_DIR, f'{g.uuid}.chat')
   open(chatFile, 'w').close()
@@ -88,13 +89,17 @@ def getChatsInit():
 
   for row in queryResult:
     myInfo = [x for x in response if x["userid"] == row[2]]
-    photo = myInfo['photo']
-    name = myInfo['name']
+    if myInfo:
+      photo = myInfo[0].get('photo')
+      name = myInfo[0].get('name')
+    else:
+      photo = None
+      name = None
     outRow = {"chatDate": row[0], 'photo': photo, 'name': name, 'chatText': row[1],
               'chatUser': row[2], 'expire': False}
     result.append(outRow)
 
-  return jsonify([result, 0, int(time.time()), error])
+  return jsonify([result, 0, time.time() * 1000, error])
 
 @app.route('/getChats', methods=['GET', 'POST'])
 def getChats():
@@ -127,7 +132,7 @@ def getChats():
       time.sleep(tryDelay)
       tries = tries + 1
 
-  return jsonify([result, lastReadRow, int(time.time()), error])
+  return jsonify([result, lastReadRow, time.time() * 1000, error])
 
 @app.route('/submitChat', methods=['GET', 'POST'])
 def submitChat():
@@ -135,12 +140,15 @@ def submitChat():
 
   params = request.get_json(force=True) # returns dict
   result = { }
+  kw = { }
   userid = params.get('userid', g.uuid)
   message = params.get('chatText', '')
-  chatTime = int(params.get('chatTime', time.time()))
-  expire = params.get('expire', False)
+  kw['chatTime'] = int(params.get('chatTime', time.time() * 1000))
+  kw['expire'] = params.get('expire', False)
+  kw['milestoneType'] = params.get('milestoneType')
+  kw['milestoneOf'] = params.get('milestoneOf')
 
-  result = post(userid, message, chatTime, expire)
+  result = post(userid, message, **kw)
   return jsonify(result)
 
 def appendChatToResult(line):
@@ -159,27 +167,35 @@ def appendChatToResult(line):
   return {"chatDate": int(timeStamp), "photo": photo, "name": name,
           "chatText": message, "chatUser": userid, "expire": expire}
 
-def post(userid, message, chatTime=None, expire=False):
+def post(userid, message, **kwargs):
   ''' posts a chat. chatTime is in milliseconds -- epoch*1000 '''
+  # kwargs can include chatTime, expire (default False), milestoneType,
+  #  milestoneOf
+
   result = { }
+  expire = kwargs.get('expire', False)
 
   # this is a little kludgy
   # bad data spooled to the chat file hoses everything
   if userid is None:
     return {"status": "Chat Missing Userid"}
-  if not expire and message is None:
-    return {"status": "Chat Missing Message"}
+
+  msg = [ ]
 
   if expire:
-    command = "delete from chat where userid = %s and timeStamp = %s"
-    g.con.execute(command, (userid, chatTime))
-    msg = userid+','+str(chatTime)+','+'\n'
-    result["msg"] = msg
-  else:
-    command = 'insert into chat (userid, timeStamp, message) values (%s, %s, %s)'
-    g.con.execute(command, (userid, chatTime, message))
-    msg = userid+','+str(chatTime)+','+message+'\n'
-    result["msg"] = msg
+    # These lines will tell the front end to delete from display
+    command = "select timeStamp from chat where milestoneType = %s and milestoneOf = %s"
+    g.con.execute(command, [kwargs['milestoneType'], kwargs['milestoneOf']])
+    for row in g.con.fetchall():
+      msg.append(f'0,{row[0]},\n')
+    command = "delete from chat where milestoneType = %s and milestoneOf = %s"
+    g.con.execute(command, [kwargs['milestoneType'], kwargs['milestoneOf']])
+
+  command = '''insert into chat (userid, timeStamp, message, milestoneType, milestoneOf)
+             values (%s, %s, %s, %s, %s)'''
+  g.con.execute(command, (userid, kwargs['chatTime'], message, kwargs['milestoneType'], kwargs['milestoneOf']))
+  msg.append(f'{userid},{str(kwargs["chatTime"])},{message}\n')
+  result["msg"] = msg
 
   # get all active userid sessions here
   url = 'http://login:5000/getLoggedInUsers'
@@ -188,7 +204,8 @@ def post(userid, message, chatTime=None, expire=False):
   for user in loggedInUsers:
     filename = os.path.join(CHAT_DIR, f'{user}.chat')
     with open(filename, 'a') as f:
-      f.write(msg)
+      for line in msg:
+        f.write(line)
   result["status"] = "success"
 
   return result

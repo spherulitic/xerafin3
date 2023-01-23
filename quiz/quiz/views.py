@@ -38,6 +38,7 @@ def get_user():
   raw_token = request.headers["Authorization"]
   auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
   g.uuid = auth_token["sub"]
+  g.name = auth_token["name"]
 
   g.mysqlcon = xu.getMysqlCon()
   g.con = g.mysqlcon.cursor()
@@ -447,30 +448,13 @@ def newQuiz():
   return jsonify(result)
 
 def submitMilestoneChat(milestone):
-  pass
-#  SYSTEM_USERID = 0 # Xerafin system uid
-#      command = "select name, firstname, lastname from login where userid = %s"
-#      con.execute(command, (userid,))
-#      row = con.fetchone()
-#      if row[1] and row[2]:
-#        if row[2] == " ":
-#          name = "{0}".format(row[1])
-#        else:
-#          name = "{0} {1}".format(row[1], row[2])
-#      else:
-#        name = con.fetchone()[0]
-#
-#    # Find the previous milestone chat to expire
-#      try:
-#        command = "select max(timeStamp) from chat where userid = %s and message like %s"
-#        con.execute(command, (SYSTEM_USERID, "%{0} has completed %".format(name)))
-#        expiredChatTime = con.fetchone()[0]
-#        error["milestoneDelete"] = xchat.post(u'0', u'', expiredChatTime, True)
-#      except:
-#        pass
-#
-#    msg = "{0} has completed <b>{1}</b> alphagrams today!".format(name, result["qAnswered"])
-#    error["milestoneSubmit"] = xchat.post(u'0', msg)
+  url = 'http://chat:5000/submitChat'
+  data = {'userid': 0,
+          'milestoneType': 'user questions',
+          'milestoneOf': g.uuid,
+          'chatText': f'{g.name} has completed {milestone} questions today.',
+          'expire': True}
+  requests.post(url, headers=g.headers, json=data)
 
 def correct (alpha, quizid) :
 
