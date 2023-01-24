@@ -157,36 +157,31 @@ def getUserLexicons():
   '''
   result = { }
   result["status"] = "success"
-  try:
-    # eventually when we have multiple language support, this will be a list of results
-    # for now we assume one
-    query = f'select lexicon, version from user_lexicon_master where userid = "{g.uuid}"'
+  # eventually when we have multiple language support, this will be a list of results
+  # for now we assume one
+  query = f'select lexicon, version from user_lexicon_master where userid = "{g.uuid}"'
+  g.con.execute(query)
+  row = g.con.fetchone()
+  if row is None:
+    userLex = 'CSW' # hard coded default; fix this someday
+    userVersion = '21'
+    query = f'''insert into user_lexicon_master (userid, lexicon, version)
+             values ("{g.uuid}", "{userLex}", "{userVersion}")'''
     g.con.execute(query)
-    row = g.con.fetchone()
-    if row is None:
-      userLex = 'CSW' # hard coded default; fix this someday
-      userVersion = '21'
-      query = f'''insert into user_lexicon_master (userid, lexicon, version)
-               values ("{g.uuid}", "{userLex}", "{userVersion}")'''
-      g.con.execute(query)
-    else:
-      userLex = row[0]
-      userVersion = row[1]
+  else:
+    userLex = row[0]
+    userVersion = row[1]
 
-    query = f'''SELECT name, country, replaced_by
-                FROM lexicon_info l
-               WHERE lexicon = "{userLex+userVersion}"'''
-    g.con.execute(query)
-    row = g.con.fetchone()
-    result["name"] = row[0]
-    result["country"] = row[1]
-    result["replaced_by"] = row[2]
-    result["lexicon"] = userLex
-    result["version"] = userVersion
-
-  except:
-    xu.errorLog()
-    result["status"] = "error"
+  query = f'''SELECT name, country, replaced_by
+              FROM lexicon_info l
+             WHERE lexicon = "{userLex+userVersion}"'''
+  g.con.execute(query)
+  row = g.con.fetchone()
+  result["name"] = row[0]
+  result["country"] = row[1]
+  result["replaced_by"] = row[2]
+  result["lexicon"] = userLex
+  result["version"] = userVersion
 
   return jsonify({"values": [result], "default": {"lexicon": "CSW", "version": "21"}})
 

@@ -135,13 +135,31 @@ def increment():
     questionsAnswered = 1
     g.con.execute(f'''insert into leaderboard (userid, dateStamp, questionsAnswered, startScore)
                       values ('{g.uuid}', curdate(), {questionsAnswered}, {startScore})''')
-  else:
-    g.con.execute(f'''select questionsAnswered, startScore from leaderboard
-                    where userid = '{g.uuid}' and datestamp = curdate()''')
-    row = g.con.fetchone()
+    return jsonify({'questionsAnswered': questionsAnswered, 'startScore': startScore})
+
+  return (getUserStatsToday())
+
+@app.route("/getUserStatsToday", methods=['GET', 'POST'])
+def getUserStatsTodayView():
+  ''' Returns questionsAnswered and startScore for the requesting user '''
+  return jsonify(getUserStatsToday())
+
+def getUserStatsToday():
+  ''' Fetches questionsAnswered and startScore for the requesting user '''
+  g.con.execute(f'''select questionsAnswered, startScore from leaderboard
+                  where userid = '{g.uuid}' and datestamp = curdate()''')
+  row = g.con.fetchone()
+  if row:
     questionsAnswered = row[0]
     startScore = row[1]
-  return jsonify({'questionsAnswered': questionsAnswered, 'startScore': startScore})
+  else:
+    questionsAnswered = 0
+    url = 'http://cardbox:5000/getCardboxScore'
+    resp = requests.get(url, headers=g.headers).json()
+    startScore = resp["score"]
+
+  return {'questionsAnswered': questionsAnswered, 'startScore': startScore}
+
 
 def getUserData(uuid):
   url = f'http://keycloak:8080/auth/admin/Xerafin/users/{uuid}'
