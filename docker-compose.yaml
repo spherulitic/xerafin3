@@ -24,7 +24,7 @@ services:
     image: x-stats:latest
     environment:
       - MYSQL_USER
-      - MYSQL_DB
+      - MYSQL_DB_STATS
       - MYSQL_PWD
       - MYSQL_HOST
     depends_on:
@@ -44,7 +44,7 @@ services:
     image: x-quiz:latest
     environment:
       - MYSQL_USER
-      - MYSQL_DB
+      - MYSQL_DB_QUIZ
       - MYSQL_PWD
       - MYSQL_HOST
     extra_hosts:
@@ -57,7 +57,7 @@ services:
     image: x-login:latest
     environment:
       - MYSQL_USER
-      - MYSQL_DB
+      - MYSQL_DB_LOGIN
       - MYSQL_PWD
       - MYSQL_HOST
       - KEYCLOAK_USER
@@ -82,7 +82,7 @@ services:
     image: x-chat:latest
     environment:
       - MYSQL_USER
-      - MYSQL_DB
+      - MYSQL_DB_CHAT
       - MYSQL_PWD
       - MYSQL_HOST
     volumes:
