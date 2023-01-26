@@ -1,0 +1,3 @@
+# min hour (day of month) month (day of week) command
+* * * * * echo "Hello World $(date)" > /proc/1/fd/1 2>/proc/1/fd/1
+#

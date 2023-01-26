@@ -91,6 +91,8 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - keycloak
+  cron:
+    image: x-cron:latest
 volumes:
   cardbox-data:
     external: true
