@@ -93,6 +93,9 @@ services:
       - keycloak
   cron:
     image: x-cron:latest
+    environment:
+      - CRON_KUSER
+      - CRON_KPASS
 volumes:
   cardbox-data:
     external: true

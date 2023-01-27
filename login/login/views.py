@@ -53,9 +53,9 @@ def close_mysql(response):
   g.mysqlcon.close()
   return response
 
-@app.route("/", methods=['POST'])
+@app.route("/", methods=['GET'])
 def index():
-  return "Xerafin Login Service"
+  return jsonify(["Xerafin Login Service"])
 
 @app.route('/setCardboxPrefs', methods=['POST'])
 def setCardboxPrefs():
