@@ -49,6 +49,7 @@ def get_user():
 
 @app.after_request
 def close_mysql(response):
+  g.mysqlcon.commit()
   g.con.close()
   g.mysqlcon.close()
   return response
