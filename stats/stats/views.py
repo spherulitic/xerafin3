@@ -144,6 +144,68 @@ def getUserStatsTodayView():
   ''' Returns questionsAnswered and startScore for the requesting user '''
   return jsonify(getUserStatsToday())
 
+@app.route("/dailySummary", methods=['GET', 'POST'])
+def dailySummary():
+  ''' Executes end-of day routine -- puts summary data in lb_summary, then posts chat to user '''
+  # Insert today's data into lb_summary
+  query = '''SELECT COUNT(*), SUM(questionsAnswered) FROM leaderboard
+             WHERE dateStamp = curdate() - interval 1 day group by dateStamp'''
+  g.con.execute(query)
+  row = g.con.fetchone()
+  if row:
+    users = row[0]
+    questions = row[1]
+  else:
+    users = 0
+    questions = 0
+  query = f'''INSERT INTO lb_summary (period, dateStamp, questionsAnswered, numUsers)
+              VALUES ("DAY", CURDATE() - INTERVAL 1 DAY, {questions}, {users})'''
+  g.con.execute(query)
+  # Post daily chat to users
+  url = 'http://chat:5000/submitChat'
+  message = f'Good job Xerfers! Today {users} users solved {questions} alphagrams!'
+  data = { 'userid': 0, 'chatText': message, 'expire': False }
+  requests.post(url, headers=g.headers, json=data)
+
+  if users == 0:
+    return jsonify([])
+
+  # Calculate daily awards
+
+  command = '''select userid, questionsAnswered from leaderboard
+            where dateStamp = curdate() - interval 1 day order by questionsAnswered desc'''
+  awards = [users, 1000, 100, 20, 8, 4];
+  awardNames = ["emerald", "ruby", "sapphire", "gold", "silver", "bronze"]
+  awardRanks = [math.ceil(float(users)/x) for x in awards]
+  g.con.execute(command)
+  results = g.con.fetchall()
+  awardIdx = 0
+  for rank, row in enumerate(results[:awardRanks[-1]]):
+    # This will never run off the end of the array
+    while rank >= awardsRanks[awardIdx]:
+      awardIdx += 1
+    # USER_COIN_LOG:
+    # userid, dateStamp, amount, period, reason, coinType, data
+    cl_userid = row[0]
+    cl_amount = 1
+    cl_period = 'DAY'
+    cl_reason = 'QA'
+    cl_coinType = awardIdx
+    cl_data = f'{row[1]}-{rank}'
+
+    command = f'''INSERT INTO user_coin_log VALUES ({cl_userid}, curdate() - interval 1 day,
+                  {cl_amount}, "{cl_period}", "{cl_reason}", {cl_coinType}, "{cl_data}")'''
+    g.con.execute(command)
+    command = f'SELECT COUNT(*) FROM user_coin_total WHERE userid = "{cl_userid}"'
+    g.con.execute(command)
+    if g.con.fetchone()[0] == 0:
+      command = 'INSERT INTO user_coin_total VALUES ("{cl_userid}", 0, 0, 0, 0, 0, 0, 0, 0, curdate() - interval 1 day)'
+      g.con.execute(command)
+    command = f'''UPDATE user_coin_total SET {awardNames[awardIdx]} = {awardNames[awardIdx]} + 1
+                WHERE userid = "{cl_userid}"'''
+    g.con.execute(command)
+  return jsonify([])
+
 def getUserStatsToday():
   ''' Fetches questionsAnswered and startScore for the requesting user '''
   g.con.execute(f'''select questionsAnswered, startScore from leaderboard
@@ -160,12 +222,9 @@ def getUserStatsToday():
 
   return {'questionsAnswered': questionsAnswered, 'startScore': startScore}
 
-
 def getUserData(uuid):
   url = f'http://keycloak:8080/auth/admin/Xerafin/users/{uuid}'
   resp = requests.get(url, headers=g.headers).json()
-  xu.debug(f"Getting user info from keycloak for {uuid}")
-  xu.debug(str(resp))
   return resp
 
 class Metaranks():
@@ -747,8 +806,6 @@ class Rankings():
     result = { "rankings": rankingsList, "myRank": self.userRank,
                "period": self.period, "users": self.userCount, "page": self.page+1}
     return result
-
-
 
 class SlothRankings():
   def __init__(self, data):

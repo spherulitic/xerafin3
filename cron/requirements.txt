@@ -1,0 +1,4 @@
+requests
+python-keycloak
+python-jose
+urllib3

@@ -53,9 +53,9 @@ def close_mysql(response):
   g.mysqlcon.close()
   return response
 
-@app.route("/", methods=['POST'])
+@app.route("/", methods=['GET'])
 def index():
-  return "Xerafin Login Service"
+  return jsonify(["Xerafin Login Service"])
 
 @app.route('/setCardboxPrefs', methods=['POST'])
 def setCardboxPrefs():
@@ -115,6 +115,9 @@ def getLoggedInUsers():
   sessionList = [{"userId": x["userId"], "lastAccess": x["lastAccess"]} for x in sessions]
   for row in sessionList:
     userInfo = keycloak_admin.get_user(row["userId"])
+    if userInfo['username'] == 'chris@xerafin.net':
+      # This is the service account
+      continue
     row["name"] = f'{userInfo["firstName"]} {userInfo["lastName"]}'
     row["photo"] = userInfo['attributes'].get('photo', 'images/unknown_player.gif')
     result.append(row)

@@ -8,7 +8,7 @@ from logging.config import dictConfig
 import jwt # pylint: disable=E0401
 from pymongo import MongoClient # pylint: disable=E0401
 from flask import jsonify, request, g # pylint: disable=E0401
-#import xerafinUtil.xerafinUtil as xu
+import xerafinUtil.xerafinUtil as xu
 from lexicon import app
 
 dictConfig({
@@ -124,3 +124,18 @@ def returnValidAlphas():
       validAlphaList.append(alpha)
 
   return jsonify(validAlphaList)
+
+@app.route('/getRandomAlphas', methods=['GET', 'POST'])
+def getRandomAlphas():
+  ''' Take in a list of lengths and a quantity. Return a list of alphagrams '''
+  params = request.get_json(force=True)
+  lengths = params.get('lengths', [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15])
+  quantity = params.get('quantity', 1)
+  cursor = g.words.aggregate([
+                     {"$group": { "_id": "$alphagram" } },
+                     {"$match": {"$expr": {"$in": [{"$strLenCP": "$_id"}, lengths]
+                     }}},
+                     {"$sample": {"size": quantity} }
+             ] )
+  response = [ x['_id'] for x in cursor ]
+  return jsonify(response)
