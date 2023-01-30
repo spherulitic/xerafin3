@@ -57,6 +57,10 @@ def close_mysql(response):
 def default():
   return "Xerafin Quiz Management Service"
 
+@app.route("/generatePeriodicQuizzes", methods=["GET", "POST"])
+def generatePeriodicQuizzesView():
+  generatePeriodicQuizzes()
+  return jsonify({"status": "completed"})
 
 @app.route("/getSubscriptions", methods=["GET", "POST"])
 def getSubscriptions():
@@ -452,3 +456,55 @@ def wrong (alpha, quizid) :
   g.con.execute("update quiz_user_detail set incorrect=1, correct = 0, " +
     "last_answered=NOW(), completed=1 where alphagram = %s and user_id = %s " +
     "and quiz_id = %s", (alpha, g.uuid, quizid))
+
+def generatePeriodicQuizzes():
+  ''' Generates Daily, Weekly, or Monthly quizzes based on info
+        in the sub_master table '''
+  datemasks = {"Daily": '%d %b %Y', "Weekly": '#%W %Y', "Monthly": "%b %Y"}
+  command = '''select sub_id, descr, quantity, frequency, quiz_type, min_length, max_length from sub_master
+             where frequency = %s'''
+  g.con.execute(command, ["Daily"])
+  quizzes = g.con.fetchall()
+
+  if datetime.now().weekday() == 0:
+  # Generate weekly quizzes on Monday
+    g.con.execute(command, ["Weekly"])
+    quizzes = quizzes + g.con.fetchall()
+
+  if datetime.now().day == 1:
+  # Generate monthly quizzes on the first
+    g.con.execute(command, ["Monthly"])
+    quizzes = quizzes + g.con.fetchall()
+
+  for quiz in quizzes:
+    lengths = list(range(quiz[5],quiz[6]+1))
+    kwargs = {"sub_id": quiz[0], "descr": quiz[1], "quantity": quiz[2], "quiz_type": quiz[4], "lengths": lengths}
+    kwargs['datemask'] = datemasks[quiz[3]]
+    generateQuiz(**kwargs)
+
+def generateQuiz(**kwargs):
+  ''' Accepts args sub_id, descr, where, datemask
+      Creates one quiz from parameters and outputs JSON '''
+  g.con.execute("select max(quiz_id) from quiz_master")
+  result = g.con.fetchone()
+  if result[0] is None:
+    quizid = 0
+  else:
+    quizid = result[0] + 1
+  url = 'http://lexicon:5000/getRandomAlphas'
+  data = {"quantity": kwargs['quantity'], 'lengths': kwargs['lengths']}
+  quizJSON = {"name": f'{kwargs["descr"]} {datetime.now().strftime(kwargs["datemask"])}'}
+  quizJSON["alphagrams"] = requests.post(url, headers=g.headers, json=data).json()
+  quizJSON["id"] = quizid
+  quizJSON["size"] = kwargs['quantity']
+
+  quizOwner = g.uuid
+  command = f'''INSERT INTO quiz_master (quiz_id, quiz_name, quiz_size, sub_id,
+                 creator, create_date, quiz_type, length, lexicon, version)
+              VALUES ({quizid}, "{quizJSON['name']}", {quizJSON['size']}, {kwargs["sub_id"]},
+                "{g.uuid}", CURDATE(), {kwargs['quiz_type']}, null, 'CSW', 21)'''
+  g.con.execute(command)
+
+  filename = os.path.join('/app/quizjson', f'{quizid}.json')
+  with open(filename, 'w') as f:
+    f.write(json.dumps(quizJSON))

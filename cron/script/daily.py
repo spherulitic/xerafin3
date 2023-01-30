@@ -18,5 +18,9 @@ headers = {"Accept": "application/json", "Authorization": token['access_token']}
 
 # Add daily summary to lb_summary -- stats service
 url = 'http://stats:5000/dailySummary'
-requests.post(url, headers=headers).json
-print(f"Daily Updates Finished at {datetime.now()}")
+requests.get(url, headers=headers)
+print(f"Daily Leaderboard Updates Finished at {datetime.now()}")
+
+url = 'http://quiz:5000/generatePeriodicQuizzes'
+requests.get(url, headers=headers)
+print(f'Quiz Generation Finished at {datetime.now()}')
