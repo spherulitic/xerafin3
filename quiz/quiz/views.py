@@ -389,6 +389,25 @@ def getQuizList():
 
   return jsonify(result)
 
+@app.route("/subscribe", methods=["POST"])
+def subscribe():
+
+  params = request.get_json(force=True) # returns a dict
+  subList = params.get('subList', [ ])
+
+  stmt = "delete from sub_user_xref where user_id = %s"
+  g.con.execute(stmt, [g.uuid])
+
+  stmt = "insert into sub_user_xref (sub_id, user_id) values (%s, %s)"
+
+  for s in subList:
+    g.con.execute(stmt, [s, g.uuid])
+
+  stmt = "select * from sub_user_xref where user_id = %s"
+  g.con.execute(stmt, [g.uuid])
+  result = [ x[0] for x in g.con.fetchall()]
+  return jsonify(result)
+
 @app.route("/newQuiz", methods=["GET", "POST"])
 def newQuiz():
 
@@ -432,6 +451,8 @@ def newQuiz():
   result["score"] = cbxScore
 
   return jsonify(result)
+
+
 
 def submitMilestoneChat(milestone):
   url = 'http://chat:5000/submitChat'

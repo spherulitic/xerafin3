@@ -22,7 +22,7 @@
 SHELL=/bin/bash
 BASH_ENV=/container.env
 # m h  dom mon dow   command
-#00,05,10,15,20,25,30,35,40,45,50,55 * * * * CRON_KUSER="$CRON_KUSER" CRON_KPASS="$CRON_KPASS" /cron/daily.py >> /proc/1/fd/1 2>/proc/1/fd/1
+#00 * * * * CRON_KUSER="$CRON_KUSER" CRON_KPASS="$CRON_KPASS" /cron/daily.py >> /proc/1/fd/1 2>/proc/1/fd/1
 
 #01 00   * * *   (date && /cron/daily.py) >> /proc/1/fd/1 2>/proc/1/fd/1
 #03 00   * * 1   (date && /cron/weekly.py) >> /proc/1/fd/1 2>/proc/1/fd/1
