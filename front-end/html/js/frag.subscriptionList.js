@@ -87,14 +87,12 @@ SubscriptionList.prototype = {
   write: function(after=function(){}){
     $(this.updateButton).prop('disabled',true);
     let self=this;
-    let d= {
-      'userid': userid,
-      'subList' : Array.from(self.subs)
-    };
+    let d= { 'subList' : Array.from(self.subs) };
     xerafin.error.log.add('Updating Subscriptions','comment');
     xerafin.error.log.add(d,'JSON');
     $.ajax({
-      url:'subscribe.py',
+      url:'subscribe',
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       data: JSON.stringify(d),
       type: "POST",
       success: function(response,responseStatus){
