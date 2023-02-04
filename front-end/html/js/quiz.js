@@ -90,7 +90,7 @@ class QuizList {
     $.ajax({type: "POST",
     data: JSON.stringify(d),
     headers: {"Accept": "application/json", "Authorization": keycloak.token},
-    url: "activateQuiz.py",
+    url: "activateQuiz",
     success: function(response, responseStatus) {
       self.refreshQuizList(self.data);
       delete self.connectionAttempts;

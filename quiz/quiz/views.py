@@ -408,6 +408,45 @@ def subscribe():
   result = [ x[0] for x in g.con.fetchall()]
   return jsonify(result)
 
+@app.route("/activateQuiz", methods=["GET", "POST"])
+def activateQuiz():
+
+  params = request.get_json(force=True) # returns a dict
+  quizidList = params.get('quizidList', [ ])
+
+  # limit ten quizzes at a time
+  if len(quizidList) > 10:
+    quizidList = quizidList[0:10]
+
+  for quizid in quizidList:
+
+    # find if this quiz id is not bookmarked
+    stmt = "select m.quiz_id from quiz_master m left join user_quiz_bookmark b on (m.quiz_id = b.quiz_id and b.user_id = %s) where b.quiz_id is null and m.quiz_id = %s"
+    g.con.execute(stmt, [g.uuid, quizid])
+    result = g.con.fetchone()
+    if result:
+      stmt = "insert into user_quiz_bookmark values (%s, %s, CURDATE())"
+      g.con.execute(stmt, [quizid, g.uuid])
+
+    # do the activation
+    # "activation" means putting records for the individual questions in quiz_user_detail
+    g.con.execute("select count(*) from quiz_user_detail where quiz_id = %s and user_id = %s", (quizid, g.uuid))
+    c = int(g.con.fetchone()[0])
+    if c > 0:
+      g.con.execute("update quiz_user_detail set locked = 0 where quiz_id = %s and user_id = %s", (quizid, g.uuid))
+    else:
+      # load quiz json
+      filename = os.path.join("/app/quizjson", f"{quizid}.json")
+      with open(filename, 'r') as f:
+        data = json.load(f)
+      # insert into quiz user detail
+      for alpha in data["alphagrams"]:
+        g.con.execute("insert into quiz_user_detail (id, quiz_id, user_id, alphagram, locked, completed, correct, incorrect) values (NULL, %s, %s, %s, 0, 0, 0, 0)", (quizid, g.uuid, alpha))
+
+  return jsonify({'activated': quizidList})
+
+
+
 @app.route("/newQuiz", methods=["GET", "POST"])
 def newQuiz():
 
@@ -424,10 +463,10 @@ def newQuiz():
   else:
     g.con.execute(f'select quiz_name from quiz_master where quiz_id = {quizid}')
     result["quizName"] = g.con.fetchone()[0]
-    g.con.execute(f"select count(*) from quiz_user_detail where quiz_id = {quizid} and user_id = {g.uuid}")
+    g.con.execute(f"select count(*) from quiz_user_detail where quiz_id = {quizid} and user_id = '{g.uuid}'")
     c = int(g.con.fetchone()[0])
     if c > 0:
-      g.con.execute(f"update quiz_user_detail set locked = 0 where quiz_id = {quizid} and user_id = {g.uuid}")
+      g.con.execute(f"update quiz_user_detail set locked = 0 where quiz_id = {quizid} and user_id = '{g.uuid}'")
     else:
       # load quiz json
       filename = os.path.join(QUIZJSON_PATH, f"{quizid}.json")
