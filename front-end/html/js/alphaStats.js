@@ -1,5 +1,4 @@
 function showAlphaStats (alpha) {
-  console.log("Showing stats for " + alpha);
   if ((typeof alpha!=='object') && (typeof alpha!=='undefined')) {
     if (alpha!==''){
       alpha=alpha.toUpperCase();
@@ -7,6 +6,7 @@ function showAlphaStats (alpha) {
     $.ajax({
       type: "POST",
       url: "getAuxInfo",
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
       data: JSON.stringify(d),
       success: displayAlphaStats,
       error: function(jqXHR, textStatus, errorThrown) {
@@ -62,7 +62,6 @@ function getCardboxNumberDropdown(alpha, auxIn) {
               correct: (periodList.value>0),
               cardbox:periodList.value-1,
               incrementQ: false };
-  console.log(JSON.stringify(d));
         $.ajax({
                 type: "POST",
                 url: "submitQuestion",

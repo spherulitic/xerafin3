@@ -87,9 +87,6 @@ def getAuxInfoView():
   result = { }
   params = request.get_json(force=True) # returns dict
   result = getAuxInfo(params.get("alpha"))
-  result["alpha"] = params.get("alpha")
-  result["aux"] = getAuxInfo(result["alpha"])
-
   return jsonify(result)
 
 @app.route('/correct', methods=['POST'])
