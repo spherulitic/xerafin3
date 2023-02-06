@@ -188,6 +188,7 @@ def getUserLexicons():
   result["lexicon"] = lexicon
   result["version"] = version
   result["default"] = default
+  result["update"] = '21' # latest version of the lexicon. Hardcoded for now
 
   return jsonify([result])
 

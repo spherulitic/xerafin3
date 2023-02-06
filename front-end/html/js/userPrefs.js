@@ -60,8 +60,6 @@ function fetchLexiconData(data){
   })
 }
 function updateLexicon(data){
-  console.log("Update Lexicon");
-  console.log(data);
   $.ajax({
     type: "POST",
     url: "convertLexiconVersion.py",
@@ -134,8 +132,6 @@ function generateLexUpdateAccordion(data){
   $(updateButton).insertAfter($('#lexUpdateOpts'));
 }
 function createLexiconEnabled(content){
-  console.log("createLexiconEnabled")
-  console.log(content);
   $('#lexUpdateInfo').remove();
   if (content.length>0){
     var fakeRow = document.createElement('div');
