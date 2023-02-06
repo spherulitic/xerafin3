@@ -49,6 +49,7 @@ def get_user():
 
 @app.after_request
 def close_mysql(response):
+  g.mysqlcon.commit()
   g.con.close()
   g.mysqlcon.close()
   return response
@@ -159,34 +160,36 @@ def getUserLexicons():
       In theory someday we can support multiple languages but this may be tricky
   '''
   result = { }
-  result["status"] = "success"
   # eventually when we have multiple language support, this will be a list of results
   # for now we assume one
-  query = f'select lexicon, version from user_lexicon_master where userid = "{g.uuid}"'
+  query = f'select lexicon, version, is_default from user_lexicon_master where userid = "{g.uuid}"'
   g.con.execute(query)
   row = g.con.fetchone()
   if row is None:
-    userLex = 'CSW' # hard coded default; fix this someday
-    userVersion = '21'
-    query = f'''insert into user_lexicon_master (userid, lexicon, version)
-             values ("{g.uuid}", "{userLex}", "{userVersion}")'''
+    lexicon = 'CSW' # hard coded default; fix this someday
+    version = '21'
+    default = 1
+    query = f'''insert into user_lexicon_master (userid, lexicon, version, is_default)
+             values ("{g.uuid}", "{lexicon}", "{version}", {default})'''
     g.con.execute(query)
   else:
-    userLex = row[0]
-    userVersion = row[1]
+    lexicon = row[0]
+    version = row[1]
+    default = row[2]
 
   query = f'''SELECT name, country, replaced_by
               FROM lexicon_info l
-             WHERE lexicon = "{userLex+userVersion}"'''
+             WHERE lexicon = "{lexicon+version}"'''
   g.con.execute(query)
   row = g.con.fetchone()
   result["name"] = row[0]
   result["country"] = row[1]
   result["replaced_by"] = row[2]
-  result["lexicon"] = userLex
-  result["version"] = userVersion
+  result["lexicon"] = lexicon
+  result["version"] = version
+  result["default"] = default
 
-  return jsonify({"values": [result], "default": {"lexicon": "CSW", "version": "21"}})
+  return jsonify([result])
 
 @app.route("/getNavbar", methods=['GET'])
 def getNavbar():

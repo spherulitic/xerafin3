@@ -226,7 +226,6 @@ XeraOverviewManager.prototype = {
 // Launches given app, populating it with given id, quizname.
 
   launchApp:function(id, name, app){
-    console.log("Launch App Attempt: id: "+id+ " name: " +name+ " target: "+app);
     var self = this;
     let x = new Function('d',self.activeApps[app][1]+'(d)');
     if (id!==undefined) {this.setCurrentQuizid(id);}
@@ -353,7 +352,6 @@ XeraOverviewManager.prototype = {
       }
       this.resetWritePoll(function(){
         overviewUI.update("SEARCH_GO_DEACTIVATE",false);
-        //console.log(self.data.searchSelection[0]+" "+self.data.searchGoName+" "+self.data.searchGoAction);
         self.setCurrentQuizid(Number(self.data.searchSelection[0]));
         self.launchApp(self.data.searchSelection[0],self.data.searchGoName, self.data.searchGoAction);
         self.fetchData(function(){self.setMySelectionRow(self.data.searchSelection[0]);});
@@ -375,7 +373,6 @@ XeraOverviewManager.prototype = {
         this.activateQuizzes(this.data.mySelection[0], this.data.activeList.quizList);
       }
       this.resetWritePoll(function(){
-        //console.log(self.data.mySelection[0]+" "+self.data.myGoName+" "+self.data.myGoAction);
         self.setCurrentQuizid(Number(self.data.mySelection[0]));
         self.launchApp(self.data.mySelection[0],self.data.myGoName, self.data.myGoAction);
         self.fetchData(function(){
@@ -452,23 +449,15 @@ XeraOverviewManager.prototype = {
       headers: {"Accept": "application/json", "Authorization": keycloak.token},
       success: function(response,responseStatus){
         if (typeof self.data.lexicon==='undefined'){self.data.lexicon={};}
-        let data = response;
-        if (typeof data.default!=='undefined'){
-          self.lexiconSetCurrent(data.default.lexicon.toUpperCase()+'-'+data.default.version);
-          overviewUI.update('SET_LEX_VAL',data);
-        }
-        else {
-          xerafin.error.log.add('Default Lex Value','comment');
-          xerafin.error.log.add(data.default,'comment');
-          this.lexiconGet = setTimeout(XeraOverviewManager.prototype.lexiconGetValues.bind(this),200);
-        }
-      },
+        let defaultLex = response.filter(function(e) { return e.default == 1; })[0];
+        self.lexiconSetCurrent(defaultLex.lexicon.toUpperCase()+'-'+defaultLex.version);
+        overviewUI.update('SET_LEX_VAL',response);
+      }
     });
   },
   lexiconSetCurrent:function(value){
     let y = (typeof(this.data.lexicon.lexicon)!=='undefined');
     let x = value.split('-');
-    console.log(x);
     this.data.lexicon.lexicon = x[0];
     this.data.lexicon.version = x[1];
     xerafin.error.log.add('Current Lexicon','comment');

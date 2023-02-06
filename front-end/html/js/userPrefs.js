@@ -2,7 +2,8 @@ function initUserPrefs() {
   var d = {userid: userid, action: ['GTN','LEX']};
   $.ajax({
     type: "POST",
-    url: "PHP/userPrefs.php",
+    url: "getUserLexicons",
+    headers: {"Accept": "application/json", "Authorization": keycloak.token},
     data: JSON.stringify(d),
     success: showUserPrefs,
     error: function(jqXHR, textStatus, errorThrown) {
@@ -14,7 +15,8 @@ function updateEnabledLexList() {
   var d = {userid: userid, action: ['LEX']};
   $.ajax({
     type: "POST",
-    url: "PHP/userPrefs.php",
+    url: "getUserLexicons",
+    headers: {"Accept": "application/json", "Authorization": keycloak.token},
     data: JSON.stringify(d),
     success: function(response,responseStatus){
       var inputs = JSON.parse(response);
@@ -58,6 +60,7 @@ function fetchLexiconData(data){
   })
 }
 function updateLexicon(data){
+  console.log("Update Lexicon");
   console.log(data);
   $.ajax({
     type: "POST",
@@ -131,6 +134,7 @@ function generateLexUpdateAccordion(data){
   $(updateButton).insertAfter($('#lexUpdateOpts'));
 }
 function createLexiconEnabled(content){
+  console.log("createLexiconEnabled")
   console.log(content);
   $('#lexUpdateInfo').remove();
   if (content.length>0){
@@ -199,10 +203,9 @@ function createLexiconEnabled(content){
 
 function showUserPrefs(response, responseStatus) {
   appendDebugLog(response[0]);
-  var inputs = JSON.parse(response);
-  console.log(inputs);
-  var nation = inputs.nation;
-  var lexes = inputs.lexes;
+  // This should come from keycloak.tokenParsed
+  var nation = "";
+  var lexes = response;
   if (!document.getElementById("pan_1_d")) {
     panelData = {
           "contentClass" : "panelContentDefault",
@@ -306,8 +309,9 @@ function showUserPrefs(response, responseStatus) {
       var d={userid: userid, nation: $('#nationList').val(), action: ['STN']}
       $.ajax({
         type: "POST",
-        url: "PHP/userPrefs.php",
+        url: "getUserLexicons",
         data: JSON.stringify(d),
+        headers: {"Accept": "application/json", "Authorization": keycloak.token},
         error: function(jqXHR, textStatus, errorThrown) {
           console.log("Error retrieving user prefs. Status: " + textStatus + "  Error: " + errorThrown);
         }

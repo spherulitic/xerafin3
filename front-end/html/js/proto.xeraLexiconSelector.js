@@ -3,11 +3,12 @@ XeraLexiconSelector.prototype= {
   drawDropdown: function(){
     let self=this;
     $(this.region).html('');
+    let userDefault = this.data.filter(function(e) { return e.default == 1; })[0]
     this.selection = new XeraSelect({
       'data': this.list,
       'id':'lexicon_list',
       'hasImages':true,
-      'val': this.data.default.lexicon.toUpperCase()+'-'+this.data.default.version,
+      'val': userDefault.lexicon.toUpperCase()+'-'+userDefault.version,
       'onChange':function(value){self.action('SET_LEX_CUR', value, true);},
       'maxHeight': $(window).height()/4
     });
@@ -29,14 +30,13 @@ XeraLexiconSelector.prototype= {
     xerafin.error.log.add(this.data,'JSON');
     this.list = new Array();
     let self=this;
-    Object.entries(this.data.values).forEach(function([i,v]){
+    this.data.forEach(function(v) {
       self.list.push({
         'img' : 'images/flags/'+country.byId[Number(v.country)-1].short.toLowerCase()+'.png',
         'name' : v.name,
         'value' : v.lexicon.toUpperCase()+"-"+v.version
       });
     });
-    console.log(this.list);
   },
   redraw: function(d){
     this.data = d;
