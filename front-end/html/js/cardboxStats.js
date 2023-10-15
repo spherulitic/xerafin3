@@ -115,6 +115,7 @@ function displayCardboxDue (response, responseStatus) {
   let dueValue=0;
   createCardboxStatsPanel();
   $('#cardboxUpdateTimeBox').html('...');
+  document.getElementById('cardboxInfoScore').innerHTML = stats.score;
   document.getElementById('cardboxTableBody').innerHTML="";
   let arrayOfCardboxes = Object.keys(stats.totalCards).sort(function(a,b) {
       return parseInt(a) - parseInt(b); });
