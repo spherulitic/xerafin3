@@ -1,6 +1,5 @@
-Flask>=2.0.2
+Flask-SQLAlchemy>=3.1
 pyjwt[crypto]
 bcrypt>=3.2.0
-mysqlclient==2.1.0
-pre-commit
+mysql-connector-python>=8.0
 requests

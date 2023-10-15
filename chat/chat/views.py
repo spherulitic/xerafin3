@@ -10,8 +10,9 @@ import time
 import requests
 import jwt
 from flask import request, jsonify, g
-import xerafinUtil.xerafinUtil as xu
-from chat import app
+from . import app, db
+from . import logger
+from .models import Chat
 
 dictConfig({
     'version': 1,
@@ -49,17 +50,10 @@ def get_user():
   # headers to send to keycloak
   g.headers = {"Accept": "application/json", "Authorization": g.raw_token}
 
-  g.mysqlcon = xu.getMysqlCon()
-  g.con = g.mysqlcon.cursor()
-
   return None
 
 @app.after_request
 def close_mysql(response):
-  ' Close database connection after satisfying the request. '
-  g.mysqlcon.commit()
-  g.con.close()
-  g.mysqlcon.close()
   return response
 
 @app.route("/", methods=['POST'])
@@ -76,27 +70,26 @@ def getChatsInit():
 
   chatFile = os.path.join(CHAT_DIR, f'{g.uuid}.chat')
   open(chatFile, 'w').close()
-  command = """SELECT timeStamp, message, chat.userid
-               FROM chat
-               WHERE timeStamp > %s
-               ORDER BY timeStamp ASC"""
+  queryResult = db.session.scalars(db.select(Chat).where(Chat.timeStamp>now).order_by(Chat.timeStamp.asc()))
+  allResults = [ ]
+  # queryResult closes the result set after first access
+  for row in queryResult:
+    allResults.append(row)
 
-  g.con.execute(command, (now,))
-  queryResult = g.con.fetchall()
   url = 'http://login:5000/getUserNamesAndPhotos'
-  data = { 'userList': [ x[2] for x in queryResult ] } # list of userids
+  data = {'userList': [x.userid for x in allResults] } # list of userids
   response = requests.post(url, headers=g.headers, json=data).json()
 
-  for row in queryResult:
-    myInfo = [x for x in response if x["userid"] == row[2]]
+  for row in allResults:
+    myInfo = [x for x in response if x["userid"] == row.userid]
     if myInfo:
       photo = myInfo[0].get('photo')
       name = myInfo[0].get('name')
     else:
       photo = None
       name = None
-    outRow = {"chatDate": row[0], 'photo': photo, 'name': name, 'chatText': row[1],
-              'chatUser': row[2], 'expire': False}
+    outRow = {"chatDate": row.timeStamp, 'photo': photo, 'name': name, 'chatText': row.message,
+              'chatUser': row.userid, 'expire': False}
     result.append(outRow)
 
   return jsonify([result, 0, time.time() * 1000, error])
@@ -184,16 +177,21 @@ def post(userid, message, **kwargs):
 
   if expire:
     # These lines will tell the front end to delete from display
-    command = "select timeStamp from chat where milestoneType = %s and milestoneOf = %s"
-    g.con.execute(command, [kwargs['milestoneType'], kwargs['milestoneOf']])
-    for row in g.con.fetchall():
-      msg.append(f'0,{row[0]},\n')
-    command = "delete from chat where milestoneType = %s and milestoneOf = %s"
-    g.con.execute(command, [kwargs['milestoneType'], kwargs['milestoneOf']])
+    queryResult = db.session.scalars(db.select(Chat).where(Chat.milestoneType==kwargs['milestoneType'] and
+      Chat.milestoneOf==kwargs['milestoneOf']))
+    for row in queryResult:
+      msg.append(f'0,{row.timeStamp},\n')
+      db.session.delete(row)
+      db.session.commit()
 
-  command = '''insert into chat (userid, timeStamp, message, milestoneType, milestoneOf)
-             values (%s, %s, %s, %s, %s)'''
-  g.con.execute(command, (userid, kwargs['chatTime'], message, kwargs['milestoneType'], kwargs['milestoneOf']))
+  chat = Chat()
+  chat.userid = userid
+  chat.timeStamp = kwargs.get('chatTime')
+  chat.message = message
+  chat.milestoneType = kwargs.get('milestoneType')
+  chat.milestoneOf = kwargs.get('milestoneOf')
+  db.session.add(chat)
+  db.session.commit()
   msg.append(f'{userid},{str(kwargs["chatTime"])},{message}\n')
   result["msg"] = msg
 
