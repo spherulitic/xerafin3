@@ -65,18 +65,18 @@ function getCardboxNumberDropdown(alpha, auxIn) {
         $.ajax({
                 type: "POST",
                 url: "submitQuestion",
+                headers: {"Accept": "application/json", "Authorization": keycloak.token},
                 data: JSON.stringify(d),
                 success: function(response, responseStatus) {
-          gFloatingAlert("cardboxUploadAlert",3000,"Alphagram Info", "Question "+alpha+" updated in cardbox",500);
-                    var aux = response.aux;
-          appendDebugLog("Alphastats Update: "+response.aux);
-          if (typeof response.aux!=='undefined'){
-            var dueDate = new Date(aux.nextScheduled * 1000);
-            $('#alphaStatsDueDate').html(gFormatDateForDisplay(dueDate));
-          }
-          else {
-            $('#alphaStatsDueDate').html('');
-          }
+                  gFloatingAlert("cardboxUploadAlert",3000,"Alphagram Info", "Question "+alpha+" updated in cardbox",500);
+                  var aux = response.aux;
+                  if (typeof aux!=='undefined'){
+                    var dueDate = new Date(aux.aux.nextScheduled * 1000);
+                    $('#alphaStatsDueDate').html(gFormatDateForDisplay(dueDate));
+                  }
+                  else {
+                    $('#alphaStatsDueDate').html('');
+                  }
                 },
                 error: function(jqXHR, textStatus, errorThrown) {
         gFloatingAlert("cardboxUploadAlert",3000,"Alphagram Info", "Error: question " + alpha+ " could not be updated.",500);
