@@ -1,6 +1,5 @@
 services:
   keycloak:
-#    image: jboss/keycloak:latest
     image: x-keycloak:latest
     ports:
      - "8080:8080"
