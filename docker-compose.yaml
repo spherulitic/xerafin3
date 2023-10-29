@@ -1,13 +1,17 @@
 services:
   keycloak:
-    image: jboss/keycloak:latest
+    image: x-keycloak:latest
+    ports:
+     - "8080:8080"
+     - "8443:8443"
     volumes:
-      - /var/opt/keycloak:/opt/jboss/keycloak/standalone/data
+      - /var/opt/keycloak:/opt/keycloak/data/h2
     environment:
-#      KEYCLOAK_USER:
-#      KEYCLOAK_PASSWORD:
-      PROXY_ADDRESS_FORWARDING: "true"
-#      KEYCLOAK_LOGLEVEL: "DEBUG"
+      KC_PROXY_ADDRESS_FORWARDING: "true"
+      KC_PROXY: "edge"
+      KC_LOGLEVEL: "DEBUG"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_RELATIVE_PATH: "/auth"
   frontend:
     image: x-frontend:latest
     ports:
