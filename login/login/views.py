@@ -58,15 +58,30 @@ def close_mysql(response):
 def index():
   return jsonify(["Xerafin Login Service"])
 
+@app.route('/createCardboxPrefs', methods=['POST'])
+def createCardboxPrefs():
+  ''' Create default cardbox prefs for a given user. '''
+  keycloak_admin = getKeycloakAdmin()
+  user = keycloak_admin.get_user(g.uuid)
+  att = user['attributes']
+
+  # params here is an array of prefs we need to create
+  params = request.get_json(force=True)
+  DEFAULT_PREFS = { "closet": 20, "newWordsAtOnce": 4,
+        "reschedHrs": 24, "showNumSolutions": "Y", "cb0max": 200, "schedVersion": 0,
+        "countryId": 0, "lexicon": "csw", "lexiconVersion": 21 }
+  for pref in params:
+    default = DEFAULT_PREFS.get(pref)
+    if default is not None:
+      att[pref] = default
+
+  resp = keycloak_admin.update_user(g.uuid, user)
+  return jsonify(resp)
+
 @app.route('/setCardboxPrefs', methods=['POST'])
 def setCardboxPrefs():
   ''' Take cardbox prefs from the client and update keycloak attributes '''
-  keycloak_admin = KeycloakAdmin(server_url="http://keycloak:8080/auth/",
-                      username=os.environ.get('KEYCLOAK_USER'),
-                      password=os.environ.get('KEYCLOAK_PASSWORD'),
-                      realm_name='Xerafin',
-                      client_id='admin-cli'
-                      )
+  keycloak_admin = getKeycloakAdmin()
   user = keycloak_admin.get_user(g.uuid)
 
   params = request.get_json(force=True)
@@ -104,13 +119,7 @@ def countries():
 def getLoggedInUsers():
   ' Called via AJAX and returns photo URL, name, and last active time of all logged in users '
   result = [ ]
-  keycloak_admin = KeycloakAdmin(server_url="http://keycloak:8080/auth/",
-                      username=os.environ.get('KEYCLOAK_USER'),
-                      password=os.environ.get('KEYCLOAK_PASSWORD'),
-                      realm_name='Xerafin',
-                      client_id='admin-cli'
-                      )
-
+  keycloak_admin = getKeycloakAdmin()
   clientId = keycloak_admin.get_client_id('x-client')
   sessions = keycloak_admin.get_client_all_sessions(clientId)
   sessionList = [{"userId": x["userId"], "lastAccess": x["lastAccess"]} for x in sessions]
@@ -134,12 +143,7 @@ def getUserNamesAndPhotos():
   result = [ ]
   params = request.get_json(force=True) # returns dict
   uuidList = params.get('userList', [ ])
-  keycloak_admin = KeycloakAdmin(server_url="http://keycloak:8080/auth/",
-                      username=os.environ.get('KEYCLOAK_USER'),
-                      password=os.environ.get('KEYCLOAK_PASSWORD'),
-                      realm_name='Xerafin',
-                      client_id='admin-cli'
-                      )
+  keycloak_admin = getKeycloakAdmin()
   for uuid in uuidList:
     userDict = {'userid': uuid}
     if uuid == '0': # System user -- not in keycloak
@@ -272,3 +276,12 @@ def navbarCreateElement(arr, nest):
     line = ""
 
   return line, nest
+
+def getKeycloakAdmin():
+  ''' return a keycloak_admin object to access the keycloak API '''
+  return KeycloakAdmin(server_url="http://keycloak:8080/auth/",
+                      username=os.environ.get('KEYCLOAK_USER'),
+                      password=os.environ.get('KEYCLOAK_PASSWORD'),
+                      realm_name='Xerafin',
+                      client_id='admin-cli'
+                      )

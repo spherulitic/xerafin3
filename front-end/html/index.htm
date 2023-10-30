@@ -32,23 +32,35 @@
     keycloak.init({onLoad: 'login-required', scope: 'roles profile'}).then(async function(authenticated) {
       if (authenticated) {
         $('#adminNote').html('<hr>Login Successful');
+      // Add any missing default attributes
+      var requiredAttributes = ["closet", "newWordsAtOnce", "reschedHrs", "showNumSolutions", "cb0max", "schedVersion", "countryId", "lexicon", "lexiconVersion"];
+      var setAttributes = Object.keys(keycloak.tokenParsed.cardboxPrefs);
+      var missingAttributes = requiredAttributes.filter(item => !setAttributes.includes(item));
+      console.log(missingAttributes);
+      if (missingAttributes.length > 0) {
+        $.ajax({
+          type: "POST",
+          url: "createCardboxPrefs",
+          data: JSON.stringify(missingAttributes),
+          headers: {"Accept": "application/json", "Authorization": keycloak.token},
+          success: function(response, responseStatus) {
+            keycloak.updateToken(-1);
+            console.log(keycloak.tokenParsed.cardboxPrefs);
+          }
+         });
+       }
         userid = -1; // legacy to suppress errors; not used anymore
-        // all the login callback stuff goes here
+
         $.ajax({
           type: "POST",
           url: "getCardboxScore",
           headers: {"Accept": "application/json", "Authorization": keycloak.token},
           success: function(response2, responseStatus2) {
-            console.log("Got Cardbox Score");
-            console.log(response2);
             if (!localStorage.qQScore) {localStorage.qQScore = response2.score;}
             if (!localStorage.qQAlpha) {localStorage.qQAlpha = 0;}
           },
-          error: function(jqXHR, textStatus, errorThrown) {
-            console.error("Error getting cardbox score, status = " + textStatus + " error: " + errorThrown);
-          }
+          error: function(jqXHR, textStatus, errorThrown) { }
         });
-
 
         let preload = new XScripts({'logged':false});
         let x = await preload.get();
@@ -229,7 +241,6 @@ function appendDebugLog(input){
 <!------------------------------------------------------------------------------------------------------------->
   function initCallback() {
     initKeycloak();
-    console.log(keycloak);
   }
 
 
