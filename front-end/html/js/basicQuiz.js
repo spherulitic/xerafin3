@@ -977,7 +977,7 @@ function addToCardboxFromQuiz(word) {
       $.ajax({type: "POST",
               data: JSON.stringify(d),
               headers: {"Accept": "application/json", "Authorization": keycloak.token},
-               url: "addQuestionToCardbox.py",
+               url: "addQuestionToCardbox",
            success: addedToCardboxFromQuiz,
              error:  function(jqXHR, textStatus, errorThrown) {
               console.log("Error adding " + alpha + ", status = " + textStatus + " error: " + errorThrown);

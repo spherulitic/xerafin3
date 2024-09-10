@@ -329,6 +329,25 @@ def shameList():
 #  return jsonify(getCardboxStats())
   return jsonify({"status": "success"})
 
+@app.route('/addQuestionToCardbox', methods=['POST'])
+def addQuestionToCardbox():
+  ''' Add one alphagram to cardbox zero, if it's valid '''
+  params = request.get_json(force=True) #returns dict
+  question = params.get('question', [ ])
+  result = { }
+
+  if len(getAnagrams(question)) > 0: # getAnagrams returns a list of words
+    addWord(question)
+  # this is done to schedule it in the future so it's not immediately due
+    wrong(question)
+    result["question"] = question
+    result["status"] = "success"
+  else:
+    result["status"] = "invalid alphagram"
+
+  return jsonify(result)
+
+
 # Library functions
 
 def getEarliestDueDate():
