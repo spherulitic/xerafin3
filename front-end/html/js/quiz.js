@@ -544,10 +544,10 @@ class Question {
     this.submitErrorTimeout = setTimeout(Question.prototype.submitQuestion.bind(this, correct, cardbox, isCardbox), (Number(code) === 0) ? 1000 : 10000);
   }
   addToCardbox() {
-    let d = { user: userid, question: this.alpha };
+    let d = {question: this.alpha };
     $.ajax({
       headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "addQuestionToCardbox.py",
+      url: "addQuestionToCardbox",
       type: "POST",
       data: JSON.stringify(d),
       success: function(response, responseStatus) { },

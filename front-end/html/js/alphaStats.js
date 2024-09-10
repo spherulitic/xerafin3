@@ -164,10 +164,11 @@ function addToCardboxFromStats(word) {
 
    var alpha = toAlpha(word);
    if (confirm("Click OK to add " + alpha + " to your Cardbox.")) {
-      var d = {user: userid, question: alpha};
+      var d = {question: alpha};
       $.ajax({type: "POST",
               data: JSON.stringify(d),
-               url: "addQuestionToCardbox.py",
+              headers: {"Accept": "application/json", "Authorization": keycloak.token},
+               url: "addQuestionToCardbox",
            success: addedToCardboxFromStats,
              error:  function(jqXHR, textStatus, errorThrown) {
               console.log("Error adding " + alpha + ", status = " + textStatus + " error: " + errorThrown);
@@ -178,7 +179,7 @@ function addToCardboxFromStats(word) {
 function addedToCardboxFromStats(response, responseStatus) {
    if (response[1].status == "success") {
       showAlphaStats(response[0].question);
-   } else if (response[1].status == "Invalid Alphagram") {
+   } else if (response[1].status == "invalid alphagram") {
       gFloatingAlert("cardboxUploadAlert",3000,"Alphagram Info", "Could not add to cardbox: Invalid Alphagram.",500);
    } else {
     gFloatingAlert("cardboxUploadAlert",3000,"Alphagram Info", "Error adding to your Cardbox. Please try again.",500);
