@@ -42,7 +42,7 @@ def createQuizzes():
       with open(f'json/{quiz_id}.json', 'w') as f:
         f.write(json.dumps(quiz_json))
               
-        stmt = f'insert into quiz_master (quiz_id, quiz_name, quiz_size, creator, create_date, expired, quiz_type) values ({quiz_id}, "{quiz_title}", {quiz_size}, {quiz_owner}, CURDATE(), 0, 2)'
+        stmt = f'insert into quiz_master (quiz_id, quiz_name, quiz_size, creator, create_date, expired, quiz_type, length) values ({quiz_id}, "{quiz_title}", {quiz_size}, {quiz_owner}, CURDATE(), 0, 2, {l})'
 
         cur.execute(stmt)    
         con.commit()

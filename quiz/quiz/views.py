@@ -317,9 +317,10 @@ def getQuizList():
     quizidList = [x[0] for x in g.con.fetchall()]
 
   elif searchType == "vowel":
-    stmt = "select quiz_id from quiz_master where quiz_type = %s and length between %s and %s order by length"
-    g.con.execute(stmt, [QUIZ_TYPE_VOWEL, minLength, maxLength])
+    stmt = f"select quiz_id from quiz_master where quiz_type = {QUIZ_TYPE_VOWEL} and length between {minLength} and {maxLength} order by length"
+    g.con.execute(stmt)
     quizidList = [x[0] for x in g.con.fetchall()]
+#    result["foundquiz"] = quizidList
 
   elif searchType == "probability":
     minProb = params.get('minProb')
@@ -340,7 +341,7 @@ def getQuizList():
 
   quizidList = quizidList[:50] # hard limit of 50 results
 
-  for qid in quizidList:
+  for index, qid in enumerate(quizidList):
 
     if qid == -1:
       result[-1] = {"quizid": qid, "quizname": "Cardbox", "quizsize": -1, "untried": -1, "unsolved": -1, "status": "Active"}
@@ -385,7 +386,7 @@ def getQuizList():
       template["bookmarked"] = (g.con.fetchone()[0] == 1)
       template["sub"] = (searchType == "myQuizzes" and qid != -1 and not template["bookmarked"] )
 
-      result[template["quizid"]] = template
+      result[index] = template
 
   return jsonify(result)
 
