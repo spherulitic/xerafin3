@@ -44,7 +44,7 @@ def createProbabilityQuizzes():
         with open(f'json/{quiz_id}.json', 'w') as f:
           f.write(json.dumps(quiz_json))
               
-        stmt = f'insert into quiz_master (quiz_id, quiz_name, quiz_size, creator, create_date, expired, min_prob, max_prob) values ({quiz_id}, "{quiz_title}", {quiz_size}, {quiz_owner}, CURDATE(), 0, {start}, {end})'
+        stmt = f'insert into quiz_master (quiz_id, quiz_name, quiz_size, creator, create_date, expired, quiz_type, min_prob, max_prob) values ({quiz_id}, "{quiz_title}", {quiz_size}, {quiz_owner}, CURDATE(), 0, 7, {start}, {end})'
 
         cur.execute(stmt)    
         quiz_id = quiz_id + 1 
