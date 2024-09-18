@@ -85,6 +85,21 @@ def getAnagrams():
   result = g.words.find(query)
   return jsonify([x["word"] for x in result])
 
+@app.route("/getManyAnagrams", methods=['GET', 'POST'])
+def getManyAnagrams():
+  '''Take in a list of alphagrams and return a dict
+       { alpha: [ word word word ], ... }
+  '''
+  params = request.get_json(force=True)
+  alphas = params.get('alphagrams')
+  result = { }
+  for alpha in alphas:
+    query = {"alphagram": alpha}
+    words = g.words.find(query)
+    result[alpha] = [x["word"] for x in words]
+  return jsonify(result)
+
+    
 @app.route("/getWordInfo", methods=['GET', 'POST'])
 def getWordInfo() :
   '''
