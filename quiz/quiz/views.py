@@ -110,57 +110,46 @@ def getQuestions():
 
     # Note if requestedAlpha is populated, numQuestions is ignored
 
-#    if requestedAlpha:
+    if requestedAlpha:
+      pass # to be implemented later
 #      questions = {requestedAlpha: xerafinLib.getAnagrams(requestedAlpha, userid)}
-#    else:
-#      questions = xerafinLib.getQuestions(numQuestions, userid, cardbox, None, isCardbox, quizid)
-#
-#    # This only happens for non-cardbox quizzes
-#    # Need a flag to let the interface know the quiz is over
-#    # And they're getting fewer questions than requested
-#
-#    if len(questions) != numQuestions:
-#      result["eof"] = True
-#    else:
-#      result["eof"] = False
-#
-#    for alpha in questions.keys():
-#
-#      template = { }
-#      template["alpha"] = alpha
-#      template["answers"] = questions[alpha]
-#      # NB if it's not in cardbox, these fields are missing
-#      auxInfo = xerafinLib.getAuxInfo(alpha, userid)
-#      if auxInfo:
-#        template["correct"] = auxInfo["correct"]
-#        template["incorrect"] = auxInfo["incorrect"]
-#        template["nextScheduled"] = auxInfo["nextScheduled"]
-#        template["cardbox"] = auxInfo["cardbox"]
-#        template["difficulty"] = auxInfo["difficulty"]
-#      template["words"] = { }
-#      if lock:
-#        xerafinLib.checkOut(alpha, userid, True,
-#                    isCardbox or (quizid==-1 and template["cardbox"] is not None), quizid)
-#      for word in template["answers"]:
-#        h = xerafinLib.getHooks(word, userid)
-#        defn = xerafinLib.getDef(word, userid)
-#        innerHooks = xerafinLib.getDots(word, userid)
-#        template["words"][word] = [ h[0], h[3], defn, innerHooks, h[2] ]
-#      result["questions"].append(template)
-#    if isCardbox and xerafinLib.getNextAddedCount(userid) < xerafinLib.getPrefs("newWordsAtOnce", userid):
-#      # localhost here referring to the server in this container
-#      # This is hacky. I don't care about the response to the request --
-#      #                I just want the endpoint to do its thing
-#      # Timeout makes it not block but I have to catch the timeout exception
-#      # prepareNewWords can take several seconds, and I want to make sure
-#      #                I return immediately
-#      try:
-#        requests.post(url="http://localhost:5000/prepareNewWords",
-#                      json={"userid":userid}, timeout=.1)
-#      except requests.exceptions.ReadTimeout:
-#        pass
+    else:
+      questions = getNonCardboxQuestions(numQuestions, quizid)
 
-  return jsonify(result)
+    # Need a flag to let the interface know the quiz is over
+    # And they're getting fewer questions than requested
+
+    if len(questions) != numQuestions:
+      result["eof"] = True
+    else:
+      result["eof"] = False
+
+    for alpha in questions.keys():
+
+      template = { }
+      template["alpha"] = alpha
+      template["answers"] = questions[alpha]
+      url = 'http://cardbox:5000/getAuxInfo'
+      data = {"alpha": alpha}
+      auxInfo = requests.post(url, headers=g.headers, json=data).json()["aux"]
+      template["correct"] = auxInfo.get("correct")
+      template["incorrect"] = auxInfo.get("incorrect")
+      template["nextScheduled"] = auxInfo.get("nextScheduled")
+      template["cardbox"] = auxInfo.get("cardbox")
+      template["difficulty"] = auxInfo.get("difficulty")
+      template["words"] = { }
+      if lock:
+        checkOut(alpha, quizid, lock)
+      lex_service = 'http://lexicon:5000'
+      for word in template["answers"]:
+        word_json = {"word": word}
+        word_info = requests.post(f'{lex_service}/getWordInfo', headers=g.headers, json=word_json).json() 
+        inner_hooks = requests.post(f'{lex_service}/getDots', headers=g.headers, json=word_json).json() 
+     # [ front hooks, back hooks, definition, [inner hooks], lexicon symbols ] 
+        template["words"][word] = [ word_info["front_hooks"], word_info["back_hooks"], word_info["definition"], inner_hooks, word_info.get("lexicon_symbols") ]
+      result["questions"].append(template)
+
+    return jsonify(result)
 
 @app.route('/submitQuestion', methods=["GET", "POST"])
 def submitQuestion():
@@ -570,3 +559,26 @@ def generateQuiz(**kwargs):
   filename = os.path.join('/app/quizjson', f'{quizid}.json')
   with open(filename, 'w') as f:
     f.write(json.dumps(quizJSON))
+
+def getNonCardboxQuestions (numNeeded, quizid) : # pylint: disable=unused-argument
+  """
+  Returns a dict with a quiz of numNeeded questions in the format
+    { "Alphagram" -> [ Word, Word, Word ] }
+  Note questionLength is currently unused but is reserved for future functionality
+  """
+  # pylint: disable=too-many-arguments,too-many-locals
+  quiz = {}
+  allQuestions = []
+  getCardsQry = ("select alphagram from quiz_user_detail " +
+    "where quiz_id = %s and user_id = %s and locked = 0 and completed = 0 limit %s")
+  g.con.execute(getCardsQry, (quizid, g.uuid, numNeeded))
+  allQuestions = [x[0] for x in g.con.fetchall()]
+  url = 'http://lexicon:5000/getManyAnagrams'
+  data = {"alphagrams": allQuestions}
+  quiz = requests.post(url, headers=g.headers, json=data).json()
+  return quiz
+
+def checkOut (alpha, quizid, lock):
+  g.con.execute(f'''update quiz_user_detail set locked = {int(lock)} 
+                    where quiz_id = {quizid} and user_id = "{g.uuid}"
+                    and alphagram = "{alpha}"''')

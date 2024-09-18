@@ -110,8 +110,6 @@ def correct():
       f"next_scheduled = {getNext(cardbox)}, " +
       f"correct=correct+1, streak=streak+1, last_correct = {now}, difficulty=4 " +
       f"where question = '{alpha}'")
-    xu.debug("Updated the cardbox")
-    xu.debug(f'{g.cur.rowcount} rows updated')
   result["auxInfo"] = getAuxInfo(alpha)
   result["score"] = getCardboxScore()
   return jsonify(result)
@@ -181,7 +179,7 @@ def getQuestions():
       innerHooks = requests.post(f'{lexService}/getDots', headers=g.headers, json=wordJSON).json()
 #     [ front hooks, back hooks, definition, [innerHooks], lexicon symbols ]
       template["words"][word] = [ wordInfo["front_hooks"], wordInfo["back_hooks"],
-                      wordInfo["definition"], innerHooks, ""]
+                      wordInfo["definition"], innerHooks, wordInfo.get("lexicon_symbols")]
     result["questions"].append(template)
 
   return jsonify(result)
