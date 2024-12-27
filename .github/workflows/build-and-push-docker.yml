@@ -1,11 +1,11 @@
 name: Build and Push Docker Images
 
-#on:
-#  push:
-#    branches:
-#      - main
 on:
-  workflow_dispatch: # Allows manual triggering
+  push:
+    branches:
+      - main
+#on:
+#  workflow_dispatch: # Allows manual triggering
 
 jobs:
   build-and-push:
