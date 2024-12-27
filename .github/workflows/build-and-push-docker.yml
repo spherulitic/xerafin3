@@ -22,7 +22,7 @@ jobs:
 
       - name: Build and Push Services
         run: |
-          for dir in cardbox chat front-end lexicon-db lexicon login; do
+          for dir in cardbox chat cron front-end lexicon login quiz stats keycloak; do
             docker build -t spherulitic/xerafin/$dir:latest $dir
             docker push spherulitic/xerafin/$dir:latest
           done
