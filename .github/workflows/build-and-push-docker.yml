@@ -23,6 +23,6 @@ jobs:
       - name: Build and Push Services
         run: |
           for dir in cardbox chat cron front-end lexicon login quiz stats keycloak; do
-            docker build -t spherulitic/xerafin/$dir:latest $dir
-            docker push spherulitic/xerafin/$dir:latest
+            docker build -t spherulitic/$dir:latest $dir
+            docker push spherulitic/$dir:latest
           done
