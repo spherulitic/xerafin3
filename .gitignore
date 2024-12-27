@@ -2,7 +2,7 @@
 front-end/html/images
 front-end/html/vendor
 front-end/localhost*
-lexicon-db/*.js
+lexicon-db
 lex_upd/prob
 lex_upd/json
 .env

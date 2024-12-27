@@ -77,11 +77,13 @@ services:
     depends_on:
       - keycloak
   lexicon-db:
-    image: lexicon-db:latest
+    image: mongo:latest
     environment:
       - MONGO_INITDB_ROOT_USERNAME
       - MONGO_INITDB_ROOT_PASSWORD
       - MONGO_INITDB_DATABASE
+    volumes:
+      - lexicon-data:/docker-entrypoint-initdb.d
   chat:
     image: x-chat:latest
     environment:
@@ -108,4 +110,6 @@ volumes:
   quizjson:
     external: true
   awards:
+    external: true
+  lexicon-data:
     external: true
