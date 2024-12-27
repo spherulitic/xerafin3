@@ -22,7 +22,20 @@ jobs:
 
       - name: Build and Push Services
         run: |
-          for dir in cardbox chat cron front-end lexicon login quiz stats keycloak; do
-            docker build -t spherulitic/$dir:latest $dir
-            docker push spherulitic/$dir:latest
+          declare -A dir_to_image
+          dir_to_image=(
+            ["chat"]="x-chat"
+            ["keycloak"]="x-keycloak"
+            ["cron"]="x-cron"
+            ["front-end"]="x-frontend"
+            ["lexicon"]="x-lexicon"
+            ["login"]="x-login"
+            ["quiz"]="x-quiz"
+            ["stats"]="x-stats"
+            ["cardbox"]="x-cardbox"
+          )
+          for dir in "${!dir_to_image[@]}"; do
+            image_name="${dir_to_image[$dir]}"
+            docker build --pull -t spherulitic/$image_name:latest $dir
+            docker push spherulitic/$image_name:latest
           done
