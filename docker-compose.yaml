@@ -6,12 +6,20 @@ services:
      - "8443:8443"
     volumes:
       - /var/opt/keycloak:/opt/keycloak/data/h2
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      KC_PROXY_ADDRESS_FORWARDING: "true"
-      KC_PROXY: "edge"
-      KC_LOGLEVEL: "DEBUG"
-      KC_HOSTNAME_STRICT: "false"
-      KC_HTTP_RELATIVE_PATH: "/auth"
+      - KC_PROXY_ADDRESS_FORWARDING
+      - KC_PROXY
+      - KC_LOGLEVEL
+      - KC_HOSTNAME_STRICT
+      - KC_HTTP_RELATIVE_PATH
+      - KC_DB
+      - KC_DB_URL
+      - KC_DB_USERNAME
+      - KC_DB_PASSWORD
+      - KEYCLOAK_ADMIN
+      - KEYCLOAK_ADMIN_PASSWORD
   frontend:
     image: x-frontend:latest
     ports:
