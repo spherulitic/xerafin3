@@ -6,7 +6,7 @@ ENV KC_METRICS_ENABLED=false
 
 # Configure a database vendor
 # Default is H2
-#ENV KC_DB=mysql
+ENV KC_DB=mysql
 
 WORKDIR /opt/keycloak
 # for demonstration purposes only, please make sure to use proper certificates in production instead
