@@ -1,4 +1,4 @@
-FROM quay.io/keycloak/keycloak:latest as builder
+FROM quay.io/keycloak/keycloak:latest AS builder
 
 # Health and metrics support off for now
 ENV KC_HEALTH_ENABLED=false

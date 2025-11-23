@@ -6,7 +6,7 @@
   <title>Xerafin Word Study System</title>
   <link rel="icon" type="image/png" href="images/xerafin2.png">
   <link rel="apple-touch-icon" href="apple-icon-144x144.png">
-  <script src="http://localhost/auth/js/keycloak.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/keycloak-js@latest/dist/keycloak.js"></script>
   <script src="vendor/jQuery/jquery-3.3.1.min.js"></script>
   <script src="https://ajax.googleapis.com/ajax/libs/jqueryui/1.12.1/jquery-ui.min.js"></script>
   <script async src="https://cdnjs.cloudflare.com/ajax/libs/jqueryui-touch-punch/0.2.3/jquery.ui.touch-punch.min.js"></script>
@@ -25,11 +25,20 @@
   <link href="styles/prefs.css?v=1" rel="stylesheet" type="text/css" />
   <link href="styles/overview.css?v=1" rel="stylesheet" type="text/css" />
   <script src="js/proto.js"></script>
+
 <script>
    function initKeycloak() {
-    keycloak = new Keycloak();
-    try {
-    keycloak.init({onLoad: 'login-required', scope: 'roles profile'}).then(async function(authenticated) {
+  try {
+    const keycloak = new Keycloak({
+        url: 'http://auth.localhost/',
+        realm: 'Xerafin',
+        clientId: 'x-client'
+    });
+
+    keycloak.init({onLoad: 'login-required',
+                   pkceMethod: 'S256',
+                   checkLoginIframe:false}).then(async function(authenticated) {
+
       if (authenticated) {
         $('#adminNote').html('<hr>Login Successful');
       // Add any missing default attributes
@@ -78,7 +87,17 @@
         console.log("finished authentication callback");
       } else { console.log("Not Authenticated"); }
 
-      }) } catch(error) {console.error(error)};
+      }).catch(function(error) {console.error('KEYCLOAK INIT FAILED:', error);
+                                console.error('Error Details: ', error.message, error.stack);
+});
+
+} catch(error) {
+
+        console.error('=== TOP LEVEL CATCH ===');
+        console.error('Error:', error);
+        console.error('Error message:', error.message);
+        console.error('Error stack:', error.stack);
+}
    }
   </script>
   <script>
