@@ -58,17 +58,6 @@
                         console.log("Updated token with cardboxPrefs: ", keycloak.tokenParsed.cardboxPrefs);
         })
         .catch(error => console.error("Error: ", error));
-
-//        $.ajax({
-//          type: "POST",
-//          url: "createCardboxPrefs",
-//          data: JSON.stringify(missingAttributes),
-//          headers: {"Accept": "application/json", "Authorization": keycloak.token},
-//          success: function(response, responseStatus) {
-//            keycloak.updateToken(-1);
-//            console.log("Updated token with cardboxPrefs: ", keycloak.tokenParsed.cardboxPrefs);
-//          }
-//         });
        } // end if cardbox prefs are missing
         userid = -1; // legacy to suppress errors; not used anymore
 
