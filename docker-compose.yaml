@@ -13,7 +13,8 @@ services:
       - KC_PROXY
       - KC_LOGLEVEL
       - KC_HOSTNAME_STRICT
-      - KC_HTTP_RELATIVE_PATH
+      - KC_HOSTNAME_STRICT_HTTPS
+      - KC_HTTP_ENABLED
       - KC_DB
       - KC_DB_URL
       - KC_DB_USERNAME
