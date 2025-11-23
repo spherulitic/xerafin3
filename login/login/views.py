@@ -38,7 +38,6 @@ def get_user():
   g.raw_token = request.headers["Authorization"]
   g.auth_token = jwt.decode(g.raw_token, public_key, audience="x-client", algorithms=['RS256'])
   g.uuid = g.auth_token["sub"]
-  xu.debug(f'UUID from token is {g.uuid}')
 
   # headers to send to keycloak
   g.headers = {"Accept": "application/json", "Authorization": g.raw_token}
