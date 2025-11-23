@@ -30,7 +30,7 @@ dictConfig({
 
 @app.before_request
 def getUser():
-  public_key_url = 'http://keycloak:8080/auth/realms/Xerafin'
+  public_key_url = 'http://keycloak:8080/realms/Xerafin'
   with urllib.request.urlopen(public_key_url) as r:
     public_key = json.loads(r.read())['public_key']
     public_key = f'''-----BEGIN PUBLIC KEY-----
@@ -99,7 +99,7 @@ def getManyAnagrams():
     result[alpha] = [x["word"] for x in words]
   return jsonify(result)
 
-    
+
 @app.route("/getWordInfo", methods=['GET', 'POST'])
 def getWordInfo() :
   '''
