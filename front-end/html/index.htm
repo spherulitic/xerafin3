@@ -29,7 +29,7 @@
 <script>
    function initKeycloak() {
   try {
-    const keycloak = new Keycloak({
+    window.keycloak = new Keycloak({
         url: 'http://auth.localhost/',
         realm: 'Xerafin',
         clientId: 'x-client'
@@ -43,21 +43,22 @@
         $('#adminNote').html('<hr>Login Successful');
       // Add any missing default attributes
       var requiredAttributes = ["closet", "newWordsAtOnce", "reschedHrs", "showNumSolutions", "cb0max", "schedVersion", "countryId", "lexicon", "lexiconVersion"];
-      var setAttributes = Object.keys(keycloak.tokenParsed.cardboxPrefs);
+      var cardboxPrefs = keycloak.tokenParsed.cardboxPrefs;
+      var setAttributes = cardboxPrefs ? Object.keys(cardboxPrefs) : [ ] ;
       var missingAttributes = requiredAttributes.filter(item => !setAttributes.includes(item));
-      console.log(missingAttributes);
-      if (missingAttributes.length > 0) {
-        $.ajax({
-          type: "POST",
-          url: "createCardboxPrefs",
-          data: JSON.stringify(missingAttributes),
-          headers: {"Accept": "application/json", "Authorization": keycloak.token},
-          success: function(response, responseStatus) {
-            keycloak.updateToken(-1);
-            console.log(keycloak.tokenParsed.cardboxPrefs);
-          }
-         });
-       }
+      console.log("Missing attributes: ", missingAttributes);
+      if (!cardboxPrefs || missingAttributes.length > 0) {
+        fetch('createCardboxPrefs', {
+          method: "POST",
+          headers: {"Content-Type": "application/json", "Authorization": keycloak.token},
+          body: JSON.stringify(missingAttributes)
+        })
+        .then(response => response.json())
+        .then(data => { keycloak.updateToken(-1);
+                        console.log("Updated token with cardboxPrefs: ", keycloak.tokenParsed.cardboxPrefs);
+        })
+        .catch(error => console.error("Error: ", error));
+       } // end if cardbox prefs are missing
         userid = -1; // legacy to suppress errors; not used anymore
 
         $.ajax({

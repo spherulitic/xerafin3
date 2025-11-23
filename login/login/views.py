@@ -29,7 +29,7 @@ dictConfig({
 
 @app.before_request
 def get_user():
-  public_key_url = 'http://keycloak:8080/auth/realms/Xerafin'
+  public_key_url = 'http://keycloak:8080/realms/Xerafin'
   with urllib.request.urlopen(public_key_url) as r:
     public_key = json.loads(r.read())['public_key']
     public_key = f'''-----BEGIN PUBLIC KEY-----
@@ -63,7 +63,9 @@ def createCardboxPrefs():
   ''' Create default cardbox prefs for a given user. '''
   keycloak_admin = getKeycloakAdmin()
   user = keycloak_admin.get_user(g.uuid)
-  att = user['attributes']
+  # if user['attributes'] doesn't exist we need to set it to the reference att
+  att = user.get('attributes', { })
+  user['attributes'] = att
 
   # params here is an array of prefs we need to create
   params = request.get_json(force=True)
@@ -279,9 +281,9 @@ def navbarCreateElement(arr, nest):
 
 def getKeycloakAdmin():
   ''' return a keycloak_admin object to access the keycloak API '''
-  return KeycloakAdmin(server_url="http://keycloak:8080/auth/",
-                      username=os.environ.get('KEYCLOAK_USER'),
-                      password=os.environ.get('KEYCLOAK_PASSWORD'),
+  return KeycloakAdmin(server_url="http://keycloak:8080/",
                       realm_name='Xerafin',
-                      client_id='admin-cli'
+                      client_id=os.environ.get('KEYCLOAK_USER'),
+                      client_secret_key=os.environ.get('KEYCLOAK_PASSWORD'),
+                      verify=False
                       )

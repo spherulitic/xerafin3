@@ -29,7 +29,7 @@ QUIZJSON_PATH = "/app/quizjson"
 
 @app.before_request
 def get_user():
-  public_key_url = 'http://keycloak:8080/auth/realms/Xerafin'
+  public_key_url = 'http://keycloak:8080/realms/Xerafin'
   with urllib.request.urlopen(public_key_url) as r:
     public_key = json.loads(r.read())['public_key']
     public_key = f'''-----BEGIN PUBLIC KEY-----
@@ -143,9 +143,9 @@ def getQuestions():
       lex_service = 'http://lexicon:5000'
       for word in template["answers"]:
         word_json = {"word": word}
-        word_info = requests.post(f'{lex_service}/getWordInfo', headers=g.headers, json=word_json).json() 
-        inner_hooks = requests.post(f'{lex_service}/getDots', headers=g.headers, json=word_json).json() 
-     # [ front hooks, back hooks, definition, [inner hooks], lexicon symbols ] 
+        word_info = requests.post(f'{lex_service}/getWordInfo', headers=g.headers, json=word_json).json()
+        inner_hooks = requests.post(f'{lex_service}/getDots', headers=g.headers, json=word_json).json()
+     # [ front hooks, back hooks, definition, [inner hooks], lexicon symbols ]
         template["words"][word] = [ word_info["front_hooks"], word_info["back_hooks"], word_info["definition"], inner_hooks, word_info.get("lexicon_symbols") ]
       result["questions"].append(template)
 
@@ -579,6 +579,6 @@ def getNonCardboxQuestions (numNeeded, quizid) : # pylint: disable=unused-argume
   return quiz
 
 def checkOut (alpha, quizid, lock):
-  g.con.execute(f'''update quiz_user_detail set locked = {int(lock)} 
+  g.con.execute(f'''update quiz_user_detail set locked = {int(lock)}
                     where quiz_id = {quizid} and user_id = "{g.uuid}"
                     and alphagram = "{alpha}"''')

@@ -37,7 +37,7 @@ def get_user():
   ''' Validate the user token signature. Put the requestor uuid in a global.
       Open a MySQL connection as a global for the session.
   '''
-  public_key_url = 'http://keycloak:8080/auth/realms/Xerafin'
+  public_key_url = 'http://keycloak:8080/realms/Xerafin'
   with urllib.request.urlopen(public_key_url) as r:
     public_key = json.loads(r.read())['public_key']
     public_key = f'''-----BEGIN PUBLIC KEY-----
