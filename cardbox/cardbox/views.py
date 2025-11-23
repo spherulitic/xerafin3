@@ -289,12 +289,18 @@ def uploadCardbox():
   file = request.files.get('cardbox')
   filename = getTempFile()
   file.save(filename)
-  if checkCardboxDatabase(filename):
+  if checkCardboxDatabase():
     shutil.move(filename, getDBFile())
     result = {"status": "success"}
   else:
     result = {"status": "Invalid Cardbox"}
 
+  return jsonify(result)
+
+@app.route('/initCardbox', methods=['GET', 'POST'])
+def initCardbox():
+  ''' runs checkCardboxDatabase on user login to ensure we have one '''
+  result = {"status": checkCardboxDatabase()}
   return jsonify(result)
 
 @app.route('/downloadCardbox', methods=['GET', 'POST'])
@@ -357,13 +363,17 @@ def getEarliestDueDate():
       "where next_scheduled is not null and next_Scheduled > 0 and difficulty != 4")
   g.cur.execute(command)
   mns = g.cur.fetchone()[0]
-  if mns > now:
-    command = "select * from cleared_until"
-    g.cur.execute(command)
-    result = g.cur.fetchone()[0]
-  else:
-    result = mns
+  try:
+    if mns > now:
+      command = "select * from cleared_until"
+      g.cur.execute(command)
+      result = g.cur.fetchone()[0]
+    else:
+      result = mns
+  except TypeError: # questions is empty, mns is None
+    result = now
   return result
+
 
 def getCardboxScore():
 
@@ -736,39 +746,40 @@ def getTempFile():
   filename = os.path.join(sys.path[0], "temp-data", f'{g.uuid}.db')
   return filename
 
-def checkCardboxDatabase (filename):
+def checkCardboxDatabase ():
   ''' Does this database have a questions table? If not return false. If so, return true.
         If other aux tables are missing, create them. This could be a Zyzzyva cardbox uploaded '''
   now = int(time.time())
   try:
-    with lite.connect(filename) as con:
-      cur = con.cursor()
-      cur.execute("select name from sqlite_master where type='table'")
-      tables = [x[0] for x in cur.fetchall()]
+      g.cur.execute("select name from sqlite_master where type='table'")
+      tables = [x[0] for x in g.cur.fetchall()]
       if 'questions' not in tables:
-        return False
+        g.cur.execute(''' create table questions (question varchar(16), correct integer, incorrect integer,
+                        streak integer, last_correct integer, difficulty integer,
+                        cardbox integer, next_scheduled integer)''')
+#        return False
       ### For reference:
       ###  create table questions (question varchar(16), correct integer, incorrect integer,
       ###                          streak integer, last_correct integer, difficulty integer,
       ###                          cardbox integer, next_scheduled integer)")
       if 'cleared_until' not in tables:
-        cur.execute("create table cleared_until (timeStamp integer)")
+        g.cur.execute("create table cleared_until (timeStamp integer)")
       if 'new_words_at' not in tables:
-        cur.execute("create table new_words_at (timeStamp integer)")
+        g.cur.execute("create table new_words_at (timeStamp integer)")
       if 'next_Added' not in tables:
-        cur.execute("create table next_Added (question varchar(16), timeStamp integer)")
-      cur.execute("create unique index if not exists question_index on questions(question)")
-      cur.execute("create unique index if not exists next_added_question_idx on next_added(question)")
+        g.cur.execute("create table next_Added (question varchar(16), timeStamp integer)")
+      g.cur.execute("create unique index if not exists question_index on questions(question)")
+      g.cur.execute("create unique index if not exists next_added_question_idx on next_added(question)")
 
-      cur.execute("select * from cleared_until")
-      row = cur.fetchone()
+      g.cur.execute("select * from cleared_until")
+      row = g.cur.fetchone()
       if row is None:
-        cur.execute("insert into cleared_until values (?)", (now,))
+        g.cur.execute("insert into cleared_until values (?)", (now,))
 
-      cur.execute("select * from new_words_at")
-      row = cur.fetchone()
+      g.cur.execute("select * from new_words_at")
+      row = g.cur.fetchone()
       if row is None:
-        cur.execute("insert into new_words_at values (?)", (now+1,))
+        g.cur.execute("insert into new_words_at values (?)", (now+1,))
 
   except:
     return False

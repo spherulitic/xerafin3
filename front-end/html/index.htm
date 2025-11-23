@@ -61,16 +61,26 @@
        } // end if cardbox prefs are missing
         userid = -1; // legacy to suppress errors; not used anymore
 
-        $.ajax({
-          type: "POST",
-          url: "getCardboxScore",
-          headers: {"Accept": "application/json", "Authorization": keycloak.token},
-          success: function(response2, responseStatus2) {
+        (async function() {
+          try {
+                // init the cardbox if it doesn't exist
+		await fetch('initCardbox', {
+		   method: 'POST',
+		   headers: { 'Accept': 'application/json',
+		              'Authorization': keycloak.token }
+                });
+		const scoreResponse = await fetch('getCardboxScore', {
+		         method: 'POST',
+			 headers: { 'Accept': 'application/json',
+			            'Authorization': keycloak.token
+				  }
+		 	});
+		const response2 = await scoreResponse.json();
+
             if (!localStorage.qQScore) {localStorage.qQScore = response2.score;}
             if (!localStorage.qQAlpha) {localStorage.qQAlpha = 0;}
-          },
-          error: function(jqXHR, textStatus, errorThrown) { }
-        });
+          } catch (error) { console.error('Error: ', error);}
+	  })();
 
         let preload = new XScripts({'logged':false});
         let x = await preload.get();
