@@ -469,8 +469,14 @@ def newQuiz():
 
   # send back cardbox info always
   url = 'http://cardbox:5000/getCardboxScore'
-  cbxResponse = requests.get(url, headers=g.headers).json()
-  cbxScore = cbxResponse.get("score", 0)
+  try:
+
+    response = requests.get(url, headers=g.headers)
+    response.raise_for_status() # Raise exception if we get 4xx/5xx response
+    cbxResponse = response.json()
+    cbxScore = cbxResponse.get("score", 0)
+  except (requests.RequestException, ValueError):
+    cbxScore = 0 # if there's an error just return 0; not important
 
   url = 'http://stats:5000/getUserStatsToday'
   statsResponse = requests.get(url, headers=g.headers).json()
