@@ -261,7 +261,6 @@ class Quiz {
   createQuestion(d) {
   // { alpha, answers: [word, word], correct, incorrect, nextScheduled,
   //   cardbox, difficulty, words: { WORD: [ info ], WORD: [ info ] etc } }
-    //console.log("Creating Question " + d.alpha);
     this.questions.push(new Question(d, this.submitStrict, this.quizid));
     this.questionsLoaded++;
   }
@@ -276,8 +275,6 @@ class Quiz {
 
    closeAnswered() {
      var finished = this.questions.filter(question => question.submitted);
-//     console.log("Quiz Refresh Questions: closing");
-//     console.log(finished);
      for(var x=0;x<finished.length;x++)
         this.closeQuestion(finished[x].alpha);
    }
@@ -361,7 +358,6 @@ class Question {
     this.submitStrict = submitStrict;
     this.quizid = quizid;
     this.hasHTTPError = false;
-//console.log(this);
   }
 
   submitAnswer(answer) {
@@ -465,84 +461,112 @@ class Question {
     }
   }
 
-  submitQuestion(correct, cardbox, isCardbox) {
+  async submitQuestion(correct, cardbox, isCardbox) {
     // if there wasn't a success when data was sent, then the previous submission doesn't count.
     if (this.hasHTTPError){this.submitted = false;}
     if (isNaN(cardbox)){cardbox = -1;}
-    if (this.submitErrorTimeout!=='undefined'){clearTimeout(this.submitErrorTimeout);}
+    if (this.submitErrorTimeout){clearTimeout(this.submitErrorTimeout);}
     this.readyToSubmit = false;
     this.complete = correct;
     let d = {
       question: this.alpha,
       correct: correct,
       cardbox: cardbox, // current cardbox
-      quizid: (isCardbox ? -1 : this.quizid),
-      incrementQ: (this.firstSubmit && !this.submitted)
+      quizid: isCardbox ? -1 : this.quizid,
+      incrementQ: this.firstSubmit && !this.submitted
     };
-    //this was moved from the top of the function and incrementQ gained new condition to stop double increments.
-    this.submitted = true;
-    let self = this;
-    // refresh token if it's in its last 30 seconds of validity.
-    // "refreshed" is a boolean indicating if the token was actually refreshed
-    keycloak.updateToken(30).then(function(refreshed) {
-    $.ajax({
-      type: "POST",
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "submitQuestion",
-      data: JSON.stringify(d),
-      success: function(response, responseStatus) {
-        self.hasHTTPError = false;
-        if (self.firstSubmit){
-          self.onFirstSubmit(response.qAnswered, correct);
-        }
-        else {
-          switch (true){
-            case (!self.lastSubmit && correct): //if wrong last time and correct this time
-              localStorage.qQCorrect = Number(localStorage.qQCorrect) + 1;
-              if (typeof (self.origCardbox)!=='undefined') {localStorage.qQAlpha = Number(localStorage.qQAlpha) + Number(self.origCardbox) + 1;}
-              break;
-            case (self.lastSubmit && !correct): //if correct last time and wrong this time.
-              localStorage.qQCorrect = Number(localStorage.qQCorrect) -1;
-              if (typeof (self.origCardbox)!=='undefined') {localStorage.qQAlpha = Number(localStorage.qQAlpha) - Number(self.origCardbox) -1;}
-              break;
-          }
-        }
-        if ($('#pan_5').length!==0){showAlphaStats(self.alpha);}
-        self.firstSubmit = false;
-        self.lastSubmit = correct;
-        if (typeof response.aux!=='undefined'){
-          let c = response.aux.aux;
-          self.nextScheduled = (((c.nextScheduled !==null) && (typeof c.nextScheduled !=='undefined')) ? c.nextScheduled : -1);
-          self.cardbox = (((c.cardbox !==null) && (typeof c.cardbox !=='undefined')) ? c.cardbox : -1);
-        }
-        else {
-          self.nextScheduled = -1;
-          self.cardbox = -1;
-        }
-        if (typeof overview.data.activeList!=='undefined'){
-          if (isCardbox) {
-            overview.fetchCardboxSummary();
-          }
-          else {
-            overview.updateOverview();
-          }
-        }
-        gUpdateCardboxScores(response);
-        self.readyToSubmit = true;
-/*-----------------------------------------------------------------------*/
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        self.retrySubmit(jqXHR.status, correct, cardbox, isCardbox);
-      }
-    }); // end ajax call
-   }).catch(function() { console.log("Failed to refresh token."); }); // end token refresh promise
-  } // end submitQuestion function
 
-  retrySubmit(code, correct, cardbox, isCardbox){
+    this.submitted = true;
+
+    try {
+    // refresh token if it's in its last 30 seconds of validity.
+    await keycloak.updateToken(30);
+
+    const response = await fetch('submitQuestion', {
+      method: 'POST',
+      headers: {"Accept": "application/json",
+                "Authorization": keycloak.token,
+                "Content-Type": 'application/json'},
+      body: JSON.stringify(d) });
+
+    if (!response.ok) { throw new Error('HTTP ${response.status}'); }
+
+    const result = await response.json()
+
+    // Process success
+    this.hasHTTPError = false;
+    this.processSubmissionResult(result, correct, isCardbox);
+
+    } catch (error) {
+      console.error("Submit question failed: ", error);
+      this.retrySubmit(error.message.includes('HTTP') ? error.message.split(' ')[1] : 0, correct, cardbox, isCardbox);
+      }
+   }
+
+processSubmissionResult(response, correct, isCardbox) {
+    if (this.firstSubmit) {
+        this.onFirstSubmit(response.qAnswered, correct);
+    } else {
+        this.updateLocalStorage(correct);
+    }
+
+    if ($('#pan_5').length !== 0) {
+        showAlphaStats(this.alpha);
+    }
+
+    this.firstSubmit = false;
+    this.lastSubmit = correct;
+
+    // Handle response data
+    const auxData = response.aux?.aux || {};
+    this.nextScheduled = auxData.nextScheduled ?? -1;
+    this.cardbox = auxData.cardbox ?? -1;
+
+    // Update overview if needed
+    if (overview.data.activeList) {
+        if (isCardbox) {
+            overview.fetchCardboxSummary();
+        } else {
+            overview.updateOverview();
+        }
+    }
+
+    gUpdateCardboxScores(response);
+    this.readyToSubmit = true;
+}
+
+updateLocalStorage(correct) {
+    const qQCorrect = Number(localStorage.qQCorrect || 0);
+    const qQAlpha = Number(localStorage.qQAlpha || 0);
+    const origCardbox = Number(this.origCardbox || 0);
+
+    if (!this.lastSubmit && correct) {
+        // Wrong last time, correct this time
+        localStorage.qQCorrect = qQCorrect + 1;
+        if (this.origCardbox !== undefined) {
+            localStorage.qQAlpha = qQAlpha + origCardbox + 1;
+        }
+    } else if (this.lastSubmit && !correct) {
+        // Correct last time, wrong this time
+        localStorage.qQCorrect = qQCorrect - 1;
+        if (this.origCardbox !== undefined) {
+            localStorage.qQAlpha = qQAlpha - origCardbox - 1;
+        }
+    }
+}
+
+retrySubmit(code, correct, cardbox, isCardbox) {
     this.hasHTTPError = true;
-    appendDebugLog("Question Submit -> Http Error Code: "+code);
-    this.submitErrorTimeout = setTimeout(Question.prototype.submitQuestion.bind(this, correct, cardbox, isCardbox), (Number(code) === 0) ? 1000 : 10000);
-  }
+    appendDebugLog(`Question Submit -> Http Error Code: ${code}`);
+
+    const delay = Number(code) === 0 ? 1000 : 10000;
+    this.submitErrorTimeout = setTimeout(
+        () => this.submitQuestion(correct, cardbox, isCardbox),
+        delay
+    );
+}
+
+
   addToCardbox() {
     let d = {question: this.alpha };
     $.ajax({
