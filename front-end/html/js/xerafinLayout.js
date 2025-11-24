@@ -69,15 +69,15 @@ function gGenerateListBox (ident, content, pare, classes){
 
 function gUpdateCardboxScores(data, attempts){
 	if (typeof attempts=='undefined'){attempts=0;}
-	localStorage.qCardboxStartScore = data.startScore;
-	localStorage.qCardboxScore = data.score;
-	localStorage.qCardboxQAnswered = data.qAnswered;
-	var movement = Number(data.score)-Number(data.startScore);
+	if (typeof data.startScore!='undefined') {localStorage.qCardboxStartScore = data.startScore;}
+	if (typeof data.score!='undefined') {localStorage.qCardboxScore = data.score;}
+	if (typeof data.qAnswered!='undefined') {localStorage.qCardboxQAnswered = data.qAnswered;}
+	var movement = Number(localStorage.qCardboxScore)-Number(localStorage.qCardboxStartScore);
 	localStorage.qCardboxDiff = String(movement > 0 ? "+" : "")+String(movement);
 	if ($('#cardboxScoreInfo').length!==0){
 		$('#cardboxInfoDiff').html(localStorage.qCardboxDiff);
-		$('#cardboxInfoQToday').html(Number(data.qAnswered));
-		$('#cardboxInfoScore').html(Number(data.score));
+		$('#cardboxInfoQToday').html(Number(localStorage.qCardboxQAnswered));
+		$('#cardboxInfoScore').html(Number(localStorage.qCardboxScore));
 	}
 	else {
 		if (attempts<3){setTimeout(function(){gUpdateCardboxScores(data,(attempts+1));},1000);}
