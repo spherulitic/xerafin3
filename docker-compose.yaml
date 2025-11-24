@@ -87,12 +87,12 @@ services:
       - keycloak
   lexicon-db:
     image: mongo:latest
+    volumes:
+      - lexicon_data:/data/db
     environment:
       - MONGO_INITDB_ROOT_USERNAME
       - MONGO_INITDB_ROOT_PASSWORD
       - MONGO_INITDB_DATABASE
-    volumes:
-      - lexicon-data:/docker-entrypoint-initdb.d
   chat:
     image: x-chat:latest
     environment:
@@ -111,6 +111,19 @@ services:
     environment:
       - CRON_KUSER
       - CRON_KPASS
+  lexicon-loader:
+    build: ./lexicon-loader
+    environment:
+      - MONGO_URL
+      - MONGO_INITDB_ROOT_USERNAME
+      - MONGO_INITDB_ROOT_PASSWORD
+      - MONGO_INITDB_DATABASE
+    volumes:
+      - ./word-data:/data
+    profiles: ["data-load"]
+    depends_on:
+      - lexicon-db
+    restart: "no" # do not restart after completion
 volumes:
   cardbox-data:
     external: true
@@ -120,5 +133,4 @@ volumes:
     external: true
   awards:
     external: true
-  lexicon-data:
-    external: true
+  lexicon_data:

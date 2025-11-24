@@ -5,5 +5,6 @@ front-end/localhost*
 lexicon-db
 lex_upd/prob
 lex_upd/json
+word-data
 .env
 .scannerwork
