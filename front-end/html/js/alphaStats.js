@@ -49,7 +49,7 @@ function createAlphaStatsTable() {
 function getCardboxNumberDropdown(alpha, auxIn) {
   /** Cardbox Number List Box Initialisation **/
   var periodList = document.createElement('select');
-  for(var x=0;x<20;x++) {
+  for(var x=0;x<25;x++) {
     cbOption = document.createElement("option");
     cbOption.text = String(x);
     cbOption.value = x;
