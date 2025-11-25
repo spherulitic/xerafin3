@@ -2,6 +2,7 @@
 
 import json
 from logging.config import dictConfig
+from functools import lru_cache
 import urllib
 import time
 import random
@@ -32,19 +33,42 @@ dictConfig({
     }
 })
 
+@lru_cache(maxsize=1)
+def get_public_key():
+    public_key_url = 'http://keycloak:8080/realms/Xerafin'
+    with urllib.request.urlopen(public_key_url) as r:
+        public_key = json.loads(r.read())['public_key']
+        return f'''-----BEGIN PUBLIC KEY-----
+{public_key}
+-----END PUBLIC KEY-----'''
 
 @app.before_request
 def get_user():
-  ''' Set up userid, DB cursor as global session variables '''
-  public_key_url = 'http://keycloak:8080/realms/Xerafin'
-  with urllib.request.urlopen(public_key_url) as r:
-    public_key = json.loads(r.read())['public_key']
-    public_key = f'''-----BEGIN PUBLIC KEY-----
-{public_key}
------END PUBLIC KEY-----'''
-  raw_token = request.headers["Authorization"]
-  auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
-  g.uuid = auth_token["sub"]
+  # Skip verification for public routes
+  if request.endpoint in ['health']:
+    return
+
+  try:
+    public_key = get_public_key()
+    raw_token = request.headers.get("Authorization")
+    if not raw_token:
+      return jsonify({'error': 'Authorization header missing'}), 401
+    if raw_token.startswith('Bearer '):
+      raw_token = raw_token[7:]
+
+    auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
+    g.uuid = auth_token["sub"]
+    g.name = auth_token.get("name", "Unknown")
+  except jwt.ExpiredSignatureError:
+    return jsonify({'error': 'Token has expired'}), 401
+  except jwt.InvalidTokenError as e:
+    return jsonify({'error': f'Invalid token: {str(e)}'}), 401
+  except KeyError as e:
+    return jsonify({'error': f'Missing required token field: {str(e)}'}), 401
+  except urllib.error.URLError as e:
+    return jsonify({'error': f'Cannot reach authentication service: {str(e)}'}), 503
+  except Exception as e:
+    return jsonify({'error': f'Authentication failed: {str(e)}'}), 401
 
   cardboxPrefs = auth_token.get('cardboxPrefs', { })
   g.closet = cardboxPrefs.get('closet', 10)

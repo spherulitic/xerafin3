@@ -21,3 +21,34 @@ function isOdd(n) {
 function getBool(str) {
   return str === 'true';
 }
+
+async function fetchWithAuth(url, options = {}) {
+    const headers = {
+        'Authorization': keycloak.token,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...options.headers
+    };
+
+    const response = await fetch(url, { ...options, headers });
+
+    if (response.status === 401) {
+        // Token invalid - handle reauth
+        try {
+            await keycloak.updateToken(30);
+            // Retry with new token
+            headers.Authorization = keycloak.token;
+            return await fetch(url, { ...options, headers });
+        } catch (error) {
+            // Refresh failed - force login
+            keycloak.login();
+            throw new Error('Authentication required');
+        }
+    }
+
+    return response;
+}
+
+// Usage - replace all your fetch calls:
+// BEFORE: fetch('/api/data', { method: 'POST', body: JSON.stringify(data) })
+// AFTER: fetchWithAuth('/api/data', { method: 'POST', body: JSON.stringify(data) })
