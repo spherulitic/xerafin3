@@ -479,14 +479,9 @@ class Question {
     this.submitted = true;
 
     try {
-    // refresh token if it's in its last 30 seconds of validity.
-    await keycloak.updateToken(30);
 
-    const response = await fetch('submitQuestion', {
+    const response = await fetchWithAuth('submitQuestion', {
       method: 'POST',
-      headers: {"Accept": "application/json",
-                "Authorization": keycloak.token,
-                "Content-Type": 'application/json'},
       body: JSON.stringify(d) });
 
     if (!response.ok) { throw new Error('HTTP ${response.status}'); }
