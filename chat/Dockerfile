@@ -9,6 +9,4 @@ RUN apt-get install -y default-libmysqlclient-dev
 RUN pip3 install -r requirements.txt
 COPY . .
 
-ENV FLASK_APP=chat
-
-CMD [ "python3", "-m", "flask", "run", "--host=0.0.0.0"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--timeout", "90", "--worker-class", "gevent", "--workers", "4", "chat:app"]
