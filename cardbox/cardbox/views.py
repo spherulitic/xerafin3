@@ -168,7 +168,7 @@ def wrong(alpha):
 @app.route("/getQuestions", methods=['GET', 'POST'])
 def getQuestions():
 
-  result = {"getFromStudyOrder": False, "questions": [ ] }
+  result = {"_get_from_study_order": False, "questions": [ ] }
 
   params = request.get_json(force=True) # returns dict
   numQuestions = params.get("numQuestions", 1)
@@ -365,7 +365,7 @@ def addQuestionToCardbox():
   result = { }
 
   if len(getAnagrams(question)) > 0: # getAnagrams returns a list of words
-    addWord(question)
+    _add_word(question)
   # this is done to schedule it in the future so it's not immediately due
     wrong(question)
     result["question"] = question
@@ -375,6 +375,20 @@ def addQuestionToCardbox():
 
   return jsonify(result)
 
+@app.route('/getNextBingo', methods=['GET', 'POST'])
+def getNextBingo():
+  '''return the next word 7 letters or longer that's due'''
+  params = request.get_json(force=True) # returns dict
+  try:
+    cardbox = int(params.get('cardbox', 0))
+  except (ValueError, TypeError):
+    cardbox = 0
+
+  result = { }
+  result["alpha"] = _get_bingo_from_cardbox(cardbox)
+  checkOut(result["alpha"], True)
+
+  return jsonify({"result": result, "error": {"status": "success"}})
 
 # Library functions
 
@@ -619,7 +633,7 @@ def makeWordsAvailable() :
   g.cur.execute(f"update cleared_until set timeStamp = {min(clearedUntil, maxReadAhead+1)}")
   # No return; this does database operations and exits
 
-def addWord (alpha) :
+def _add_word (alpha) :
 
   '''
   Add one word to cardbox zero - assumed to be valid
@@ -636,7 +650,7 @@ def addWord (alpha) :
 
 def addWords (numWords) :
   ''' Pull words from next_added and study_order and send each
-        to addWord (which puts it in the cardbox)
+        to _add_word (which puts it in the cardbox)
   '''
 
 # We assume everything in next_added and study_order is valid
@@ -648,14 +662,14 @@ def addWords (numWords) :
   if result is not None:
     wordsToAdd = [x[0] for x in result]
     for word in wordsToAdd:
-      addWord(word)
+      _add_word(word)
   if numWords > nextAddedCount:
-    studyOrderAlphas = getFromStudyOrder(numWords-nextAddedCount)
+    studyOrderAlphas = _get_from_study_order(numWords-nextAddedCount)
     for alpha in studyOrderAlphas:
-      addWord(alpha)
+      _add_word(alpha)
   dbClean()
 
-def getFromStudyOrder (numNeeded):
+def _get_from_study_order (numNeeded, getBingo=False):
   ''' Returns the next numNeeded alphagrams from study order. Excludes questions
         already in cardbox or in next_added
   '''
@@ -666,7 +680,10 @@ def getFromStudyOrder (numNeeded):
   g.cur.execute("select question from questions where next_scheduled is not null " +
               "union all select question from next_added")
   allQuestions = {x[0] for x in g.cur.fetchall()}
-  unusedStudyOrder = [x for x in studyOrder.data if x not in allQuestions]
+  if getBingo:
+    unusedStudyOrder = [x for x in studyOrder.data if x not in allQuestions and len(x) >= 7]
+  else:
+    unusedStudyOrder = [x for x in studyOrder.data if x not in allQuestions]
   result = unusedStudyOrder[:numNeeded]
   return result
 
@@ -708,6 +725,54 @@ def checkOut (alpha, lock) :
     difficulty = 0
 
   g.cur.execute(f"update questions set difficulty = {difficulty} where question = '{alpha}'")
+
+def _get_bingo_from_cardbox(cardbox=0):
+    """
+    Returns a list of alphagrams that are due, length 7 or greater
+    Uses the authenticated user's database connection via g.cur
+    """
+    try:
+        # Use the existing cursor from g (already connected to user's DB)
+        cur = g.cur
+
+        # First query: get due questions from cardbox
+        cur.execute("""
+            SELECT question FROM questions
+            WHERE cardbox IS NOT NULL
+            AND length(question) >= 7
+            AND difficulty IN (-1, 0, 2)
+            ORDER BY CASE cardbox WHEN ? THEN -2
+                     ELSE difficulty END,
+                     cardbox, next_scheduled
+            LIMIT 1
+        """, (cardbox,))
+
+        result = cur.fetchone()
+        if result is not None:
+            return result[0]
+
+        # Second query: get from next_added
+        cur.execute("""
+            SELECT question FROM next_added
+            WHERE length(question) >= 7
+            ORDER BY timeStamp
+            LIMIT 1
+        """)
+
+        result = cur.fetchone()
+        if result is not None:
+            _add_word(result[0])
+            return result[0]
+
+        # Third fallback: get from study order
+        result = _get_from_study_order(1, True)
+        _add_word(result[0])
+        return result[0]
+
+    except Exception as e:
+        # Log error and re-raise or handle appropriately
+        print(f"Error in _get_bingo_from_cardbox: {e}")
+        raise
 
 def getNext (newCardbox = 0) :
 

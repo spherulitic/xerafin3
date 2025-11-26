@@ -677,29 +677,28 @@ Sloth.prototype = {
       }
     });
   },
-  getNextBingo: function(){
-    let self=this;
-    let d;
-    if (localStorage.cardboxSent=='false'){
-      d = { user: userid };
+  getNextBingo: async function() {
+    try {
+        const d = localStorage.cardboxSent !== 'false'
+            ? { cardbox: localStorage.cardboxCurrent }
+            : {};
+
+        const response = await fetchWithAuth('getNextBingo', {
+            method: 'POST',
+            body: JSON.stringify(d)
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const {result, e} = await response.json(); // Destructure directly
+        this.question = result.alpha;
+        console.log("Got Sloth question ", this.question);
+        this.fetchQuestion();
+
+    } catch (error) {
+        console.error("Error getting bingo:", error);
     }
-    else {
-      d = {user:userid, cardbox: localStorage.cardboxCurrent};
-    }
-    //d.lexicon = overview.data.lexicon.current;
-    $.ajax({type: "POST",
-      data: JSON.stringify(d),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "getNextBingo.py",
-      success: function(response,responseStatus){
-        self.question = response[0].alpha;
-        self.fetchQuestion();
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        console.log("Error getting bingo, status = " + textStatus + " error: " + errorThrown);
-      }
-    });
-  },
+},
   getSlothData: function(){
     this.serverGetRankings();
     let self=this;
@@ -782,21 +781,18 @@ function Sloth(question,lex){
 
 function initSloth(q,lex){
   console.log("initSloth - todo issue #21");
-//***  console.log(q);
-//***  console.log(lex);
-//***  if (typeof sloth!=='undefined'){
-//***    if (!sloth.inProgress) {
-//***      if (sloth.question!==q){sloth = new Sloth(q,lex);}
-//***    }
-//***    else {
-//***      if (typeof q!=='undefined'){
-//***        sloth = new Sloth(q,lex);
-//***      }
-//***    }
-//***  }
-//***  else {
-//***    //Yes there are lots of globals, won't be in V2
-//***    sloth = new Sloth(q,lex);
-//***    sloth.output();
-//***  }
+  if (typeof sloth!=='undefined'){
+    if (!sloth.inProgress) {
+      if (sloth.question!==q){sloth = new Sloth(q,lex);}
+    }
+  else {
+      if (typeof q!=='undefined'){
+        sloth = new Sloth(q,lex);
+      }
+   }
+  }
+  else {
+   sloth = new Sloth(q,lex);
+   sloth.output();
+  }
 }
