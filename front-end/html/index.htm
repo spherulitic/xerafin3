@@ -25,9 +25,33 @@
   <link href="styles/prefs.css?v=1" rel="stylesheet" type="text/css" />
   <link href="styles/overview.css?v=1" rel="stylesheet" type="text/css" />
   <script src="js/proto.js"></script>
+  <script src="js/util.general.js"></script>
+<script>
+// Run this BEFORE initKeycloak
+function clearOIDCState() {
+    const url = new URL(window.location);
+
+    // Remove common OIDC parameters that might cause redirects
+    const oidcParams = ['code', 'state', 'session_state', 'error', 'error_description'];
+    let cleaned = false;
+
+    oidcParams.forEach(param => {
+        if (url.searchParams.has(param)) {
+            url.searchParams.delete(param);
+            cleaned = true;
+        }
+    });
+
+    // If we cleaned any OIDC params, replace the URL without page reload
+    if (cleaned && window.history.replaceState) {
+        window.history.replaceState({}, '', url.toString());
+    }
+}
+</script>
 
 <script>
-   function initKeycloak() {
+ async  function initKeycloak() {
+
   try {
     window.keycloak = new Keycloak({
         url: 'http://auth.localhost/',
@@ -35,9 +59,22 @@
         clientId: 'x-client'
     });
 
-    keycloak.init({onLoad: 'login-required',
-                   pkceMethod: 'S256',
-                   checkLoginIframe:false}).then(async function(authenticated) {
+
+        // Shorter timeout for the race condition
+        const initTimeout = 10000; // 10 seconds
+
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Authentication service timeout')), initTimeout);
+        });
+
+        const authenticated = await Promise.race([
+            keycloak.init({
+                onLoad: 'login-required',
+                pkceMethod: 'S256',
+                checkLoginIframe: false
+            }),
+            timeoutPromise
+        ]);
 
       if (authenticated) {
         $('#adminNote').html('<hr>Login Successful');
@@ -46,11 +83,9 @@
       var cardboxPrefs = keycloak.tokenParsed.cardboxPrefs;
       var setAttributes = cardboxPrefs ? Object.keys(cardboxPrefs) : [ ] ;
       var missingAttributes = requiredAttributes.filter(item => !setAttributes.includes(item));
-      console.log("Missing attributes: ", missingAttributes);
       if (!cardboxPrefs || missingAttributes.length > 0) {
-        fetch('createCardboxPrefs', {
+        fetchWithAuth('createCardboxPrefs', {
           method: "POST",
-          headers: {"Content-Type": "application/json", "Authorization": keycloak.token},
           body: JSON.stringify(missingAttributes)
         })
         .then(response => response.json())
@@ -64,17 +99,10 @@
         (async function() {
           try {
                 // init the cardbox if it doesn't exist
-		await fetch('initCardbox', {
-		   method: 'POST',
-		   headers: { 'Accept': 'application/json',
-		              'Authorization': keycloak.token }
-                });
-		const scoreResponse = await fetch('getCardboxScore', {
-		         method: 'POST',
-			 headers: { 'Accept': 'application/json',
-			            'Authorization': keycloak.token
-				  }
-		 	});
+		await fetchWithAuth('initCardbox', {
+		   method: 'POST' });
+		const scoreResponse = await fetchWithAuth('getCardboxScore', {
+		         method: 'POST' });
 		const response2 = await scoreResponse.json();
 
             if (!localStorage.qQScore) {localStorage.qQScore = response2.score;}
@@ -95,21 +123,14 @@
         leaderboardPanel = "today";
         cardboxStatsPanel = "dueNow";
         generateScripts();
-        console.log("finished authentication callback");
-      } else { console.log("Not Authenticated"); }
+      } else { console.log("Unexpected: Not Authenticated");
+               showKeycloakDownMessage('Gremlins');}
 
-      }).catch(function(error) {console.error('KEYCLOAK INIT FAILED:', error);
-                                console.error('Error Details: ', error.message, error.stack);
-});
-
-} catch(error) {
-
-        console.error('=== TOP LEVEL CATCH ===');
-        console.error('Error:', error);
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
+    } catch (error) {
+        console.error('Failed to initialize Keycloak:', error);
+        showKeycloakDownMessage(error.message);
+    }
 }
-   }
   </script>
   <script>
 
@@ -120,6 +141,20 @@ $(document).on('click','.navbar-collapse.in',function(e) {
         $(this).collapse('hide');
     }
 });
+
+
+function showKeycloakDownMessage(message) {
+
+        // Display a user-friendly error message on the page
+        $('#adminNote').html('<h2>Service Temporarily Unavailable</h2>' +
+                '<p>We are having trouble connecting to the authentication service. Please try again in a few moments.</p>' +
+                '<p><small>Technical details: ' + message + '</small></p>');
+
+        // stop Keycloak redirect, prevent further navigation
+        window.keycloak = null;
+        window.stop();
+
+}
 
 <!------------------------------------------------------------------------------------------------------------->
 function debounce(fn, delay) {
@@ -154,17 +189,20 @@ function once(fn, context) {
 }
 
 <!------------------------------------------------------------------------------------------------------------->
-    function getUnloggedStats(){
-      $.ajax({
-        type: "POST",
-        url: "getAllTimeStats",
-        success: function(response,responseStatus){
-          $('#Area1').html("<div>Since <span style='font-weight:bold;'>11/10/2016</span>, <span style='font-weight:bold;'>"+response.users+"</span> Xerafin users have answered <span style='font-weight:bold;'>"+response.questions+"</span> alphagrams.  That's an average of <span style='font-weight:bold;'>"+Math.ceil(Number(response.questions)/Number(response.users))+"</span> per user!</div>");
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-          alert("Error, status = " + textStatus + " error: " + errorThrown);
-        }
-      });
+async function getUnloggedStats() {
+    try {
+        const response = await fetchWithAuth('getAllTimeStats', { method:'POST'});
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const { users, questions } = await response.json();
+        const average = Math.ceil(Number(questions) / Number(users));
+
+        $('#Area1').html(`<div>Since <span style='font-weight:bold;'>11/10/2016</span>, <span style='font-weight:bold;'>${users}</span> Xerafin users have answered <span style='font-weight:bold;'>${questions}</span> alphagrams. That's an average of <span style='font-weight:bold;'>${average}</span> per user!</div>`);
+
+    } catch (error) {
+        console.error('Error fetching stats:', error);
+        alert(`Error: ${error.message}`);
+      }
     }
 <!------------------------------------------------------------------------------------------------------------->
     function URLExists(url) {
@@ -270,7 +308,10 @@ function appendDebugLog(input){
 }
 <!------------------------------------------------------------------------------------------------------------->
   function initCallback() {
-    initKeycloak();
+     // Call this first
+     clearOIDCState();
+     initKeycloak();
+
   }
 
 
