@@ -527,9 +527,7 @@ Sloth.prototype = {
 
   },
   populate: function(){
-    console.log('Sloth populate() running.');
     this.questions = new SlothQuiz(this.data,this.question);
-    console.log('Sloth contains ' + this.questions.words.size + 'words');
     slothUI.update("HOME_SET_INFO","Sloth contains "+this.questions.words.size+" words");
     slothUI.childUI['SRack'].styles.unanswered = "correct slothAlpha";
     slothUI.childUI['SRack'].show();
