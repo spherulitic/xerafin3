@@ -3,10 +3,12 @@
 import os
 import urllib
 import json
-#import requests
+import requests
 from logging.config import dictConfig
 from functools import lru_cache
 import jwt # pylint: disable=E0401
+import itertools
+import dawg
 from pymongo import MongoClient # pylint: disable=E0401
 from flask import jsonify, request, g # pylint: disable=E0401
 import xerafinUtil.xerafinUtil as xu
@@ -65,11 +67,15 @@ def get_user():
   except Exception as e:
     return jsonify({'error': f'Authentication failed: {str(e)}'}), 401
 
+  # headers to send to other services
+  g.headers = {"Accept": "application/json", "Authorization": raw_token}
+
   mongo_user = os.environ.get('MONGO_INITDB_ROOT_USERNAME')
   mongo_pass = os.environ.get('MONGO_INITDB_ROOT_PASSWORD')
   mongo_db_name = os.environ.get('MONGO_INITDB_DATABASE')
   g.client = MongoClient(f'mongodb://{mongo_user}:{mongo_pass}@lexicon-db:27017/')
   g.words = g.client[mongo_db_name]['words']
+  g.dawg_filename = '/data/csw24.dawg'
 
   return None
 
@@ -101,14 +107,17 @@ def getAlphagramCounts():
   return jsonify(result)
 
 @app.route("/getAnagrams", methods=['GET', 'POST'])
-def getAnagrams():
-  '''Take in one alphagram and return the valid words associated.'''
-  # Someday may want to implement this with the DAWG
+def getAnagramsView():
   params = request.get_json(force=True)
   alpha = params.get('alpha')
+  return jsonify(getAnagrams(alpha))
+
+def getAnagrams(alpha):
+  '''Take in one alphagram and return the valid words associated.'''
+  # Someday may want to implement this with the DAWG
   query = {"alphagram": alpha}
   result = g.words.find(query)
-  return jsonify([x["word"] for x in result])
+  return [x["word"] for x in result]
 
 @app.route("/getManyAnagrams", methods=['GET', 'POST'])
 def getManyAnagrams():
@@ -179,3 +188,115 @@ def getRandomAlphas():
              ] )
   response = [ x['_id'] for x in cursor ]
   return jsonify(response)
+
+@app.route('/getSlothData', methods=['POST'])
+def get_sloth_data():
+    """
+    Get subanagram data for Subword Sloth game
+    Returns words grouped by length with auxiliary info
+    """
+    try:
+      params = request.get_json()
+      alpha = params.get("alpha")
+
+      if not alpha:
+        return jsonify({"error": "Missing alphagram parameter"}), 400
+
+      # Use authenticated user from JWT
+      userid = g.uuid
+
+      # Configuration
+      REASONABLE_QUIZ_SIZE = 25
+      pruneWords = True  # params.get("getAllWords") == "1" - simplified for now
+
+      result = []
+      total_words = 0
+      total_lengths = 0
+      max_length = len(alpha)
+      # Get all subanagrams for the input alphagram
+      subalphas = getSubanagrams(alpha)
+      auxInfoBatch = getAuxInfoBatch(subalphas)
+
+      # Process by length (longest first)
+      for length in range(max_length, 1, -1):
+        length_sublist = [x for x in subalphas if len(x) == length]
+
+        if not length_sublist:
+          continue
+
+        # Process each alphagram of this length
+        for subalpha in length_sublist:
+          words = getAnagrams(subalpha)
+          aux_info = auxInfoBatch.get(subalpha, { })
+
+          total_words += len(words)
+          result.append({
+            "alpha": subalpha,
+            "words": words,
+            "auxInfo": aux_info
+          })
+
+          total_lengths += 1
+
+          # Stop if we have enough data
+          if total_lengths >= 4 and total_words > REASONABLE_QUIZ_SIZE:
+            break
+
+      return jsonify({
+        "result": result,
+        "error": {"status": "success"}
+        })
+
+    except Exception as e:
+      # Log the error
+      xu.debug(f"Error in get_sloth_data: {e}")
+      return jsonify({
+          "result": [],
+          "error": {"status": f"Error: {str(e)}"}
+      }), 500
+
+def getSubanagrams(alpha):
+  ''' Take in an alphagram and return valid subanagrams '''
+
+  # Load DAWG
+  d = dawg.CompletionDAWG().load(g.dawg_filename)
+
+  # Find valid subanagrams
+  result = list(filter(d.__contains__, powerset(alpha)))
+
+  # Sort by length (longest first) then alphabetically
+  result.sort(key=lambda x: (-len(x), x))
+
+  return result
+
+def powerset(alphagram):
+  ''' Return the powerset of an alphagram,
+       unique entries of length 2 or more only '''
+  return {
+    ''.join(combo)
+    for r in range(2, len(alphagram) + 1)
+    for combo in itertools.combinations(alphagram, r)
+  }
+
+def getAuxInfoBatch(alphalist):
+    """
+    Get auxiliary info for alphagrams from the cardbox service
+    """
+    try:
+        response = requests.post(
+            'http://cardbox:5000/getAuxInfoBatch',
+            json={'alphalist': alphalist},
+            headers=g.headers,
+            timeout=30
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            return data
+        else:
+            xu.debug(f"Cardbox service returned error: {response.status_code}")
+            return {}
+
+    except requests.exceptions.RequestException as e:
+        xu.debug(f"Error calling cardbox service: {e}")
+        return {}

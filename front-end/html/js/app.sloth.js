@@ -699,35 +699,38 @@ Sloth.prototype = {
         console.error("Error getting bingo:", error);
     }
 },
-  getSlothData: function(){
+  getSlothData: function() {
     this.serverGetRankings();
-    let self=this;
     let d = { user: userid, alpha: this.question, getAllWords: localStorage.gSlothPref };
-    $.ajax({
-      type: "POST",
-      data: JSON.stringify(d),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "getSlothData.py",
-      success:  function(response,responseStatus){
-        self.data = response[0];
-        if (self.data.length===0){
-        // Notify user that question is invalid
-          (self.lastQuestion!==null) ? self.question=self.lastQuestion : self.question=null;
-          self.fetchQuestion();
+
+    fetchWithAuth("getSlothData", {
+        method: "POST",
+        body: JSON.stringify(d)
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
-        else {
-          self.lastQuestion = self.question
-          slothUI.update("HOME_LOCK",false);
-          slothUI.update('HOME_UPDATE',self.question);
-          self.cardboxStatsChecks();
-          self.populate();
+        return response.json();
+    })
+    .then(response => {
+        this.data = response.result;
+        if (this.data.length === 0) {
+            // Notify user that question is invalid
+            (this.lastQuestion !== null) ? this.question = this.lastQuestion : this.question = null;
+            this.fetchQuestion();
+        } else {
+            this.lastQuestion = this.question;
+            slothUI.update("HOME_LOCK", false);
+            slothUI.update('HOME_UPDATE', this.question);
+            this.cardboxStatsChecks();
+            this.populate();
         }
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        console.log("Error, status = " + textStatus + " error: " + errorThrown);
-      }
+    })
+    .catch(error => {
+        console.log("Error: " + error.message);
     });
-  },
+},
   resetLocks: function(){
     let self=this;
     let d;
