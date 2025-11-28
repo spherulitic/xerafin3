@@ -598,40 +598,27 @@ Sloth.prototype = {
   },
   testQuestion: function(q){
     slothUI.update("HOME_LOCK",true);
-    let self=this;
-    $.ajax({
-      type: "POST",
-      data: JSON.stringify({
-        'mode':'alpha',
-        'checkList':[q]
-      }),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "checkAlpha.py",
-      success: function(response,responseStatus){
-        if (response[q]){
-          slothUI.update("HOME_LOCK",false);
-          //console.log(response);
-          self.fetchQuestion();
-        }
-        else {
-          slothUI.update("HOME_LOCK",false);
-          if (q.length<7){
+    fetchWithAuth('returnValidAlphas', { method: "POST",
+               body: JSON.stringify({'alphas': [q]}) })
+    .then(response => {
+      if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
+      return response.json();
+    })
+    .then(response => {
+       slothUI.update("HOME_LOCK",false);
+       if(response.includes(q)) {
+         this.fetchQuestion();
+       } else {
+         if (q.length < 7) {
             slothUI.update("HOME_SET_INFO","Alphagram is invalid.  Unable to Sloth");
             slothUI.update("HOME_LOCK_START",true);
-          }
-          else {
-            self.fetchQuestion();
-          }
-        }
-
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        self.testQuestion(q);
-        //temp until this py call is fixed
-        //self.fetchQuestion();
-        console.log("Error testing alpha, status = " + textStatus + " error: " + errorThrown);
-      }
-    });
+         } else { this.fetchQuestion(); }
+       }
+      })
+    .catch(error => {
+        console.log("Error testing alpha " + q + ": " + error.message);
+        this.testQuestion(q);
+     });
   },
   getFirstBingo: function(){
     let self=this;

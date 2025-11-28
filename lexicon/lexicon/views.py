@@ -165,14 +165,14 @@ def returnValidAlphas():
         valid solutions in the dictionary. '''
   params = request.get_json(force=True)
   alphaList = params.get('alphas', [ ])
-  validAlphaList = [ ]
-  for alpha in alphaList:
-    query = {'alphagram': alpha}
-    result = g.words.count_documents(query)
-    if result > 0:
-      validAlphaList.append(alpha)
 
-  return jsonify(validAlphaList)
+  # Load DAWG
+  d = dawg.CompletionDAWG().load(g.dawg_filename)
+
+  # Find valid subanagrams
+  result = list(filter(d.__contains__, alphaList))
+
+  return jsonify(result)
 
 @app.route('/getRandomAlphas', methods=['GET', 'POST'])
 def getRandomAlphas():
