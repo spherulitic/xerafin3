@@ -88,8 +88,10 @@ def get_user():
 @app.after_request
 def close_sqlite(response):
   '''Close the cursor to the cardbox database'''
-  g.con.commit()
-  g.con.close()
+  # In a crash, g.con might not have been set up correctly
+  if hasattr(g, 'con') and g.con:
+    g.con.commit()
+    g.con.close()
   return response
 
 @app.route("/", methods=['GET', 'POST'])
@@ -111,6 +113,17 @@ def getAuxInfoView():
   result = { }
   params = request.get_json(force=True) # returns dict
   result = getAuxInfo(params.get("alpha"))
+  return jsonify(result)
+
+@app.route('/getAuxInfoBatch', methods=['POST'])
+def getAuxInfoBatch():
+  ''' Endpoint to get auxInfo for a list of alphas
+  '''
+  result = { }
+  params = request.get_json(force=True, silent=True)
+  alphalist = params.get("alphalist", [ ])
+  for alpha in alphalist:
+    result[alpha] = getAuxInfo(alpha)
   return jsonify(result)
 
 @app.route('/correct', methods=['POST'])
