@@ -95,6 +95,15 @@ services:
       - MONGO_INITDB_ROOT_USERNAME
       - MONGO_INITDB_ROOT_PASSWORD
       - MONGO_INITDB_DATABASE
+  sloth:
+    image: x-sloth:latest
+    environment:
+      - MYSQL_USER
+      - MYSQL_DB_SLOTH
+      - MYSQL_PWD
+      - MYSQL_HOST
+    depends_on:
+      - keycloak
   chat:
     image: x-chat:latest
     environment:
