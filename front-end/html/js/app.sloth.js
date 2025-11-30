@@ -403,20 +403,21 @@ Sloth.prototype = {
   },
   serverGetStats : function(){
     this.statsReady = false;
-    let self=this;
-    $.ajax({
-      type: "POST",
-      data: JSON.stringify({'action':'GET_STATS', 'user': userid, 'lexicon':this.lexicon}),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "/PHP/slothQuery.php",
-      success: function(response,responseStatus){
-        let x = JSON.parse(response);
-        self.statsReady= true;
-        self.userStats = x;
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        xerafin.error.log.add("slothQuery.php, "+jqXHR.status,'error');
-      }
+
+    fetchWithAuth('/getSlothStats', {method: "GET"})
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(stats => {
+        this.statsReady = true;
+        this.userStats = stats;
+    })
+    .catch(error => {
+        console.error("Error getting sloth stats:", error);
+        xerafin.error.log.add(`sloth stats, ${error.message}`, 'error');
     });
   },
   serverWriteActive: function(){
