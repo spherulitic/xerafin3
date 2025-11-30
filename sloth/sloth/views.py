@@ -100,6 +100,39 @@ def getRankings():
     app.logger.error(f'Error getting sloth rankings for {alpha}: {e}')
     return jsonify({"error": "Internal server error"}), 500
 
+@app.route("/getSlothStats", methods=['GET'])
+def getStats():
+  try:
+    query = """
+      SELECT
+        COUNT(DISTINCT alphagram) AS uAttempts,
+        COUNT(alphagram) AS tAttempts,
+        COUNT(DISTINCT CASE WHEN correct >= 100 THEN alphagram END) AS uComplete,
+        COUNT(CASE WHEN correct >= 100 THEN alphagram END) AS tComplete,
+        COUNT(DISTINCT CASE WHEN correct >= 100 AND accuracy >= 100 THEN alphagram END) AS uPerfect,
+        COUNT(CASE WHEN correct >= 100 AND accuracy >= 100 THEN alphagram END) AS tPerfect
+      FROM sloth_completed
+      WHERE userid = %s AND date = CURDATE()
+    """
+    g.cur.execute(query, (g.uuid,))
+    row = g.cur.fetchone()
+
+    output = {
+      'uAttempts': row['uAttempts'],
+      'tAttempts': row['tAttempts'],
+      'uComplete': row['uComplete'],
+      'tComplete': row['tComplete'],
+      'uPerfect': row['uPerfect'],
+      'tPerfect': row['tPerfect']
+    }
+
+    return jsonify(output)
+
+  except Exception as e:
+    app.logger.error(f"Error getting sloth stats: {e}")
+    return jsonify({"error": "Internal server error"}), 500
+
+
 def getAlphaRankings(alpha, lexicon):
   try:
     # Get the game results
