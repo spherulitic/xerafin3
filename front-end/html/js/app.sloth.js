@@ -494,25 +494,18 @@ Sloth.prototype = {
     });
   },
   serverGetRankings: function(){
-    let d= JSON.stringify({
-        'action':'GET_RANKINGS',
-        'user': userid,
-        'alpha':this.question,
-        'lexicon':this.lexicon
-      });
-    //console.log(d);
-    $.ajax({
-      type: "POST",
-      data: d,
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "/PHP/slothQuery.php",
-      success: function(response,responseStatus){
-        let x = JSON.parse(response);
-        slothUI.update("HOME_SET_RANKINGS",x);
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        xerafin.error.log.add("slothQuery.php, "+jqXHR.status,'error');
-      }
+    let d = JSON.stringify({ 'alpha': this.question });
+    fetchWithAuth('getSlothRankings', { method: "POST", body: d })
+    .then(response => {
+          if (!response.ok) {
+             throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          return response.json();
+    })
+    .then(rankings => { slothUI.update('HOME_SET_RANKINGS', rankings); })
+    .catch(error => {
+          console.error("Error getting sloth rankings: ", error);
+          xerafin.error.log.add(`sloth rankings, ${error.message}`, 'error');
     });
   },
   getStats: function(){

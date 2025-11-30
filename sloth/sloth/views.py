@@ -1,5 +1,6 @@
 '''Xerafin sloth module'''
 
+import MySQLdb.cursors
 import os
 import urllib
 import json
@@ -67,8 +68,8 @@ def get_user():
   # headers to send to other services
   g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
-  g.con = lite.connect(getDBFile())
-  g.cur = g.con.cursor()
+  g.con = xu.getMysqlCon()
+  g.cur = g.con.cursor(MySQLdb.cursors.DictCursor)
 
   return None
 
@@ -85,8 +86,70 @@ def close_sqlite(response):
 def default():
   return "Xerafin Sloth Service"
 
-@app.route("/getAnagrams", methods=['GET', 'POST'])
-def getAnagramsView():
-  params = request.get_json(force=True)
-  alpha = params.get('alpha')
-  return None
+@app.route("/getSlothRankings", methods=['POST'])
+def getRankings():
+  try:
+    params = request.get_json()
+    alpha = params.get('alpha')
+    lexicon = 'CSW24'
+
+    rankings = getAlphaRankings(alpha, lexicon)
+    return jsonify(rankings)
+
+  except Exception as e:
+    app.logger.error(f'Error getting sloth rankings for {alpha}: {e}')
+    return jsonify({"error": "Internal server error"}), 500
+
+def getAlphaRankings(alpha, lexicon):
+  try:
+    # Get the game results
+    query = """
+    SELECT userid, time_taken, correct, accuracy, date
+    FROM sloth_completed
+    WHERE alphagram = %s AND lex = %s
+    ORDER BY correct DESC, accuracy DESC, time_taken ASC LIMIT 5
+    """
+
+    g.cur.execute(query, (alpha, lexicon))
+    rows = g.cur.fetchall()
+
+    # Extract unique user IDs for batch lookup
+    user_ids = list({row['userid'] for row in rows})
+
+    user_attributes = getUserAttributes(user_ids)
+    user_info = {user["userid"]: user for user in user_attributes}
+    # Build rankings with merged data
+    rankings = []
+    for rank, row in enumerate(rows, 1):
+      user_data = user_info.get(row['userid'], {})
+      ranking = {
+        'rank': rank,
+        'name': user_data.get('name', 'Unknown User'),
+        'photo': user_data.get('photo'),
+        'countryId': None,  # Explicitly null for now
+        'time': row['time_taken'],
+        'correct': row['correct'],
+        'accuracy': row['accuracy'],
+        'date': row['date']
+      }
+      if g.userid == row['userid']:
+        ranking['isMe'] = True
+      rankings.append(ranking)
+
+    return rankings
+  except Exception as e:
+    xu.debug(f'Error in getAlphaRankings for {alpha}: {e}')
+    raise e
+
+def getUserAttributes(user_list):
+  try:
+    response = requests.post('http://login:5000/getUserNamesAndPhotos',
+                   headers=g.headers,
+                   json={'userList': user_list},
+                   timeout=10)
+    if response.status_code == 200:
+      return response.json()
+    return { }
+  except requests.exceptions.RequestException as e:
+    xu.debug(f'Error fetching user data: {e}')
+    return { }

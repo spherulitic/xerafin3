@@ -102,6 +102,8 @@ services:
       - MYSQL_DB_SLOTH
       - MYSQL_PWD
       - MYSQL_HOST
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - keycloak
   chat:
