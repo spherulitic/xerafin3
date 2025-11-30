@@ -191,75 +191,76 @@ def getRandomAlphas():
 
 @app.route('/getSlothData', methods=['POST'])
 def get_sloth_data():
-    """
-    Get subanagram data for Subword Sloth game
-    Returns words grouped by length with auxiliary info
-    """
-    try:
-      params = request.get_json()
-      alpha = params.get("alpha")
+  """
+  Get subanagram data for Subword Sloth game
+  Returns words grouped by length with auxiliary info
+  """
+  try:
+    params = request.get_json()
+    alpha = params.get("alpha")
 
-      if not alpha:
-        return jsonify({"error": "Missing alphagram parameter"}), 400
+    if not alpha:
+      return jsonify({"error": "Missing alphagram parameter"}), 400
 
-      # Use authenticated user from JWT
-      userid = g.uuid
+    # Use authenticated user from JWT
+    userid = g.uuid
 
-      # Configuration
-      REASONABLE_QUIZ_SIZE = 25
-      pruneWords = True  # params.get("getAllWords") == "1" - simplified for now
+    # Configuration
+    REASONABLE_QUIZ_SIZE = 25
+    pruneWords = True  # params.get("getAllWords") == "1" - simplified for now
 
-      result = []
-      total_words = 0
-      total_lengths = 0
-      max_length = len(alpha)
-      # Get all subanagrams for the input alphagram
-      subalphas = getSubanagrams(alpha)
-      auxInfoBatch = getAuxInfoBatch(subalphas)
+    result = []
+    total_words = 0
+    total_lengths = 0
+    max_length = len(alpha)
+    # Get all subanagrams for the input alphagram
+    subalphas = getSubanagrams(alpha)
+    auxInfoBatch = getAuxInfoBatch(subalphas)
 
-      # Process by length (longest first)
-      for length in range(max_length, 1, -1):
-        length_sublist = [x for x in subalphas if len(x) == length]
+    # Process by length (longest first)
+    for length in range(max_length, 1, -1):
+      length_sublist = [x for x in subalphas if len(x) == length]
 
-        if not length_sublist:
-          continue
+      if not length_sublist:
+        continue
 
-        # Process each alphagram of this length
-        for subalpha in length_sublist:
-          words = getAnagrams(subalpha)
-          aux_info = auxInfoBatch.get(subalpha, { })
+      # Process each alphagram of this length
+      for subalpha in length_sublist:
+        words = getAnagrams(subalpha)
+        aux_info = auxInfoBatch.get(subalpha, { })
 
-          total_words += len(words)
-          result.append({
-            "alpha": subalpha,
-            "words": words,
-            "auxInfo": aux_info
-          })
-
-          total_lengths += 1
-
-          # Stop if we have enough data
-          if total_lengths >= 4 and total_words > REASONABLE_QUIZ_SIZE:
-            break
-
-      return jsonify({
-        "result": result,
-        "error": {"status": "success"}
+        total_words += len(words)
+        result.append({
+          "alpha": subalpha,
+          "words": words,
+          "auxInfo": aux_info
         })
 
-    except Exception as e:
-      # Log the error
-      xu.debug(f"Error in get_sloth_data: {e}")
-      return jsonify({
-          "result": [],
-          "error": {"status": f"Error: {str(e)}"}
-      }), 500
+        total_lengths += 1
+
+      # Stop if we have enough data
+      if total_lengths >= 4 and total_words > REASONABLE_QUIZ_SIZE:
+        break
+
+    return jsonify({
+      "result": result,
+      "error": {"status": "success"}
+      })
+
+  except Exception as e:
+    # Log the error
+    xu.debug(f"Error in get_sloth_data: {e}")
+    return jsonify({
+        "result": [],
+        "error": {"status": f"Error: {str(e)}"}
+    }), 500
 
 def getSubanagrams(alpha):
   ''' Take in an alphagram and return valid subanagrams '''
 
   # Load DAWG
   d = dawg.CompletionDAWG().load(g.dawg_filename)
+  xu.debug(powerset(alpha))
 
   # Find valid subanagrams
   result = list(filter(d.__contains__, powerset(alpha)))

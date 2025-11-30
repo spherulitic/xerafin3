@@ -2,10 +2,10 @@
 #!/usr/bin/env python3
 
 try:
-    from flask import Flask
-    print("✓ Flask imported")
+  from flask import Flask
+  print("✓ Flask imported")
 except ImportError as e:
-    print(f"✗ Flask import failed: {e}")
+  print(f"✗ Flask import failed: {e}")
 
 # Rest of your Flask app...
 
