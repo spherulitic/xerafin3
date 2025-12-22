@@ -5,6 +5,8 @@ import os
 import urllib
 import json
 import requests
+import time
+import secrets
 from logging.config import dictConfig
 from functools import lru_cache
 import jwt # pylint: disable=E0401
@@ -132,6 +134,74 @@ def getStats():
     app.logger.error(f"Error getting sloth stats: {e}")
     return jsonify({"error": "Internal server error"}), 500
 
+@app.route('/slothWriteActive', methods=['POST'])
+def start_game():
+  """
+  WRITE_ACTIVE - Create new game session
+  Returns: { 'token': 'game_token' }
+  """
+  try:
+    data = request.get_json()
+    alpha = data.get('alpha')
+    lexicon = 'CSW24' # see issue 266
+
+    # Validate input
+    if not alpha or not lexicon:
+        return jsonify({"error": "Missing alpha or lexicon"}), 400
+
+    # Generate token and timestamp
+    token = secrets.token_hex(20)  # Equivalent to bin2hex(openssl_random_pseudo_bytes(20))
+    start_time = time.time()  # Equivalent to microtime(true)
+
+    # Insert into database
+    query = """
+        INSERT INTO sloth_active
+        (userid, alphagram, date, start_time, token, lex)
+        VALUES (%s, %s, NOW(), %s, %s, %s)
+    """
+    g.cur.execute(query, (g.uuid, alpha, start_time, token, lexicon))
+
+    return jsonify({'token': token})
+
+  except Exception as e:
+    app.logger.error(f"Error starting game: {e}")
+    g.con.rollback()
+    return jsonify({"error": "Internal server error"}), 500
+
+@app.route('/slothAbortActive', methods=['POST'])
+def abort_game():
+  """
+  ABORT_ACTIVE - Cancel/delete an active game session.
+  Expects JSON: {'token': 'game_token_string'}
+  """
+  try:
+    data = request.get_json()
+    token = data.get('token')
+
+    if not token:
+        return jsonify({'error': 'Missing game token'}), 400
+
+    # Delete the active session for THIS user and THIS token
+    # This ensures users can only abort their own games.
+    query = """
+        DELETE FROM sloth_active
+        WHERE userid = %s AND token = %s
+    """
+    g.cur.execute(query, (g.uuid, token))
+
+    # Check if a row was actually deleted
+    if g.cur.rowcount == 0:
+      # This could mean the token was invalid or the game already ended
+      app.logger.warning(f"No active game found for user {g.uuid} with token {token}")
+      # You might still return success, or a specific message
+      return jsonify({'status': 'no_active_game_found'}), 200
+
+    return jsonify({'status': 'game_aborted'})
+
+  except Exception as e:
+    app.logger.error(f"Error aborting game: {e}")
+    g.con.rollback()
+    return jsonify({'error': 'Internal server error'}), 500
 
 def getAlphaRankings(alpha, lexicon):
   try:

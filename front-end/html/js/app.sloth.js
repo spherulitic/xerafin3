@@ -420,49 +420,50 @@ Sloth.prototype = {
         xerafin.error.log.add(`sloth stats, ${error.message}`, 'error');
     });
   },
-  serverWriteActive: function(){
+serverWriteActive: function() {
     this.writeDone = false;
-    let self=this;
-    $.ajax({
-      type: "POST",
-      data: JSON.stringify({
-        'action':'WRITE_ACTIVE',
-        'user': userid,
-        'alpha':this.question,
-        'lexicon':this.lexicon
-      }),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "/PHP/slothQuery.php",
-      success: function(response,responseStatus){
-        let x = JSON.parse(response);
-        self.writeDone= true;
-        self.token = x.token;
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        xerafin.error.log.add("slothQuery.php, "+jqXHR.status,'error');
-      }
+
+    fetchWithAuth('/slothWriteActive', {
+        method: "POST",
+        body: JSON.stringify({ alpha: this.question })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        this.writeDone = true;
+        this.token = data.token;
+    })
+    .catch(error => {
+        console.error("Error starting game:", error);
+        xerafin.error.log.add(`sloth game start, ${error.message}`, 'error');
     });
-  },
+},
   serverWriteAbort: function(){
     this.writeDone = false;
-    let self=this;
-    $.ajax({
-      type: "POST",
-      data: JSON.stringify({
-        'action':'ABORT_ACTIVE',
-        'user': userid,
-        'alpha':this.question,
-        'token':this.token
-      }),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "/PHP/slothQuery.php",
-      success: function(response,responseStatus){
-        self.writeDone= true;
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        xerafin.error.log.add("slothQuery.php, "+jqXHR.status,'error');
+    fetchWithAuth('/slothAbortActive', {
+      method: 'POST',
+      body: JSON.stringify({ 'token':this.token })
+    })
+    .then( response => {
+      if (!response.ok) {
+      // Handle HTTP errors (4xx, 5xx)
+        return response.json().then(err => {throw new Error(err.error || 'Server error: ${response.status}'); });
       }
-    });
+      return response.json();
+    })
+    .then(data => {
+       console.log('Game abort successful:', data.status);
+       this.token = null; // clear local token
+       this.writeDone = true;
+      })
+    .catch(error => {
+      console.error('Error aborting game:', error);
+      xerafin.error.log.add('sloth game abort failed: ${error.message}', 'error');
+      });
   },
   serverWriteComplete: function(){
     this.completeDone = false;

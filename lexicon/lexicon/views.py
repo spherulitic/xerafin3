@@ -260,7 +260,6 @@ def getSubanagrams(alpha):
 
   # Load DAWG
   d = dawg.CompletionDAWG().load(g.dawg_filename)
-  xu.debug(powerset(alpha))
 
   # Find valid subanagrams
   result = list(filter(d.__contains__, powerset(alpha)))
