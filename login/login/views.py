@@ -165,25 +165,66 @@ def getLoggedInUsers():
 @app.route('/getUserNamesAndPhotos', methods=['GET', 'POST'])
 def getUserNamesAndPhotos():
   ''' Takes in a list of uuids
-      Returns a list of dicts
-      [ {"userid": uuid, "name": name, "photo": photo}, { .... } ]
+    Returns a list of dicts
+    [ {"userid": uuid, "name": name, "photo": photo}, { .... } ]
   '''
-  result = [ ]
-  params = request.get_json(force=True) # returns dict
-  uuidList = params.get('userList', [ ])
-  keycloak_admin = getKeycloakAdmin()
-  for uuid in uuidList:
-    userDict = {'userid': uuid}
-    if uuid == '0': # System user -- not in keycloak
-      userDict["name"] = 'Xerafin'
-      userDict['photo'] = 'images/unknown_player.gif'
-    else:
-      userInfo = keycloak_admin.get_user(uuid)
-      userDict["name"] = f'{userInfo["firstName"]} {userInfo["lastName"]}'
-      userDict["photo"] = userInfo['attributes'].get('photo', 'images/unknown_player.gif')
-    result.append(userDict)
+  result = []
+  not_found_users = []  # Track users not found in Keycloak
 
-  return jsonify(result)
+  try:
+    params = request.get_json(force=True, silent=True)
+    if params is None:
+      app.logger.error("Invalid JSON received in getUserNamesAndPhotos")
+      return jsonify({"error": "Invalid JSON payload"}), 400
+
+    uuidList = params.get('userList', [])
+
+    if not uuidList:
+      app.logger.warning("Empty userList received")
+      return jsonify(result)
+
+    keycloak_admin = getKeycloakAdmin()
+
+    for uuid in uuidList:
+      userDict = {'userid': uuid}
+
+      if uuid in ['0', '1']:  # System user -- not in keycloak
+        userDict["name"] = 'Xerafin'
+        userDict['photo'] = 'images/xerafin2.png'
+        result.append(userDict)
+        continue
+
+      try:
+        userInfo = keycloak_admin.get_user(uuid)
+        userDict["name"] = f'{userInfo["firstName"]} {userInfo["lastName"]}'
+        userDict["photo"] = userInfo['attributes'].get('photo', 'images/unknown_player.gif')
+        result.append(userDict)
+
+      except Exception as user_error:
+        # Check if it's a "user not found" error
+        error_msg = str(user_error).lower()
+        if 'not found' in error_msg or '404' in error_msg:
+          not_found_users.append(uuid)
+          app.logger.warning(f"User not found in Keycloak: {uuid}")
+
+          # Return default values for missing users
+          userDict["name"] = 'Unknown User'
+          userDict["photo"] = 'images/unknown_player.gif'
+          result.append(userDict)
+        else:
+          # Re-raise unexpected errors
+          app.logger.error(f"Unexpected error fetching user {uuid}: {user_error}")
+          raise
+
+    # Log summary if any users weren't found
+    if not_found_users:
+      app.logger.info(f"Users not found in Keycloak: {', '.join(not_found_users)}")
+
+    return jsonify(result)
+
+  except Exception as e:
+    app.logger.error(f"Critical error in getUserNamesAndPhotos: {e}", exc_info=True)
+    return jsonify({"error": "Internal server error"}), 500
 
 @app.route("/getUserLexicons", methods=['GET', 'POST'])
 def getUserLexicons():
@@ -199,7 +240,7 @@ def getUserLexicons():
   row = g.con.fetchone()
   if row is None:
     lexicon = 'CSW' # hard coded default; fix this someday
-    version = '21'
+    version = '24'
     default = 1
     query = f'''insert into user_lexicon_master (userid, lexicon, version, is_default)
              values ("{g.uuid}", "{lexicon}", "{version}", {default})'''
