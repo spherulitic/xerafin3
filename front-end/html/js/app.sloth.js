@@ -465,36 +465,53 @@ serverWriteActive: function() {
       xerafin.error.log.add('sloth game abort failed: ${error.message}', 'error');
       });
   },
-  serverWriteComplete: function(){
+serverWriteComplete: function() {
     this.completeDone = false;
-    let a = (this.questions.correct/this.questions.attempts)*100;
-    let c = slothUI.childUI['SBar'].getProgress();
-    let self=this;
-    $.ajax({
-      type: "POST",
-      data: JSON.stringify({
-        'action':'WRITE_COMPLETED',
-        'user': userid,
-        'alpha':this.question,
-        'token':this.token,
-        'accuracy':a,
-        'correct': c,
-        'lexicon':this.lexicon
-      }),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "/PHP/slothQuery.php",
-      success: function(response,responseStatus){
-        //Returns time and rank
-        let x = JSON.parse(response);
-        console.log(x);
-        slothUI.update("TIMER_FINAL",x.time);
-        self.completeDone= true;
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        xerafin.error.log.add("slothQuery.php, "+jqXHR.status,'error');
-      }
+
+    // Calculate accuracy and progress as before
+    let accuracy = (this.questions.correct / this.questions.attempts) * 100;
+    let correct = slothUI.childUI['SBar'].getProgress();
+
+    // Make sure we have a token
+    if (!this.token) {
+        console.error("Cannot complete game: no active token");
+        xerafin.error.log.add("sloth game completion: no active token", 'error');
+        return;
+    }
+
+    fetchWithAuth('/slothComplete', {
+        method: 'POST',
+        body: JSON.stringify({
+            token: this.token,
+            correct: correct,
+            accuracy: accuracy,
+            // lexicon is derived from user attributes server-side
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => {
+                throw new Error(err.error || `Server error: ${response.status}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+
+        // Update UI with time taken
+        slothUI.update("TIMER_FINAL", data.time_taken);
+
+        // Clear the game state
+        this.completeDone = true;
+        this.token = null;  // Important: clear the token after completion
+
+
+    })
+    .catch(error => {
+        console.error('Error completing game:', error);
+        xerafin.error.log.add(`sloth game completion failed: ${error.message}`, 'error');
     });
-  },
+},
   serverGetRankings: function(){
     let d = JSON.stringify({ 'alpha': this.question });
     fetchWithAuth('getSlothRankings', { method: "POST", body: d })

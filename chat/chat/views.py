@@ -182,7 +182,7 @@ def appendChatToResult(line):
   data = { 'userList': [ userid ] }
   response = requests.post(url, headers=g.headers, json=data).json()
   photo = response[0].get('photo', 'images/unknown_player.gif')
-  name = response[0].get('name')
+  name = response[0].get('name', 'Unknown Player')
 
   return {"chatDate": int(timeStamp), "photo": photo, "name": name,
           "chatText": message, "chatUser": userid, "expire": expire}
