@@ -1,0 +1,74 @@
+# HTTP to HTTPS redirect
+server {
+    listen 80;
+    server_name localhost;
+    return 301 https://$host$request_uri;
+}
+
+# HTTPS wrapper
+server {
+    listen 443 ssl;
+    server_name localhost;
+
+    # SSL for dev
+    ssl_certificate /etc/nginx/ssl/cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/key.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # INCLUDE your existing location blocks
+    include /etc/nginx/conf.d/locations.conf;
+}
+
+# HTTP redirect to HTTPS
+server {
+  listen 80;
+  server_name auth.localhost;
+  return 301 https://auth.localhost$request_uri;
+}
+
+server {
+  listen 443 ssl;
+  server_name auth.localhost;
+
+    # SSL for dev
+    ssl_certificate /etc/nginx/ssl/cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/key.pem;
+
+    # Handle CORS preflight requests in a separate location
+    location / {
+        # Handle OPTIONS requests first
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
+            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+            add_header 'Access-Control-Max-Age' 1728000;
+            add_header 'Content-Type' 'text/plain; charset=utf-8';
+            add_header 'Content-Length' 0;
+            return 204;
+        }
+
+        proxy_pass http://keycloak:8080;
+
+        # Add CORS headers to actual responses
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
+        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
+        add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
+
+        proxy_http_version 1.1;
+        proxy_set_header Host                   $host;
+        proxy_set_header X-Real-IP              $remote_addr;
+        proxy_set_header X-Forwarded-For        $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto      $scheme;
+        proxy_set_header X-Forwarded-Host       $host;
+        proxy_set_header X-Forwarded-Port       $server_port;
+
+        proxy_redirect off;
+
+        # WebSocket support
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        proxy_buffer_size          128k;
+        proxy_buffers              4 256k;
+        proxy_busy_buffers_size    256k;
+    }
+}
