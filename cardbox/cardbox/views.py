@@ -281,9 +281,9 @@ def getCardboxStats():
 
   if coverage:
   ## get these values from the lexicon service (issue #51)
-    allLenFreq = {2: 93, 3: 879, 4: 3484, 5: 8647, 6: 17011, 7: 27485, 8: 36497,
-                  9: 39317, 10: 35415, 11: 28237, 12: 20669, 13: 14211, 14: 9334,
-                  15: 5889}
+    allLenFreq = {2: 93, 3: 883, 4: 3503, 5: 8710, 6: 17142, 7: 27660, 8: 36693,
+                  9: 39572, 10: 35637, 11: 28398, 12: 20775, 13: 14304, 14: 9373,
+                  15: 5919}
      # probably from prefs service -- issue #52
 #    lexicon = getLexicon(userid)
     result["coverage"] = { }
