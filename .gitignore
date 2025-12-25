@@ -2,6 +2,7 @@
 front-end/html/images
 front-end/html/vendor
 front-end/localhost*
+front-end/ssl
 lexicon-db
 lex_upd/prob
 lex_upd/json
