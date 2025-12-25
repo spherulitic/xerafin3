@@ -97,7 +97,7 @@ def createCardboxPrefs():
   params = request.get_json(force=True)
   DEFAULT_PREFS = { "closet": 20, "newWordsAtOnce": 4,
         "reschedHrs": 24, "showNumSolutions": "Y", "cb0max": 200, "schedVersion": 0,
-        "countryId": 0, "lexicon": "csw", "lexiconVersion": 21 }
+        "countryId": 0, "lexicon": "csw", "lexiconVersion": 24 }
   for pref in params:
     default = DEFAULT_PREFS.get(pref)
     if default is not None:
@@ -261,7 +261,7 @@ def getUserLexicons():
   result["lexicon"] = lexicon
   result["version"] = version
   result["default"] = default
-  result["update"] = '21' # latest version of the lexicon. Hardcoded for now
+  result["update"] = '24' # latest version of the lexicon. Hardcoded for now
 
   return jsonify([result])
 
