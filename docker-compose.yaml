@@ -54,7 +54,7 @@ services:
   cardbox:
     image: x-cardbox:latest
     volumes:
-      - cardbox-data:/app/cardbox-data
+      - /var/lib/xerafin/cardbox-data:/app/cardbox-data
       - temp-cardbox-data:/app/temp-data
     depends_on:
       - keycloak
@@ -143,8 +143,6 @@ services:
       - lexicon-db
     restart: "no" # do not restart after completion
 volumes:
-  cardbox-data:
-    external: true
   temp-cardbox-data:
   temp-chat-data:
   quizjson:
