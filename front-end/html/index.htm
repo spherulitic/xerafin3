@@ -54,7 +54,7 @@ function clearOIDCState() {
 
   try {
     window.keycloak = new Keycloak({
-        url: 'https://auth.localhost/',
+        url: '__KEYCLOAK_URL__/',
         realm: 'Xerafin',
         clientId: 'x-client'
     });
