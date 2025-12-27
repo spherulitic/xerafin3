@@ -6,6 +6,8 @@ on:
       - main
 #on:
 #  workflow_dispatch: # Allows manual triggering
+env:
+  PROD_KEYCLOAK_URL: 'https://auth.xerafin.net'
 
 jobs:
   build-and-push:
@@ -29,6 +31,7 @@ jobs:
             ["cron"]="x-cron"
             ["front-end"]="x-frontend"
             ["lexicon"]="x-lexicon"
+            ["lexicon-loader"]="x-lexicon-loader"
             ["login"]="x-login"
             ["quiz"]="x-quiz"
             ["stats"]="x-stats"
@@ -36,6 +39,6 @@ jobs:
           )
           for dir in "${!dir_to_image[@]}"; do
             image_name="${dir_to_image[$dir]}"
-            docker build --pull -t spherulitic/$image_name:latest $dir
+            docker build --pull --build-arg KEYCLOAK_URL=${{env.PROD_KEYCLOAK_URL}} -t spherulitic/$image_name:latest $dir
             docker push spherulitic/$image_name:latest
           done
