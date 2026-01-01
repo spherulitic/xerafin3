@@ -1,0 +1,35 @@
+[Unit]
+Description=Keycloak Identity Provider
+After=xerafin-network.service
+Requires=xerafin-network.service
+
+[Container]
+ContainerName=keycloak
+Image=x-keycloak:latest
+
+Network=systemd-xerafin
+NetworkAlias=keycloak
+
+# PORTS - Running rootless, for admin console
+PublishPort=8080:8080
+PublishPort=8443:8443
+
+# VOLUMES
+Volume=/home/spherulitic/xerafin3/front-end/ssl/dev:/opt/keycloak/certs:ro
+
+# ENVIRONMENT
+EnvironmentFile=/home/spherulitic/xerafin3/config/keycloak.env
+EnvironmentFile=/home/spherulitic/xerafin3/config/common.env
+Environment=CONTAINER_CONMON=/usr/local/bin/conmon
+Environment=CONTAINER_RUNTIME=/home/linuxbrew/.linuxbrew/bin/crun
+
+# Keycloak specific
+PodmanArgs=--entrypoint=/opt/keycloak/bin/kc.sh
+PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
+Exec=start-dev
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
