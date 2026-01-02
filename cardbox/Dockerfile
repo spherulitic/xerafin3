@@ -9,6 +9,9 @@ RUN apt-get install -y default-libmysqlclient-dev
 RUN pip3 install -r requirements.txt
 
 RUN useradd -u 1001 --no-create-home --shell /bin/false appuser
+RUN mkdir /app/temp-data
+RUN chown appuser /app/temp-data
+RUN chgrp appuser /app/temp-data
 COPY . .
 
 USER appuser

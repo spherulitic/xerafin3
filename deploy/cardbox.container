@@ -1,0 +1,29 @@
+[Unit]
+Description=Xerafin Cardbox Service
+After=keycloak.service
+Requires=keycloak.service
+After=xerafin-network.service
+Requires=xerafin-network.service
+
+[Container]
+ContainerName=cardbox
+Image=x-cardbox:latest
+
+# No environment variables needed here
+
+# Network settings for service discovery
+Network=systemd-xerafin
+NetworkAlias=cardbox
+
+# Cardbox service needs cardbox storage and temp space for upload
+Volume=/var/lib/xerafin/cardbox-data:/app/cardbox-data
+
+# Ensure the correct runtime and conmon are used
+Environment=CONTAINER_CONMON=/usr/local/bin/conmon
+PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
