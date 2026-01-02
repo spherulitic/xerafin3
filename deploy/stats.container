@@ -1,0 +1,29 @@
+[Unit]
+Description=Xerafin Stats Service
+After=keycloak.service
+Requires=keycloak.service
+After=xerafin-network.service
+Requires=xerafin-network.service
+
+[Container]
+ContainerName=stats
+Image=x-stats:latest
+
+EnvironmentFile=/home/spherulitic/xerafin3/config/stats.env
+EnvironmentFile=/home/spherulitic/xerafin3/config/mysql.env
+
+# Network settings for service discovery
+Network=systemd-xerafin
+NetworkAlias=stats
+
+Volume=/var/lib/xerafin/awards:/app/awards
+
+# Ensure the correct runtime and conmon are used
+PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
+Environment=CONTAINER_CONMON=/usr/local/bin/conmon
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

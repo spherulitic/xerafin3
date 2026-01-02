@@ -1,0 +1,31 @@
+[Unit]
+Description=Xerafin Lexicon Service
+After=keycloak.service
+Requires=keycloak.service
+After=xerafin-network.service
+Requires=xerafin-network.service
+After=lexicon-db.service
+Requires=lexicon-db.service
+
+[Container]
+ContainerName=lexicon
+Image=x-lexicon:latest
+
+EnvironmentFile=/home/spherulitic/xerafin3/config/mongo.env
+
+# Network settings for service discovery
+Network=systemd-xerafin
+NetworkAlias=lexicon
+
+# Stores DAWG
+Volume=/var/lib/xerafin/word-data:/app/data
+
+# Ensure the correct runtime and conmon are used
+Environment=CONTAINER_CONMON=/usr/local/bin/conmon
+PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

@@ -9,7 +9,7 @@ RUN apt-get install -y default-libmysqlclient-dev
 RUN pip3 install -r requirements.txt
 
 RUN useradd --no-create-home --shell /bin/false appuser
-#RUN mkdir -p /app/chatdata && chown -R appuser:appuser /app/chatdata
+RUN mkdir /app/chatdata && chown -R appuser:appuser /app/chatdata
 
 COPY . .
 

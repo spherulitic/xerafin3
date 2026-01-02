@@ -1,0 +1,42 @@
+[Unit]
+Description=Xerafin Front End
+After=keycloak.service
+After=stats.service
+After=sloth.service
+After=cardbox.service
+After=login.service
+After=quiz.service
+After=chat.service
+Requires=keycloak.service
+Requires=stats.service
+Requires=sloth.service
+Requires=cardbox.service
+Requires=login.service
+Requires=quiz.service
+Requires=chat.service
+
+After=xerafin-network.service
+Requires=xerafin-network.service
+
+[Container]
+ContainerName=frontend
+Image=x-frontend:latest
+
+PublishPort=7080:80
+PublishPort=7443:443
+
+# Network settings for service discovery
+Network=systemd-xerafin
+NetworkAlias=frontend
+
+Volume=/home/spherulitic/xerafin3/front-end/ssl/dev:/etc/nginx/ssl:ro
+
+# Ensure the correct runtime and conmon are used
+Environment=CONTAINER_CONMON=/usr/local/bin/conmon
+PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

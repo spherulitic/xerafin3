@@ -1,0 +1,27 @@
+[Unit]
+Description=Xerafin Subword Sloth Service
+After=keycloak.service
+Requires=keycloak.service
+After=xerafin-network.service
+Requires=xerafin-network.service
+
+[Container]
+ContainerName=sloth
+Image=x-sloth:latest
+
+EnvironmentFile=/home/spherulitic/xerafin3/config/sloth.env
+EnvironmentFile=/home/spherulitic/xerafin3/config/mysql.env
+
+# Network settings for service discovery
+Network=systemd-xerafin
+NetworkAlias=sloth
+
+# Ensure the correct runtime and conmon are used
+Environment=CONTAINER_CONMON=/usr/local/bin/conmon
+PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target

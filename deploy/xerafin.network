@@ -1,0 +1,10 @@
+[Unit]
+Description=Shared network for Xerafin services
+
+[Network]
+# Options: bridge, macvlan, ipvlan
+Driver=bridge
+DisableDNS=false
+
+[Install]
+WantedBy=default.target

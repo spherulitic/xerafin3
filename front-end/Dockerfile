@@ -1,4 +1,4 @@
-FROM nginx:alpine
+FROM nginx:stable-alpine-slim
 RUN mkdir -p /etc/nginx/ssl
 
 # Copy your existing config (renamed to locations.conf)
@@ -11,7 +11,7 @@ ARG NGINX_ENV=dev
 COPY default.conf.${NGINX_ENV} /etc/nginx/conf.d/default.conf
 
 # Get environment-specific Keycloak URL in place for keycloak init
-ARG KEYCLOAK_URL=https://auth.localhost
+ARG KEYCLOAK_URL=https://auth.localhost:7443
 ENV KEYCLOAK_URL=${KEYCLOAK_URL}
 RUN sed -i "s|__KEYCLOAK_URL__|${KEYCLOAK_URL}|" /usr/share/nginx/html/index.htm
 

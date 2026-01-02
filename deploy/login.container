@@ -1,0 +1,29 @@
+[Unit]
+Description=Xerafin Login Service
+After=keycloak.service
+Requires=keycloak.service
+After=xerafin-network.service
+Requires=xerafin-network.service
+
+[Container]
+ContainerName=login
+Image=x-login:latest
+
+EnvironmentFile=/home/spherulitic/xerafin3/config/login.env
+EnvironmentFile=/home/spherulitic/xerafin3/config/mysql.env
+
+# Network settings for service discovery
+Network=systemd-xerafin
+NetworkAlias=login
+
+# No volumes needed
+
+# Ensure the correct runtime and conmon are used
+Environment=CONTAINER_CONMON=/usr/local/bin/conmon
+PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=default.target
