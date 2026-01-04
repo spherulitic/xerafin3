@@ -17,7 +17,7 @@ Network=systemd-xerafin
 NetworkAlias=cardbox
 
 # Cardbox service needs cardbox storage and temp space for upload
-Volume=/var/lib/xerafin/cardbox-data:/app/cardbox-data
+Volume=/var/lib/xerafin/cardbox-data:/app/cardbox-data:rw,U
 
 # Ensure the correct runtime and conmon are used
 Environment=CONTAINER_CONMON=/usr/local/bin/conmon
