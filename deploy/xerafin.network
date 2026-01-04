@@ -4,7 +4,11 @@ Description=Shared network for Xerafin services
 [Network]
 # Options: bridge, macvlan, ipvlan
 Driver=bridge
-DisableDNS=false
+NetworkName=xerafin
+Subnet=10.89.0.0/24
+Gateway=10.89.0.1
+IPv6=true
+Internal=false
 
 [Install]
 WantedBy=default.target
