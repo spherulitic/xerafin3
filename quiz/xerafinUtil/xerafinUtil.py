@@ -6,7 +6,7 @@ import MySQLdb as mysql
 from quiz import app
 
 MYSQL_USER = os.environ.get('MYSQL_USER')
-MYSQL_DB = os.environ.get('MYSQL_DB_QUIZ')
+MYSQL_DB = os.environ.get('MYSQL_DB')
 MYSQL_PWD = os.environ.get('MYSQL_PWD')
 MYSQL_HOST = os.environ.get('MYSQL_HOST')
 

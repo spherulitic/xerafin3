@@ -1,0 +1,7 @@
+-- Development users (coming from Podman network)
+-- Use environment variables or replace placeholders
+CREATE USER IF NOT EXISTS 'chat'@'%' IDENTIFIED BY '${CHAT_DB_PASSWORD}';
+CREATE USER IF NOT EXISTS 'login'@'%' IDENTIFIED BY '${LOGIN_DB_PASSWORD}';
+CREATE USER IF NOT EXISTS 'quiz'@'%' IDENTIFIED BY '${QUIZ_DB_PASSWORD}';
+CREATE USER IF NOT EXISTS 'sloth'@'%' IDENTIFIED BY '${SLOTH_DB_PASSWORD}';
+CREATE USER IF NOT EXISTS 'stats'@'%' IDENTIFIED BY '${STATS_DB_PASSWORD}';

@@ -1,0 +1,6 @@
+-- Grant minimal privileges
+GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON chat.* TO 'chat'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON login.* TO 'login'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON quiz.* TO 'quiz'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON sloth.* TO 'sloth'@'%';
+GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON stats.* TO 'stats'@'%';
