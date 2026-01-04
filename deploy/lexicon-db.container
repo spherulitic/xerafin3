@@ -2,6 +2,7 @@
 Description=MongoDB for Lexicon Data
 After=xerafin-network.service
 Requires=xerafin-network.service
+PartOf=xerafin.target
 
 [Container]
 ContainerName=lexicon-db
@@ -24,4 +25,4 @@ LimitNPROC=64000
 LimitNOFILE=64000
 
 [Install]
-WantedBy=default.target
+WantedBy=xerafin.target

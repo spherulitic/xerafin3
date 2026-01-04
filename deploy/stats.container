@@ -4,6 +4,7 @@ After=keycloak.service
 Requires=keycloak.service
 After=xerafin-network.service
 Requires=xerafin-network.service
+PartOf=xerafin.target
 
 [Container]
 ContainerName=stats
@@ -26,4 +27,4 @@ Environment=CONTAINER_CONMON=/usr/local/bin/conmon
 Restart=always
 
 [Install]
-WantedBy=default.target
+WantedBy=xerafin.target
