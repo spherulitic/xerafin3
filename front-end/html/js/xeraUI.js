@@ -785,8 +785,10 @@ XeraOverviewManager.prototype = {
 //------------------------------------------------------------------------------------------------------>
 }
 function XeraOverviewManager(data){
-  this.stSrc = xerafin.storage.data.overview;
+  this.stSrc = xerafin?.storage?.data?.overview || {};
   //this.listSource = data.listSource || xerafin.io.overviewLists;
+  this.stSrc.currentQuiz = this.stSrc.currentQuiz ?? -1;
+  this.stSrc.currentQuizName = this.stSrc.currentQuizName ?? "Cardbox";
   this.data = {};
   this.data.lexicon = {};
   this.data.lexicon.initialized = false;
