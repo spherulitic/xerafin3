@@ -1,7 +1,8 @@
 [Unit]
-Description=Keycloak Identity Provider
+Description=Keycloak IdP for Xerafin
 After=xerafin-network.service
 Requires=xerafin-network.service
+PartOf=xerafin.target
 
 [Container]
 ContainerName=keycloak
@@ -32,4 +33,4 @@ Exec=start-dev
 Restart=always
 
 [Install]
-WantedBy=default.target
+WantedBy=xerafin.target

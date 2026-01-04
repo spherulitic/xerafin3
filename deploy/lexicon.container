@@ -6,6 +6,7 @@ After=xerafin-network.service
 Requires=xerafin-network.service
 After=lexicon-db.service
 Requires=lexicon-db.service
+PartOf=xerafin.target
 
 [Container]
 ContainerName=lexicon
@@ -28,4 +29,4 @@ PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
 Restart=always
 
 [Install]
-WantedBy=default.target
+WantedBy=xerafin.target

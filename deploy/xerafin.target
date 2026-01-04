@@ -1,0 +1,10 @@
+[Unit]
+Description=Xerafin Application Group
+Wants=chat.service sloth.service login.service quiz.service stats.service cardbox.service keycloak.service frontend.service lexicon-db.service lexicon.service
+After=chat.service sloth.service login.service quiz.service stats.service cardbox.service keycloak.service frontend.service lexicon-db.service lexicon.service
+Requires=xerafin-network.service
+After=xerafin-network.service
+AllowIsolate=yes
+
+[Install]
+WantedBy=default.target

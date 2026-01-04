@@ -1,5 +1,6 @@
 [Unit]
 Description=Shared network for Xerafin services
+Before=xerafin.target
 
 [Network]
 # Options: bridge, macvlan, ipvlan

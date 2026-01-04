@@ -1,8 +1,10 @@
 [Unit]
+Description=Xerafin Chat Service
 After=keycloak.service
 Requires=keycloak.service
 After=xerafin-network.service
 Requires=xerafin-network.service
+PartOf=xerafin.target
 
 [Container]
 ContainerName=chat
@@ -20,4 +22,4 @@ PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
 Restart=always
 
 [Install]
-WantedBy=default.target
+WantedBy=xerafin.target
