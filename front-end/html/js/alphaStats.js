@@ -1,23 +1,23 @@
-function showAlphaStats (alpha) {
+async function showAlphaStats (alpha) {
   if ((typeof alpha!=='object') && (typeof alpha!=='undefined')) {
     if (alpha!==''){
       alpha=alpha.toUpperCase();
-      d = { alpha: alpha };
-    $.ajax({
-      type: "POST",
-      url: "getAuxInfo",
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      data: JSON.stringify(d),
-      success: displayAlphaStats,
-      error: function(jqXHR, textStatus, errorThrown) {
-        console.log("Error getting alphagram stats, status = " + textStatus + " error: " + errorThrown);
-      }
-    });
-    }
-    else {displayAlphaStats();}
+      const d = { alpha: alpha };
+      try {
+        const response = await fetchWithAuth('getAuxInfo', {
+                          method: "POST",
+                          body: JSON.stringify(d) });
+        // Check if response is OK
+        if (!response.ok) {
+             throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        const data = await response.json();
+        displayAlphaStats(data);
+
+      } catch (error) { console.log("Error getting alphagram stats: " + error.message); }
+    } else { displayAlphaStats(); }
   }
 }
-
 
 function createAlphaStatsTable() {
   if (!document.getElementById("pan_5")) {
@@ -46,43 +46,46 @@ function createAlphaStatsTable() {
   document.getElementById('alphaTableBody').innerHTML="";
 }
 
+
 function getCardboxNumberDropdown(alpha, auxIn) {
   /** Cardbox Number List Box Initialisation **/
-  var periodList = document.createElement('select');
+  const periodList = document.createElement('select');
   for(var x=0;x<25;x++) {
-    cbOption = document.createElement("option");
+    const cbOption = document.createElement("option");
     cbOption.text = String(x);
     cbOption.value = x;
     periodList.add(cbOption);
   }
-  if (typeof auxIn!=='undefined') {if (typeof auxIn!=='null') {periodList.value=auxIn;}}
+  if (auxIn !== undefined && auxIn !== null) { periodList.value=auxIn;}
 /** Actions when list box value changes **/
   periodList.onchange = function() {
-    var d = { question: alpha,
+    const d = { question: alpha,
               correct: (periodList.value>0),
               cardbox:periodList.value-1,
               incrementQ: false };
-        $.ajax({
-                type: "POST",
-                url: "submitQuestion",
-                headers: {"Accept": "application/json", "Authorization": keycloak.token},
-                data: JSON.stringify(d),
-                success: function(response, responseStatus) {
-                  gFloatingAlert("cardboxUploadAlert",3000,"Alphagram Info", "Question "+alpha+" updated in cardbox",500);
-                  var aux = response.aux;
-                  if (typeof aux!=='undefined'){
-                    var dueDate = new Date(aux.aux.nextScheduled * 1000);
-                    $('#alphaStatsDueDate').html(gFormatDateForDisplay(dueDate));
-                  }
-                  else {
-                    $('#alphaStatsDueDate').html('');
-                  }
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-        gFloatingAlert("cardboxUploadAlert",3000,"Alphagram Info", "Error: question " + alpha+ " could not be updated.",500);
-                }
-    });
-  };
+    fetchWithAuth("submitQuestion", {
+        method: "POST",
+        body: JSON.stringify(d) })
+        .then(response => {
+           if (!response.ok) {
+              throw new Error(`HTTP ${response.status}`); }
+           return response.json(); })
+        .then(responseData => {
+            gFloatingAlert("cardboxUploadAlert",3000,"Alphagram Info", `Question ${alpha} updated in cardbox`,500);
+            const aux = responseData.aux;
+            const dueDateElement = document.getElementById('alphaStatsDueDate');
+
+            if (aux !== undefined && aux.aux.nextScheduled) {
+              const dueDate = new Date(aux.aux.nextScheduled * 1000);
+              if (dueDateElement) {dueDateElement.innerHTML = gFormatDateForDisplay(dueDate);}
+              } else if (dueDateElement) { dueDateElement.innerHTML = ''; }
+           } )
+        .catch(error => {
+           console.error("Error updating cardbox:", error);
+           gFloatingAlert("cardboxUploadAlert",3000,"Alphagram Info", `Error: question ${alpha} could not be updated.`,500);
+           }
+        );
+      };
   periodList.style.width='25%';
   periodList.id = 'alphaStatsCardbox';
   return periodList;
@@ -161,27 +164,32 @@ function hideAlphaStats() {
 }
 
 function addToCardboxFromStats(word) {
+    const alpha = toAlpha(word);
 
-   var alpha = toAlpha(word);
-   if (confirm("Click OK to add " + alpha + " to your Cardbox.")) {
-      var d = {question: alpha};
-      $.ajax({type: "POST",
-              data: JSON.stringify(d),
-              headers: {"Accept": "application/json", "Authorization": keycloak.token},
-               url: "addQuestionToCardbox",
-           success: addedToCardboxFromStats,
-             error:  function(jqXHR, textStatus, errorThrown) {
-              console.log("Error adding " + alpha + ", status = " + textStatus + " error: " + errorThrown);
-              }} );
-       }
+    if (confirm(`Click OK to add ${alpha} to your Cardbox.`)) {
+        const d = { question: alpha };
+
+        fetchWithAuth("addQuestionToCardbox", {
+            method: "POST",
+            body: JSON.stringify(d) })
+        .then(response => {
+            if (!response.ok) { throw new Error(`HTTP ${response.status}`); }
+            return response.json();
+        })
+        .then(responseData => { addedToCardboxFromStats(responseData); })
+        .catch(error => {
+            console.error(`Error adding ${alpha}:`, error);
+            // Optional: Show error to user
+            gFloatingAlert( "cardboxUploadAlert", 3000, "Alphagram Info", `Error adding ${alpha} to cardbox. Please try again.`, 500);
+        });
+    }
 }
 
-function addedToCardboxFromStats(response, responseStatus) {
-   if (response[1].status == "success") {
-      showAlphaStats(response[0].question);
-   } else if (response[1].status == "invalid alphagram") {
-      gFloatingAlert("cardboxUploadAlert",3000,"Alphagram Info", "Could not add to cardbox: Invalid Alphagram.",500);
-   } else {
-    gFloatingAlert("cardboxUploadAlert",3000,"Alphagram Info", "Error adding to your Cardbox. Please try again.",500);
-  }
+function addedToCardboxFromStats(response) {
+    if (response.status === "success") { showAlphaStats(response.question);
+    } else if (response.status === "invalid alphagram") {
+        gFloatingAlert( "cardboxUploadAlert", 3000, "Alphagram Info", "Could not add to cardbox: Invalid Alphagram.", 500);
+    } else {
+        gFloatingAlert( "cardboxUploadAlert", 3000, "Alphagram Info", "Error adding to your Cardbox. Please try again.", 500);
+    }
 }
