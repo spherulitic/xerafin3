@@ -199,8 +199,7 @@ function createLexiconEnabled(content){
 
 function showUserPrefs(response, responseStatus) {
   appendDebugLog(response[0]);
-  // This should come from keycloak.tokenParsed
-  var nation = "";
+  const nation = keycloak.tokenParsed.cardboxPrefs.countryId;
   var lexes = response;
   if (!document.getElementById("pan_1_d")) {
     panelData = {
@@ -302,16 +301,19 @@ function showUserPrefs(response, responseStatus) {
     $('#nationList').insertAfter($('#prefNationS1'));
     $('#nationList').val(nation);
     $('#nationList').on('change',function(e){
-      var d={userid: userid, nation: $('#nationList').val(), action: ['STN']}
-      $.ajax({
-        type: "POST",
-        url: "getUserLexicons",
-        data: JSON.stringify(d),
-        headers: {"Accept": "application/json", "Authorization": keycloak.token},
-        error: function(jqXHR, textStatus, errorThrown) {
-          console.log("Error retrieving user prefs. Status: " + textStatus + "  Error: " + errorThrown);
-        }
-      });
+      const d = { countryId: parseInt(document.getElementById('nationList').value, 0) };
+      fetchWithAuth("setCardboxPrefs", {
+         method: "POST",
+         body: JSON.stringify(d) })
+      .then(response => { if (!response.ok) {
+           throw new Error(`HTTP ${response.status}`);}
+           return response.json(); })
+      .then(responseData => {
+          gFloatingAlert("countryUpdateAlert",3000,"Preferences","Country updated.",500);
+      })
+      .catch(error => { console.error("Error updating countryId.");
+          gFloatingAlert("countryUpdateAlert",3000,"Preferences","Error updating country.",500);
+          });
     });
 
    // file upload box here

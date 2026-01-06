@@ -124,6 +124,8 @@ def setCardboxPrefs():
     att['reschedHrs'] = [ params.get('reschedHrs') ]
   if 'schedVersion' in params:
     att['schedVersion'] = [ params.get('schedVersion') ]
+  if 'countryId' in params:
+    att['countryId'] = [ params.get('countryId') ]
 
   resp = keycloak_admin.update_user(g.uuid, user)
   return jsonify(resp)
@@ -132,9 +134,6 @@ def setCardboxPrefs():
 def countries():
   result = { }
   query = "SELECT countryid, name, short from countries"
-# I think this query was going to be used for country-level aggregation metrics
-#   unusedquery = """SELECT countrid, name, short, count(distinct countryId) as most from countries, user_prefs
-#                   WHERE countrid = countryId GROUP BY countryid ORDER BY most DESC, LIMIT 5"""
   g.con.execute(query)
   rows = g.con.fetchall()
   rows = [{"id": r[0], "name": r[1], "short": r[2]} for r in rows]
