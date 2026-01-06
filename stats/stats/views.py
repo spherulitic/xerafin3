@@ -75,7 +75,7 @@ def get_user():
 
 
   g.photo = 'images/unknown_player.gif'
-  g.countryId = auth_token.get('countryId', "")
+  g.countryId = auth_token.get('cardboxPrefs', {}).get('countryId', 0)
   g.handle = auth_token.get('preferred_username', g.name)
   # headers to send to other services
   g.headers = {"Accept": "application/json", "Authorization": raw_token}

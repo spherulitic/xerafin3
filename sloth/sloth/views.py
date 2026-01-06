@@ -56,6 +56,7 @@ def get_user():
     auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
     g.uuid = auth_token["sub"]
     g.name = auth_token.get("name", "Unknown")
+    g.countryId = auth_token.get('cardboxPrefs', {}).get('countryId', 0)
   except jwt.ExpiredSignatureError:
     return jsonify({'error': 'Token has expired'}), 401
   except jwt.InvalidTokenError as e:
@@ -330,7 +331,7 @@ def getAlphaRankings(alpha, lexicon):
         'rank': rank,
         'name': user_data.get('name', 'Unknown User'),
         'photo': user_data.get('photo'),
-        'countryId': None,  # Explicitly null for now
+        'countryId': g.countryId,
         'time': row['time_taken'],
         'correct': row['correct'],
         'accuracy': row['accuracy'],
