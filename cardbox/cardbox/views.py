@@ -570,7 +570,6 @@ def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None) : # pylint
   """
   # pylint: disable=too-many-arguments,too-many-locals
   quiz = {}
-  allQuestions = []
 
   # Cardbox doesn't filter, it only prioritizes one cardbox over others
   # If you specifically ask for a cardbox in the backlog, ignore backlogging
@@ -586,65 +585,87 @@ def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None) : # pylint
      "order by case cardbox when ? then -1 else cardbox end, next_scheduled limit ?")
   g.cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
   result = g.cur.fetchall()
-  # run the query. If not enough results are returned, run makeWordsAvailable and then
-  #  run the whole-ass query again. Yikes. See Issue #86
-  while len(result) < numNeeded:
- #  if questionLength is None:
-    makeWordsAvailable()
+  if len(result) < numNeeded:
+    makeWordsAvailable(numNeeded-len(result))
     g.cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
     result = g.cur.fetchall()
- #  else:
- #    makeWordsAvailableWithFilter(numNeeded, questionLength)
   allQuestions = [x[0] for x in result]
   for alpha in allQuestions:
     quiz[alpha] = getAnagrams(alpha)
   return quiz
 
-def makeWordsAvailable() :
+def makeWordsAvailable(words_needed) :
   """
   Sets words with difficulty = -1 to be used by getQuestions
   Used by getQuestionsFromCardbox
   """
   now = int(time.time())
+  futureSweep()
 
   g.cur.execute("select max(cardbox) from questions")
-  maxCardbox = g.cur.fetchone()[0]
-  if maxCardbox is None:
-    maxCardbox = 0
-  if maxCardbox >= 10:
-    maxCardbox = 30
-  soonestNewWordsAt = now + (3600*g.reschedHrs)
-  maxReadAhead = max(now + (maxCardbox*3600*24), soonestNewWordsAt+60)
+  max_cardbox = g.cur.fetchone()[0] or 0
+  if max_cardbox >= 10:
+    max_cardbox = 30
+
+  # only give new words when we clear reschedHrs in the future
+  new_words_nlt = now + (3600*g.reschedHrs)
+  max_work_ahead = max(now + (max_cardbox*3600*24), new_words_nlt+60)
   g.cur.execute("select * from cleared_until")
-  clearedUntil = max([g.cur.fetchone()[0], now])
+  cleared_until = max(g.cur.fetchone()[0], now)
   g.cur.execute("select * from new_words_at")
-  newWordsAt = max([g.cur.fetchone()[0], soonestNewWordsAt])
-  if clearedUntil < newWordsAt:
-    clearedUntil = clearedUntil + 3600
-  else:
-    g.cur.execute("select count(*) from questions where cardbox = 0")
-    cb0cnt = g.cur.fetchone()[0]
-    g.cur.execute("select count(*) from questions where difficulty != 4 " +
-      "and next_Scheduled is not null")
-    readycnt = g.cur.fetchone()[0]
-    # if readycnt = 0, there are no words available to repeat so we must add new
-    #   even overriding newWordsAtOnce = 0 or cb0max
-    if readycnt == 0:
-      addWords(max(g.newWordsAtOnce,1))
-    elif cb0cnt < g.cb0max:
-      addWords(g.newWordsAtOnce)
-    newWordsAt = newWordsAt + 3600
-  if clearedUntil > now:
-    futureSweep()
-    g.cur.execute("update questions set difficulty = -1 " +
-      "where question in (select question from questions " +
-                          "where difficulty = 2 "+
-                          "order by cardbox, next_scheduled limit 10)")
-  g.cur.execute("update questions set difficulty = -1 " +
-    f"where difficulty = 0 and next_scheduled < {clearedUntil}")
-  g.cur.execute(f"update new_words_at set timeStamp = {min(newWordsAt,maxReadAhead)}")
-  g.cur.execute(f"update cleared_until set timeStamp = {min(clearedUntil, maxReadAhead+1)}")
-  # No return; this does database operations and exits
+  # if we previously gave new words for a certain (absolute) time period
+  # do not give new words for that time period again
+  new_words_at = max(g.cur.fetchone()[0], new_words_nlt)
+  seconds_per_backlog = 360 # 10 backlog words per hour working ahead
+  seconds_per_new_word = 3600 / g.newWordsAtOnce # similarly
+
+  g.cur.execute("select count(*) from questions where difficulty = 2")
+  backlog_size = g.cur.fetchone()[0] or 0
+  g.cur.execute("select count(*) from questions where cardbox = 0")
+  cb0_available = g.cb0max - (g.cur.fetchone()[0] or 0)
+
+  g.cur.execute('''SELECT question, cardbox, next_scheduled, difficulty
+                   FROM questions WHERE next_scheduled > ?
+                   ORDER BY next_scheduled ASC limit 1''',(cleared_until,))
+  row = g.cur.fetchone()
+
+  for i in range(0,words_needed):
+    g.cur.execute(""" SELECT question FROM questions
+                      WHERE difficulty = 0 AND next_scheduled < ?
+                      ORDER BY next_scheduled ASC LIMIT 1""", (cleared_until,))
+    row = g.cur.fetchone()
+    if row:
+      g.cur.execute("UPDATE questions SET difficulty = -1 WHERE question = ?", (row[0],))
+      continue
+    if backlog_size > i:
+      if cleared_until <= new_words_at or cb0_available < 1:
+        g.cur.execute("""UPDATE questions SET difficulty = -1
+                     WHERE difficulty = 2
+                     ORDER BY cardbox, next_scheduled LIMIT 1
+                      """)
+        cleared_until = cleared_until + seconds_per_backlog
+      else: # there is backlog, but it's time for a new word
+        addWords(1)
+        cb0_available = cb0_available - 1
+        new_words_at = new_words_at + seconds_per_new_word
+    else: # no backlog
+      g.cur.execute('SELECT min(next_scheduled) FROM questions WHERE difficulty = 0')
+      min_eligible = g.cur.fetchone()[0] or 0
+      if min_eligible == 0: # the emergency situation
+        addWords(1)
+      elif min_eligible < new_words_at or cb0_available < 1:
+        g.cur.execute("""SELECT question FROM questions
+                         WHERE difficulty = 0 AND next_scheduled = ?
+                         LIMIT 1""",(min_eligible,))
+        row = g.cur.fetchone()
+        g.cur.execute("UPDATE questions SET difficulty = -1 WHERE question = ?", (row[0],))
+        cleared_until = min_eligible
+      else:
+        addWords(1)
+        cb0_available = cb0_available - 1
+        new_words_at = new_words_at + seconds_per_new_word
+  g.cur.execute(f'UPDATE cleared_until SET timeStamp = {cleared_until}')
+  g.cur.execute(f'UPDATE new_words_at SET timeStamp = {new_words_at}')
 
 def _add_word (alpha) :
 
@@ -666,6 +687,8 @@ def addWords (numWords) :
         to _add_word (which puts it in the cardbox)
   '''
 
+  if numWords == 0:
+    return
 # We assume everything in next_added and study_order is valid
 
   dbClean()
@@ -681,6 +704,7 @@ def addWords (numWords) :
     for alpha in studyOrderAlphas:
       _add_word(alpha)
   dbClean()
+  return
 
 def _get_from_study_order (numNeeded, getBingo=False):
   ''' Returns the next numNeeded alphagrams from study order. Excludes questions
