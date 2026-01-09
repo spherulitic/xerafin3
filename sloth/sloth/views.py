@@ -379,5 +379,5 @@ def getUserAttributes(user_list):
       return response.json()
     return { }
   except requests.exceptions.RequestException as e:
-    xu.debug(f'Error fetching user data: {e}')
+    app.logger.error(f'Error fetching user data: {e}')
     return { }
