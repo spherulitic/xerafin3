@@ -75,7 +75,7 @@ def get_user():
   mongo_db_name = os.environ.get('MONGO_INITDB_DATABASE')
   g.client = MongoClient(f'mongodb://{mongo_user}:{mongo_pass}@lexicon-db:27017/')
   g.words = g.client[mongo_db_name]['words']
-  g.dawg_filename = '/data/csw24.dawg'
+  g.dawg_filename = '/app/data/csw24.dawg'
 
   return None
 
@@ -233,7 +233,7 @@ def get_sloth_data():
         result.append({
           "alpha": subalpha,
           "words": words,
-          "auxInfo": aux_info
+          "auxInfo": aux_info.get('aux', { })
         })
 
         total_lengths += 1

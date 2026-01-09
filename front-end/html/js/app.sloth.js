@@ -111,21 +111,17 @@ SlothQuestion.prototype = {
   addToCardbox: function(){
     if (this.addDone) {
       this.addDone = false;
-      let self=this;
-      $.ajax({
-        type: "POST",
-        data: JSON.stringify({user: userid, question: this.data.alpha}),
-        headers: {"Accept": "application/json", "Authorization": keycloak.token},
-        url: "addQuestionToCardbox.py",
-        success: function(response,responseStatus){
-          self.addDone=true;
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-          console.log("Error adding " + alpha + ", status = " + textStatus + " error: " + errorThrown);
-        }
+      fetchWithAuth("addQuestionToCardbox", {
+        method: "POST", body: JSON.stringify({question: this.data.alpha}) })
+      .then(response => {
+        if(!response.ok) { throw new Error(`HTTP ${response.status}`); }
+        return response.json();
+      })
+      .then(responseData => { this.addDone=true; })
+      .catch(error=> {
+        console.error(`Error adding ${this.data.alpha}:`, error);
       });
-    }
-    else {
+   } else {
       //add 100ms wait to try again
     }
   },
@@ -140,7 +136,6 @@ SlothQuestion.prototype = {
     // 6: Question is incomplete, not in cardbox, partially answered
     let cb = $.isEmptyObject(this.data.auxInfo) ? false:true;
     let x = (this.data.auxInfo.difficulty!==4);
-    //console.log (this.data.alpha+" "+this.data.auxInfo.difficulty);
     this.endState =
       (this.unanswered.size === 0) ?
         ((cb) ?
@@ -149,7 +144,6 @@ SlothQuestion.prototype = {
         : ((this.unanswered.size === this.words.size) ?
           ((cb) ? 3 : 4) :
           (cb) ? 5 : 6);
-    //console.log(this.data.alpha+": "+this.endState);
   },
   submitQuestion: function(i){
     let x;
@@ -165,22 +159,14 @@ SlothQuestion.prototype = {
       'cardbox': x,
       'incrementQ': i
     };
-    $.ajax({
-    type: "POST",
-    data: JSON.stringify(d),
-    headers: {"Accept": "application/json", "Authorization": keycloak.token},
-    url: "submitQuestion",
-    success: function(response) {
-      if (i){
-        gUpdateCardboxScores (response);
-        gCheckMilestones(response.qAnswered);
-      }
-    },
-    error: function(jqXHR, textStatus, errorThrown) {
-      console.log("Error getting bingo, status = " + textStatus + " error: " + errorThrown);
-        }
-  });
-  },
+    fetchWithAuth("submitQuestion", { method: "POST", body: JSON.stringify(d) })
+    .then(response => { if (!response.ok) {throw new Error(`HTTP ${response.status}`);}
+                        return response.json();
+    })
+    .then(responseData => { if (i) { gUpdateCardboxScores(responseData);
+                                     gCheckMilestones(responseData.qAnswered); } })
+    .catch(error => { console.error(`Error submitting question ${this.data.alpha}`, error); });
+  }
 }
 function SlothQuestion(data){
   this.data = data;
