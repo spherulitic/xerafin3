@@ -614,7 +614,7 @@ serverWriteComplete: function() {
        }
       })
     .catch(error => {
-        console.log("Error testing alpha " + q + ": " + error.message);
+        console.error(`Error testing alpha ${q}: `, error);
         this.testQuestion(q);
      });
   },
@@ -627,77 +627,40 @@ serverWriteComplete: function() {
     else {
       d = {cardbox: localStorage.cardboxCurrent};
     }
-    $.ajax({type: "POST",
-      data: JSON.stringify(d),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "newQuiz",
-      success: function(response,responseStatus){
-        self.getNextBingo();
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        self.getFirstBingo();
-        console.log("Error resetting locks, status = " + textStatus + " error: " + errorThrown);
-      }
-    });
+    fetchWithAuth("newQuiz", { method:"POST", body:JSON.stringify(d) })
+    .then(response => { if(!response.ok) { throw new Error(`HTTP ${response.status}`); }
+                        return response.json(); })
+    .then(responseData => { this.getNextBingo(); } )
+    .catch(error => { this.getNextBingo();
+                      console.error("Error resetting locks", error); });
   },
   getRandomBingo: function(){
-    let self=this;
-    let d;
-    if (localStorage.cardboxSent=='false'){
-      d = { user: userid };
-    }
-    else {
-      d = {user:userid, cardbox: localStorage.cardboxCurrent};
-    }
-    $.ajax({type: "POST",
-      data: JSON.stringify(d),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "getRandomBingo.py",
-      success: function(response,responseStatus){
-        self.question = response.alpha;
-        self.fetchQuestion();
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        console.log("Error getting bingo, status = " + textStatus + " error: " + errorThrown);
-      }
-    });
+    const d = {lengths: [7,8], quantity: 1}
+    fetchWithAuth("getRandomAlphas", { method:"POST", body:JSON.stringify(d) })
+    .then(response => { if(!response.ok) { throw new Error(`HTTP ${response.status}`); }
+                        return response.json(); })
+    .then(responseData => { this.question = responseData[0];
+                            this.fetchQuestion(); })
+    .catch(error => { console.error("Error getting random bingo for Sloth", error)});
   },
-  getNextBingo: async function() {
-    try {
-        const d = localStorage.cardboxSent !== 'false'
-            ? { cardbox: localStorage.cardboxCurrent }
-            : {};
-
-        const response = await fetchWithAuth('getNextBingo', {
-            method: 'POST',
-            body: JSON.stringify(d)
-        });
-
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-        const {result, e} = await response.json(); // Destructure directly
-        this.question = result.alpha;
-        console.log("Got Sloth question ", this.question);
-        this.fetchQuestion();
-
-    } catch (error) {
-        console.error("Error getting bingo:", error);
-    }
+  getNextBingo: function() {
+    const d = localStorage.cardboxSent !== 'false'
+        ? { cardbox: localStorage.cardboxCurrent }
+        : {};
+    fetchWithAuth("getNextBingo", { method:"POST", body:JSON.stringify(d) })
+    .then(response => { if(!response.ok) { throw new Error(`HTTP ${response.status}`); }
+                        return response.json(); })
+    .then(responseData => { this.question = responseData.result.alpha;
+                            this.fetchQuestion(); })
+    .catch(error => { console.error("Error getting sloth bingo:", error); });
 },
   getSlothData: function() {
     this.serverGetRankings();
     let d = { user: userid, alpha: this.question, getAllWords: localStorage.gSlothPref };
 
-    fetchWithAuth("getSlothData", {
-        method: "POST",
-        body: JSON.stringify(d)
-    })
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-    })
+    fetchWithAuth("getSlothData", { method: "POST", body: JSON.stringify(d) })
+    .then(response => { if (!response.ok) { throw new Error(`HTTP error! status: ${response.status}`); }
+                        return response.json(); })
     .then(response => {
         this.data = response.result;
         if (this.data.length === 0) {
@@ -712,33 +675,8 @@ serverWriteComplete: function() {
             this.populate();
         }
     })
-    .catch(error => {
-        console.log("Error: " + error.message);
-    });
+    .catch(error => { console.error("Error getting sloth data: ", error); });
 },
-  resetLocks: function(){
-    let self=this;
-    let d;
-    if (localStorage.cardboxSent=='false'){
-      d = { };
-    }
-    else {
-      d = {cardbox: localStorage.cardboxCurrent};
-    }
-    $.ajax({type: "POST",
-      data: JSON.stringify(d),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "newQuiz",
-      success: function(response,responseStatus){
-        xerafin.error.log.add("Sloth: Question locks reset","HTTP");
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        self.getFirstBingo();
-        xerafin.error.log.add("Sloth: Question locks reset failed","error");
-        console.log("Error resetting locks, status = " + textStatus + " error: " + errorThrown);
-      }
-    });
-  },
   fetchQuestion: function(){
     if (this.question!==null){
       this.getSlothData();
@@ -760,26 +698,18 @@ function Sloth(question,lex){
   //Sloth chat output will either have to be multiple channels, or filter according to lexicons a user has in the chat socket
   //currently, if the overview does not load and populate data before Sloth panel loads, using overview.data.lexicon.current will break
   //All of this sort of data in V2 will need to reside in a higher object than panel level.
-  //So for now, if no lexicon specified, csw 19 is the default.
-  this.lexicon = lex || "CSW19";
+  //So for now, if no lexicon specified, csw 24 is the default.
+  this.lexicon = lex || "CSW24";
   this.lastQuestion = null;
   $('#content_pan_1_b').html('');
   this.init();
 }
 
 function initSloth(q,lex){
-  console.log("initSloth - todo issue #21");
   if (typeof sloth!=='undefined'){
-    if (!sloth.inProgress) {
-      if (sloth.question!==q){sloth = new Sloth(q,lex);}
-    }
-  else {
-      if (typeof q!=='undefined'){
-        sloth = new Sloth(q,lex);
-      }
-   }
-  }
-  else {
+    if (!sloth.inProgress) { if (sloth.question!==q){sloth = new Sloth(q,lex);}
+    } else { if (typeof q!=='undefined'){ sloth = new Sloth(q,lex); } }
+  } else {
    sloth = new Sloth(q,lex);
    sloth.output();
   }
