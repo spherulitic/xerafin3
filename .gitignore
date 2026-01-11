@@ -10,3 +10,4 @@ word-data
 .env
 .scannerwork
 config
+migration/migration_export.sql
