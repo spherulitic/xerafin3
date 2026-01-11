@@ -66,3 +66,73 @@ ORDER BY rows_unexpected DESC; -- Show any unexpected rows first
 
 COMMIT;
 SET FOREIGN_KEY_CHECKS = 1;
+
+-- combined_coin_migration.sql
+START TRANSACTION;
+
+-- user_coin_log migration
+CREATE TABLE IF NOT EXISTS stats.user_coin_log LIKE migration.user_coin_log;
+TRUNCATE TABLE stats.user_coin_log;
+
+INSERT INTO stats.user_coin_log (userid, dateStamp, amount, period, reason, coinType, data)
+SELECT
+    CASE
+        WHEN mp.keycloak_uuid IS NOT NULL THEN mp.keycloak_uuid
+        WHEN ucl.userid IS NOT NULL THEN CONCAT('LEGACY_', ucl.userid)
+        ELSE 'LEGACY_NULL_USER'
+    END AS userid,
+    ucl.dateStamp,
+    ucl.amount,
+    ucl.period,
+    ucl.reason,
+    ucl.coinType,
+    ucl.data
+FROM migration.user_coin_log ucl
+LEFT JOIN migration.migration_progress mp
+    ON ucl.userid = mp.userid;
+
+SELECT "NULL USERIDS" AS "User Coin Log", count(*) from stats.user_coin_log WHERE userid is null;
+
+DELETE FROM stats.user_coin_log WHERE userid IS NULL;
+
+-- user_coin_total migration
+CREATE TABLE IF NOT EXISTS stats.user_coin_total LIKE migration.user_coin_total;
+TRUNCATE TABLE stats.user_coin_total;
+
+INSERT INTO stats.user_coin_total (userid, bronze, silver, gold, platinum, emerald, sapphire, ruby, diamond, dateStamp)
+SELECT
+    CASE
+        WHEN mp.keycloak_uuid IS NOT NULL THEN mp.keycloak_uuid
+        WHEN uct.userid IS NOT NULL THEN CONCAT('LEGACY_', uct.userid)
+        ELSE 'LEGACY_NULL_USER'
+    END AS userid,
+    uct.bronze,
+    uct.silver,
+    uct.gold,
+    uct.platinum,
+    uct.emerald,
+    uct.sapphire,
+    uct.ruby,
+    uct.diamond,
+    uct.dateStamp
+FROM migration.user_coin_total uct
+LEFT JOIN migration.migration_progress mp
+    ON uct.userid = mp.userid;
+
+SELECT "NULL USERIDS" AS "User Coin Total", count(*) from stats.user_coin_total WHERE userid is null;
+
+DELETE FROM stats.user_coin_total WHERE userid IS NULL;
+
+-- Final verification
+SELECT 'Coin Tables Migration Complete' AS status;
+SELECT
+    'user_coin_log' AS table_name,
+    (SELECT COUNT(*) FROM migration.user_coin_log) AS source,
+    (SELECT COUNT(*) FROM stats.user_coin_log) AS target
+UNION ALL
+SELECT
+    'user_coin_total',
+    (SELECT COUNT(*) FROM migration.user_coin_total),
+    (SELECT COUNT(*) FROM stats.user_coin_total);
+
+COMMIT;
