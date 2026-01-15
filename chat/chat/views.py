@@ -136,6 +136,12 @@ def getChats():
   tries = 0
   time.sleep(4)
   chatFile = os.path.join(CHAT_DIR, f'{g.uuid}.chat')
+
+  # Ensure the chat file exists; create it if it doesn't
+  if not os.path.exists(chatFile):
+    with open(chatFile, 'w') as f:
+      pass # Create an empty file
+
   with open(chatFile, 'r') as f:
     lineCounter = 0
     while lineCounter < lastReadRow:
