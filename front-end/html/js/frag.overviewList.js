@@ -107,6 +107,8 @@ OverviewList.prototype = {
 	},
 //--------------------------------------------------
 	processSelectedRows:function(){
+          console.log("process selected rows for:");
+          console.log(this);
 		var self=this;
 		var x = new Array();
 		Object.entries(this.rows).forEach(function([index,value]){

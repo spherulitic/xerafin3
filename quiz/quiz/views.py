@@ -185,7 +185,7 @@ def submitQuestion():
 
   # quiz -1 is cardbox only
   quizid = params.get("quizid", -1)
-  currentCardbox = params.get('cardbox')
+  currentCardbox = params.get('cardbox', None) # None means "not in cardbox"
   alpha = params.get("question")
   correct = params.get('correct') # boolean
   increment = params.get("incrementQ") # boolean
@@ -322,6 +322,7 @@ def getQuizList():
     quizidList = [x[0] for x in g.con.fetchall()]
 
   elif searchType == "quizid":
+    app.logger.info(f'getting quiz {params.get("quizid")}')
     quizidList = [params.get('quizid')]
 
   elif searchType == "new":
@@ -359,6 +360,7 @@ def getQuizList():
     if qid == -1:
       result[-1] = {"quizid": qid, "quizname": "Cardbox", "quizsize": -1, "untried": -1, "unsolved": -1, "status": "Active"}
     else:
+      app.logger.info('DEBUG 1')
       command = "select quiz_name, quiz_size from quiz_master where quiz_id = %s"
       g.con.execute(command, [qid])
       row = g.con.fetchone()
@@ -366,10 +368,12 @@ def getQuizList():
       template["quizid"] = qid
       template["quizname"] = row[0]
       template["quizsize"] = int(row[1])
+      app.logger.info('DEBUG 2')
 
       command = "select count(*), sum(completed), sum(sign(correct)), max(last_answered) from quiz_user_detail where user_id = %s and quiz_id = %s"
       g.con.execute(command, [g.uuid, qid])
       row = g.con.fetchone()
+      app.logger.info('DEBUG 3')
 
       if int(row[0]) == 0:
         template["status"] = "Inactive"
@@ -394,12 +398,14 @@ def getQuizList():
         template["correct"] = int(row[2])
         template["incorrect"] = int(row[1]) - int(row[2])
 
+      app.logger.info('DEBUG 4')
       stmt = "select count(*) from user_quiz_bookmark where user_id = %s and quiz_id = %s"
       g.con.execute(stmt, [g.uuid, qid])
       template["bookmarked"] = (g.con.fetchone()[0] == 1)
       template["sub"] = (searchType == "myQuizzes" and qid != -1 and not template["bookmarked"] )
 
       result[index] = template
+      app.logger.info('DEBUG 5')
 
   return jsonify(result)
 
