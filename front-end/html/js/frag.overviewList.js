@@ -226,8 +226,6 @@ OverviewList.prototype = {
 //-----------------------------------------------------------------------------------------------
 //	A systematic comparison and update of existing rows
 	compareData:function(d){
-		//console.log(d);
-		//console.log(this.data);
 		let i = new Set([...Object.keys(d)]);
 		let c = new Set([...Object.keys(this.data)]);
 		let self = this;
@@ -258,14 +256,9 @@ OverviewList.prototype = {
 		});
 		//Append the rows that are not in the old data
 		let append = new Set([...i].filter(x => !c.has(x)));
-		//console.log("APPEND");
-		//console.log(append);
 		append.forEach(function(v){
 			let x = Number(v);
-			//console.log(v);
-			//console.log(self.data[v]);
 			self.data[x]=d[x];
-			//console.log(self.data);
 			self.addDataRow(x,d[x]);
 		});
 
@@ -278,9 +271,7 @@ OverviewList.prototype = {
 		let y = (this.countSubs ? this.countSubAmount() : 0);
 
 		if (x===0) {
-			//console.log('Results search: '+x);
 			if (this.hasPlaceholder) {
-				console.log('Results search: '+x);
 				$(this.placeholder).html('your search returned no results.');
 				$(this.placeholder).fadeTo(1000,1);
 				$(this.title).hide();
@@ -384,6 +375,9 @@ OverviewList.prototype = {
 		Object.keys(d).length===0 ? $(this.title).hide() : $(this.title).show();
 		if (this.hasTransitions){$(this.listRegion).fadeTo(1000,1);}
 		this.initialized = true;
+                window.dispatchEvent(new CustomEvent('listUpdated', {
+                  detail: { listName: this.id }
+                }));
 	}
 //-----------------------------------------------------------------------------------------------
 }

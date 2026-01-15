@@ -31,7 +31,6 @@ XeraOverviewManager.prototype = {
 //------------------------------------------------------------------------------------------------------>
 
   initUI: function(){
-    //let watchFilter = !(userid == "10106924779084089");
     let watchFilter = true;
     overviewUI = new XeraPanelUI({id:"overviewUI", title:"Overview", targetPanel:0,'disableWatch':watchFilter});
 
@@ -317,12 +316,25 @@ XeraOverviewManager.prototype = {
 //Will do this another way later.
 
   setMySelectionRow:function(value){
-    if (this.listsReady!=='undefined'){clearTimeout(this.listsReady);}
-    if (overviewUI.childUI['activeList'].initialized && overviewUI.childUI['currentList'].initialized){
-      overviewUI.update('CUR_SET_SELECTION_VALUE',value);
-      overviewUI.update('ACT_SET_SELECTION_VALUE',value);
+    // Store what the user wants
+    this._pendingSelectionValue = value;
+
+    // Reset the tracker to wait for fresh 'listUpdated' events
+    this._listsReadyState.activeList = false;
+    this._listsReadyState.currentList = false;
+
+    // Optional: Immediate execution if both lists are already idle/initialized.
+    // This handles the case where no update is in progress.
+    const activeList = overviewUI.childUI['activeList'];
+    const currentList = overviewUI.childUI['currentList'];
+    if (activeList.initialized && currentList.initialized) {
+        // If they're already done, trigger the update immediately.
+        overviewUI.update('CUR_SET_SELECTION_VALUE', value);
+        overviewUI.update('ACT_SET_SELECTION_VALUE', value);
+        this._pendingSelectionValue = null; // Clear since we executed it
     }
-    else {this.listsReady = setTimeout(XeraOverviewManager.prototype.setMySelectionRow.bind(this,value),30);}
+    // If they are NOT initialized (i.e., are updating), just exit.
+    // The _handleListUpdated listener will pick it up later.
   },
 
 //------------------------------------------------------------------------------------------------------>
@@ -796,8 +808,43 @@ function XeraOverviewManager(data){
   this.data.currentQuiz = this.stSrc.currentQuiz;
   this.data.selectedQuizName = this.stSrc.currentQuizName;
   this.data.searchSelection = []
+
+  // Selection Coordinator -- events when quizlists update
+  this._pendingSelectionValue = null;
+  this._listsReadyState = {
+    activeList: false,
+    currentList: false
+  };
+
+  // Bind the event listener to this instance
+  this._handleListUpdated = this._handleListUpdated.bind(this);
+  window.addEventListener('listUpdated', this._handleListUpdated);
+
   this.init();
 }
+
+XeraOverviewManager.prototype._handleListUpdated = function(event) {
+    const listName = event.detail.listName; // e.g., 'activeList' or 'currentList'
+
+    // Mark this specific list as ready
+    if (this._listsReadyState.hasOwnProperty(listName)) {
+        this._listsReadyState[listName] = true;
+    }
+
+    // Check if ALL required lists are now ready AND we have a value to set
+    const allReady = this._listsReadyState.activeList && this._listsReadyState.currentList;
+    if (allReady && this._pendingSelectionValue !== null) {
+        // Both lists are ready! Apply the pending selection.
+        overviewUI.update('CUR_SET_SELECTION_VALUE', this._pendingSelectionValue);
+        overviewUI.update('ACT_SET_SELECTION_VALUE', this._pendingSelectionValue);
+
+        // Reset for the next operation
+        this._pendingSelectionValue = null;
+        this._listsReadyState.activeList = false;
+        this._listsReadyState.currentList = false;
+    }
+}
+
 function initXeraOverview(){
   overview = new XeraOverviewManager({});
 }
