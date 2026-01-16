@@ -42,14 +42,7 @@ CREATE TABLE `quiz_master` (
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
---
--- Dumping data for table `quiz_master`
---
-
-LOCK TABLES `quiz_master` WRITE;
-/*!40000 ALTER TABLE `quiz_master` DISABLE KEYS */;
-/*!40000 ALTER TABLE `quiz_master` ENABLE KEYS */;
-UNLOCK TABLES;
+CREATE INDEX idx_sub_id_quiz_id ON quiz_master(sub_id, quiz_id);
 
 --
 -- Table structure for table `quiz_type_master`
@@ -96,6 +89,9 @@ CREATE TABLE `quiz_user_detail` (
   KEY `quiz_user_idx` (`quiz_id`,`user_id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=939046 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
+
+CREATE INDEX idx_user_quiz_completed
+ON quiz_user_detail(user_id, quiz_id, completed);
 
 --
 -- Dumping data for table `quiz_user_detail`
@@ -154,15 +150,6 @@ CREATE TABLE `sub_user_xref` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
--- Dumping data for table `sub_user_xref`
---
-
-LOCK TABLES `sub_user_xref` WRITE;
-/*!40000 ALTER TABLE `sub_user_xref` DISABLE KEYS */;
-/*!40000 ALTER TABLE `sub_user_xref` ENABLE KEYS */;
-UNLOCK TABLES;
-
---
 -- Table structure for table `user_quiz_bookmark`
 --
 
@@ -175,15 +162,8 @@ CREATE TABLE `user_quiz_bookmark` (
   `create_date` date DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
+CREATE INDEX idx_uid_qid_bookmark ON user_quiz_bookmark(user_id, quiz_id);
 
---
--- Dumping data for table `user_quiz_bookmark`
---
-
-LOCK TABLES `user_quiz_bookmark` WRITE;
-/*!40000 ALTER TABLE `user_quiz_bookmark` DISABLE KEYS */;
-/*!40000 ALTER TABLE `user_quiz_bookmark` ENABLE KEYS */;
-UNLOCK TABLES;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;

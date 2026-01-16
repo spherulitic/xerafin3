@@ -270,16 +270,15 @@ def getQuizList():
 
     quizidSet = set()
     # Subscriptions
-    command = "select sub_id from sub_user_xref where user_id = %s"
+    command = ''' SELECT DISTINCT qm.quiz_id
+                  FROM sub_user_xref sux
+                  JOIN quiz_master qm ON sux.sub_id = qm.sub_id
+                  WHERE sux.user_id = %s
+                  AND qm.sub_id IS NOT NULL
+              '''
     g.con.execute(command, [g.uuid])
-    subList = [x[0] for x in g.con.fetchall()]
+    quizidSet.update([row[0] for row in g.con.fetchall()])
 
-    command = "select quiz_id from quiz_master where sub_id in (%s)"
-    for s in subList:
-      g.con.execute(command, [s])
-      row = g.con.fetchone()
-      if row:
-        quizidSet.add(row[0])
 
     # User Bookmarks
     command = "select quiz_id from user_quiz_bookmark where user_id = %s"
