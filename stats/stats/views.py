@@ -249,9 +249,9 @@ def getUserStatsToday():
 
   return {'questionsAnswered': questionsAnswered, 'startScore': startScore}
 
-def getUserData(uuid):
-  url = f'http://keycloak:8080/auth/admin/Xerafin/users/{uuid}'
-  resp = requests.get(url, headers=g.headers).json()
+def getUserData(uuidList):
+  url = 'http://login:5000/getUserNamesAndPhotos'
+  resp = requests.get(url, headers=g.headers, json={"userList": uuidList}).json()
   return resp
 
 class Metaranks():
@@ -449,13 +449,25 @@ class Metaranks():
                ORDER BY total DESC, date ASC
                LIMIT {self.offset},{self.pageSize} """
     result = self.runQuery()
+    user_info_list = getUserData([row[2] for row in result])
+    user_info_dict = {user["userid"]: user for user in user_info_list}
     rank = self.offset
     self.rankData = [ ]
     foundMe = False
     foundCurrent = False
     for row in result:
       rank += 1
-      rowDict = { "total": row[0], "date": row[1], "userid": row[2]}
+      userid = row[2]
+      user_info = user_info_dict.get(userid, {"name": "Mystery User",
+                                              "photo": "images/unknown_player.gif",
+                                              "countryId": 0})
+      rowDict = { "total": row[0],
+                  "date": row[1],
+                  "userid": row[2],
+                  "name": user_info["name"],
+                  "photo": user_info["photo"],
+                  "countryId": user_info["countryId"]}
+
       if rowDict["userid"] == g.uuid:
         rowDict["isMe"] = True
         if rank == self.userRank:
@@ -518,10 +530,9 @@ class Metaranks():
         userData['countryId'] = g.countryId
         userData["isMe"] = row["isMe"]
       else:
-        keycloakData = getUserData(row["userid"])
-        subData['photo'] = keycloakData.get('photo', 'images/unknown_player.gif')
-        subData['name'] = keycloakData.get('name', 'Mystery User')
-        userData['countryId'] = keycloakData.get('countryId')
+        subData['photo'] = row['photo']
+        subData['name'] = row['name']
+        userData['countryId'] = row.get('countryId', '0')
 
       userData['rank'] = row['rank']
       userData['date'] = self.formatDate(row['date'])
@@ -785,9 +796,19 @@ class Rankings():
                     LIMIT {self.offset},{self.pageSize}'''
     result = self.runQuery()
     self.rankData = [ ]
+    user_info_list = getUserData([row[1] for row in result])
+    user_info_dict = {user["userid"]: user for user in user_info_list}
     foundMe = False
     for index, row in enumerate(result):
-      rowDict = {"total": row[0], "userid": row[1]}
+      userid = row[1]
+      user_info = user_info_dict.get(userid, {"name": "Mystery User",
+                                              "photo": "images/unknown_player.gif",
+                                              "countryId": 0})
+      rowDict = { "total": row[0],
+                  "userid": row[1],
+                  "name": user_info["name"],
+                  "photo": user_info["photo"],
+                  "countryId": user_info["countryId"]}
       if rowDict["userid"] == g.uuid:
         rowDict['isMe'] = True
         foundMe = True
@@ -821,10 +842,9 @@ class Rankings():
         userData['countryId'] = g.countryId
         userData["isMe"] = row["isMe"]
       else:
-        keycloakData = getUserData(row["userid"])
-        subData['photo'] = keycloakData.get('photo', 'images/unknown_player.gif')
-        subData['name'] = keycloakData.get('name', 'Mystery User')
-        userData['countryId'] = keycloakData.get('countryId')
+        subData['photo'] = row['photo']
+        subData['name'] = row['name']
+        userData['countryId'] = row.get('countryId', "0")
 
       userData['rank'] = row['rank']
       userData['users'] = [ subData ]
@@ -975,9 +995,19 @@ class SlothRankings():
                     LIMIT {self.offset},{self.pageSize}'''
     result = self.runQuery
     self.rankData = [ ]
+    user_info_list = getUserData([row[1] for row in result])
+    user_info_dict = {user["userid"]: user for user in user_info_list}
     foundMe = False
     for index, row in enumerate(result):
-      rowDict = {"total": row[0], "userid": row[1]}
+      userid = row[1]
+      user_info = user_info_dict.get(userid, {"name": "Mystery User",
+                                              "photo": "images/unknown_player.gif",
+                                              "countryId": 0})
+      rowDict = { "total": row[0],
+                  "userid": row[1],
+                  "name": user_info["name"],
+                  "photo": user_info["photo"],
+                  "countryId": user_info["countryId"]}
       if rowDict["userid"] == g.uuid:
         rowDict['isMe'] = True
         foundMe = True
@@ -1012,10 +1042,9 @@ class SlothRankings():
         userData['countryId'] = g.countryId
         userData["isMe"] = row["isMe"]
       else:
-        keycloakData = getUserData(row["userid"])
-        subData['photo'] = keycloakData.get('photo', 'images/unknown_player.gif')
-        subData['name'] = keycloakData.get('name', 'Mystery User')
-        userData['countryId'] = keycloakData.get('countryId')
+        subData['photo'] = row['photo']
+        subData['name'] = row['name']
+        userData['countryId'] = row.get('countryId', '0')
 
       userData['rank'] = row['rank']
       userData['users'] = [ subData ]
