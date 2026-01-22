@@ -190,6 +190,7 @@ def getUserNamesAndPhotos():
       if uuid in ['0', '1']:  # System user -- not in keycloak
         userDict["name"] = 'Xerafin'
         userDict['photo'] = 'images/xerafin2.png'
+        userDict['countryId'] = 0
         result.append(userDict)
         continue
 
@@ -197,6 +198,7 @@ def getUserNamesAndPhotos():
         userInfo = keycloak_admin.get_user(uuid)
         userDict["name"] = f'{userInfo["firstName"]} {userInfo["lastName"]}'
         userDict["photo"] = userInfo['attributes'].get('photo', 'images/unknown_player.gif')
+        userDict["countryId"] = userInfo['attributes'].get('countryId', 0)
         result.append(userDict)
 
       except Exception as user_error:
