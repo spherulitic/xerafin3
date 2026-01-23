@@ -30,10 +30,10 @@ QUIZJSON_PATH = "/app/quizjson"
 
 @lru_cache(maxsize=1)
 def get_public_key():
-    public_key_url = 'http://keycloak:8080/realms/Xerafin'
-    with urllib.request.urlopen(public_key_url) as r:
-        public_key = json.loads(r.read())['public_key']
-        return f'''-----BEGIN PUBLIC KEY-----
+  public_key_url = 'http://keycloak:8080/realms/Xerafin'
+  with urllib.request.urlopen(public_key_url) as r:
+    public_key = json.loads(r.read())['public_key']
+    return f'''-----BEGIN PUBLIC KEY-----
 {public_key}
 -----END PUBLIC KEY-----'''
 
@@ -185,7 +185,7 @@ def submitQuestion():
 
   # quiz -1 is cardbox only
   quizid = params.get("quizid", -1)
-  currentCardbox = params.get('cardbox')
+  currentCardbox = params.get('cardbox', None) # None means "not in cardbox"
   alpha = params.get("question")
   correct = params.get('correct') # boolean
   increment = params.get("incrementQ") # boolean
@@ -231,9 +231,9 @@ def submitQuestion():
     result['score'] = resp['score']
   else: # non-cardbox quiz
     if correct:
-      correct(alpha, quizid)
+      mark_correct(alpha, quizid)
     else:
-      wrong(alpha, quizid)
+      mark_wrong(alpha, quizid)
     url = 'http://cardbox:5000/getCardboxScore'
     resp = requests.get(url, headers=g.headers).json()
     result['score'] = resp['score']
@@ -522,7 +522,7 @@ def submitMilestoneChat(milestone):
           'expire': True}
   requests.post(url, headers=g.headers, json=data)
 
-def correct (alpha, quizid) :
+def mark_correct (alpha, quizid) :
 
   ''' Schedules a word in cardbox which has been marked correct
   '''
@@ -530,7 +530,7 @@ def correct (alpha, quizid) :
       "last_answered=NOW(), completed=1 where alphagram = %s and user_id = %s " +
       "and quiz_id = %s", (alpha, g.uuid, quizid))
 
-def wrong (alpha, quizid) :
+def mark_wrong (alpha, quizid) :
 
   ''' Schedules a word in cardbox which has been marked wrong
   '''
@@ -579,7 +579,6 @@ def generateQuiz(**kwargs):
   quizJSON["id"] = quizid
   quizJSON["size"] = kwargs['quantity']
 
-  quizOwner = g.uuid
   command = f'''INSERT INTO quiz_master (quiz_id, quiz_name, quiz_size, sub_id,
                  creator, create_date, quiz_type, length, lexicon, version)
               VALUES ({quizid}, "{quizJSON['name']}", {quizJSON['size']}, {kwargs["sub_id"]},

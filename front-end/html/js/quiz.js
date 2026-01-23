@@ -405,7 +405,7 @@ class Question {
   markCorrect() {
     if (this.readyToSubmit) {
     // for all quizzes, if it's eligible to advance and is correct, update in cardbox
-      if (this.difficulty != 4) {
+      if (this.difficulty != null && this.difficulty != 4) {
         //IF NOT is SUBMITTED FLAG
 
         //appendDebugLog("1C FIRED");
