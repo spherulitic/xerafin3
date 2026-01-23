@@ -30,10 +30,10 @@ QUIZJSON_PATH = "/app/quizjson"
 
 @lru_cache(maxsize=1)
 def get_public_key():
-    public_key_url = 'http://keycloak:8080/realms/Xerafin'
-    with urllib.request.urlopen(public_key_url) as r:
-        public_key = json.loads(r.read())['public_key']
-        return f'''-----BEGIN PUBLIC KEY-----
+  public_key_url = 'http://keycloak:8080/realms/Xerafin'
+  with urllib.request.urlopen(public_key_url) as r:
+    public_key = json.loads(r.read())['public_key']
+    return f'''-----BEGIN PUBLIC KEY-----
 {public_key}
 -----END PUBLIC KEY-----'''
 
@@ -231,9 +231,9 @@ def submitQuestion():
     result['score'] = resp['score']
   else: # non-cardbox quiz
     if correct:
-      correct(alpha, quizid)
+      mark_correct(alpha, quizid)
     else:
-      wrong(alpha, quizid)
+      mark_wrong(alpha, quizid)
     url = 'http://cardbox:5000/getCardboxScore'
     resp = requests.get(url, headers=g.headers).json()
     result['score'] = resp['score']
@@ -322,7 +322,6 @@ def getQuizList():
     quizidList = [x[0] for x in g.con.fetchall()]
 
   elif searchType == "quizid":
-    app.logger.info(f'getting quiz {params.get("quizid")}')
     quizidList = [params.get('quizid')]
 
   elif searchType == "new":
@@ -360,7 +359,6 @@ def getQuizList():
     if qid == -1:
       result[-1] = {"quizid": qid, "quizname": "Cardbox", "quizsize": -1, "untried": -1, "unsolved": -1, "status": "Active"}
     else:
-      app.logger.info('DEBUG 1')
       command = "select quiz_name, quiz_size from quiz_master where quiz_id = %s"
       g.con.execute(command, [qid])
       row = g.con.fetchone()
@@ -368,12 +366,10 @@ def getQuizList():
       template["quizid"] = qid
       template["quizname"] = row[0]
       template["quizsize"] = int(row[1])
-      app.logger.info('DEBUG 2')
 
       command = "select count(*), sum(completed), sum(sign(correct)), max(last_answered) from quiz_user_detail where user_id = %s and quiz_id = %s"
       g.con.execute(command, [g.uuid, qid])
       row = g.con.fetchone()
-      app.logger.info('DEBUG 3')
 
       if int(row[0]) == 0:
         template["status"] = "Inactive"
@@ -398,14 +394,12 @@ def getQuizList():
         template["correct"] = int(row[2])
         template["incorrect"] = int(row[1]) - int(row[2])
 
-      app.logger.info('DEBUG 4')
       stmt = "select count(*) from user_quiz_bookmark where user_id = %s and quiz_id = %s"
       g.con.execute(stmt, [g.uuid, qid])
       template["bookmarked"] = (g.con.fetchone()[0] == 1)
       template["sub"] = (searchType == "myQuizzes" and qid != -1 and not template["bookmarked"] )
 
       result[index] = template
-      app.logger.info('DEBUG 5')
 
   return jsonify(result)
 
@@ -528,7 +522,7 @@ def submitMilestoneChat(milestone):
           'expire': True}
   requests.post(url, headers=g.headers, json=data)
 
-def correct (alpha, quizid) :
+def mark_correct (alpha, quizid) :
 
   ''' Schedules a word in cardbox which has been marked correct
   '''
@@ -536,7 +530,7 @@ def correct (alpha, quizid) :
       "last_answered=NOW(), completed=1 where alphagram = %s and user_id = %s " +
       "and quiz_id = %s", (alpha, g.uuid, quizid))
 
-def wrong (alpha, quizid) :
+def mark_wrong (alpha, quizid) :
 
   ''' Schedules a word in cardbox which has been marked wrong
   '''
@@ -585,7 +579,6 @@ def generateQuiz(**kwargs):
   quizJSON["id"] = quizid
   quizJSON["size"] = kwargs['quantity']
 
-  quizOwner = g.uuid
   command = f'''INSERT INTO quiz_master (quiz_id, quiz_name, quiz_size, sub_id,
                  creator, create_date, quiz_type, length, lexicon, version)
               VALUES ({quizid}, "{quizJSON['name']}", {quizJSON['size']}, {kwargs["sub_id"]},
