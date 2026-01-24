@@ -23,24 +23,13 @@ def load_words():
     print("Starting word data load...")
 
 
-    # Get MongoDB credentials from environment
     mongo_host = os.getenv('MONGO_URL', 'mongodb://mongo:27017')
-    mongo_user = os.getenv('MONGO_INITDB_ROOT_USERNAME', 'admin')
-    mongo_pass = os.getenv('MONGO_INITDB_ROOT_PASSWORD', 'xxx')
     mongo_db = os.getenv('MONGO_INITDB_DATABASE', 'word_db')
 
-    # Build connection string with authentication
-    if '@' in mongo_host:
-        # Already has credentials in URL
-        mongo_uri = mongo_host
-    else:
-        # Add credentials to URL
-        mongo_uri = f"mongodb://{mongo_user}:{mongo_pass}@{mongo_host.split('://')[-1]}/"
+    print(f"Connecting to MongoDB: {mongo_host}")
 
-    print(f"Connecting to MongoDB: {mongo_uri.replace(mongo_pass, '***')}")
-
-    # MongoDB connection with authentication
-    client = MongoClient(mongo_uri)
+    # MongoDB connection without authentication
+    client = MongoClient(mongo_host)
     db = client[mongo_db]
 
     # Test connection
@@ -117,6 +106,13 @@ def load_words():
     db.words.create_index('word')
     db.words.create_index('alphagram')
     print("Indexes created")
+
+    # Create file to signal lexicon-db to restart readOnly
+    signal_file_path = "/tmp/lexicon_loaded"
+    with open(signal_file_path, 'w') as f:
+      f.write('ready')
+
+    print(f"Signal file created at {signal_file_path}")
 
 if __name__ == '__main__':
     load_words()

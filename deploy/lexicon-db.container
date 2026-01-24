@@ -6,7 +6,7 @@ PartOf=xerafin.target
 
 [Container]
 ContainerName=lexicon-db
-Image=mongo:latest
+Image=mongo:7-jammy
 
 EnvironmentFile=/home/spherulitic/xerafin3/config/mongo.env
 Environment=TCMALLOC_PERCPU_CACHE_ENABLED=false
@@ -15,12 +15,24 @@ Environment=TCMALLOC_PERCPU_CACHE_ENABLED=false
 Network=systemd-xerafin
 NetworkAlias=lexicon-db
 
+Tmpfs=/tmp:size=1M
+Volume=/var/lib/xerafin/mongod.conf:/etc/mongod.conf:ro
+Volume=/var/lib/xerafin/mongo-start.sh:/mongo-start.sh:ro
+
 # Ensure the correct runtime and conmon are used
 Environment=CONTAINER_CONMON=/usr/local/bin/conmon
 PodmanArgs=--runtime=/bin/runc --security-opt seccomp=unconfined
+PodmanArgs=--entrypoint=/mongo-start.sh
 
 [Service]
 Restart=always
+RestartSec=10
+
+# Hard memory limits
+MemoryHigh=220M
+MemoryMax=200M
+MemorySwapMax=20M
+
 LimitNPROC=64000
 LimitNOFILE=64000
 

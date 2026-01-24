@@ -19,6 +19,7 @@ NetworkAlias=lexicon-loader
 
 # Stores words.csv
 Volume=/var/lib/xerafin/word-data:/data
+Tmpfs=/tmp:size=1M
 
 # Ensure the correct runtime and conmon are used
 Environment=CONTAINER_CONMON=/usr/local/bin/conmon
