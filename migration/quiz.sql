@@ -1,6 +1,20 @@
 -- quiz_master_migration.sql
 -- Simple copy (creator field is only 0 = system user)
 
+CREATE TABLE IF NOT EXISTS quiz.quiz_type_master LIKE migration.quiz_type_master;
+CREATE TABLE IF NOT EXISTS quiz.sub_master LIKE migration.sub_master;
+
+TRUNCATE TABLE quiz.quiz_type_master;
+TRUNCATE TABLE quiz.sub_master;
+
+INSERT INTO quiz.quiz_type_master (quiz_type, description)
+SELECT quiz_type, description FROM migration.quiz_type_master;
+
+INSERT INTO quiz.sub_master
+(sub_id, sub_group, descr, frequency, quiz_type, quantity, min_length, max_length)
+SELECT sub_id, sub_group, descr, frequency, quiz_type, quantity, min_length, max_length
+FROM migration.sub_master;
+
 -- Create table in quiz database
 CREATE TABLE IF NOT EXISTS quiz.quiz_master LIKE migration.quiz_master;
 
