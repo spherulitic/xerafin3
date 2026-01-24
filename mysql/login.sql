@@ -30,7 +30,7 @@ CREATE TABLE `countries` (
   `continent` int NOT NULL,
   PRIMARY KEY (`countryid`),
   UNIQUE KEY `short` (`short`)
-) ENGINE=InnoDB AUTO_INCREMENT=226 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=226 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -50,7 +50,7 @@ CREATE TABLE `lexicon_info` (
   `country` int NOT NULL DEFAULT '0',
   `replaced_by` varchar(10) DEFAULT NULL,
   UNIQUE KEY `lexicon` (`lexicon`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -66,7 +66,7 @@ CREATE TABLE `user_lexicon_master` (
   `lexicon` varchar(4) DEFAULT NULL,
   `version` varchar(4) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1375 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=1375 DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
