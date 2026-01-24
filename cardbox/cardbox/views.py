@@ -329,6 +329,7 @@ def uploadCardbox():
   if checkCardboxDatabase():
     shutil.move(filename, getDBFile())
     result = {"status": "success"}
+    reset_start_score()
   else:
     result = {"status": "Invalid Cardbox"}
 
@@ -911,3 +912,13 @@ def checkCardboxDatabase ():
     return False
 
   return True
+
+def reset_start_score():
+  ''' Send a request to stats/resetStartScore to reset cardbox movment after upload
+  '''
+  data = {"score": getCardboxScore()}
+  url = 'http://stats:5000/resetStartScore'
+  resp = requests.post(url, headers=g.headers, json={"score": getCardboxScore()}).json()
+  if not resp["success"]:
+    app.logger.info(f"Unable to reset cardbox score on upload for {g.uuid}. See stats log for more info.")
+  return

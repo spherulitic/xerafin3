@@ -166,6 +166,33 @@ def increment():
 
   return (getUserStatsToday())
 
+@app.route("/resetStartScore", methods=['GET', 'POST'])
+def reset_start_score():
+  ''' When a user uploads a cardbox file, reset the start score for the day
+  '''
+  try:
+    data = request.get_json(force=True)
+    new_start_score = data.get("score", 0)
+    query = ''' UPDATE leaderboard SET startScore = %s
+                WHERE userid = %s AND dateStamp = CURDATE() '''
+    g.con.execute(query, (new_start_score, g.uuid))
+    rows_affected = g.con.rowcount
+    return jsonify({
+             "success": True,
+             "message": "Start score updated successfully" if rows_affected > 0 else "No matching record found for today",
+             "error": None }), 200
+
+  except AttributeError as e:
+    app.logger.error(f'Database connection issue: {str(e)}')
+    return jsonify({"success": False,
+                    "message": "Database connection error",
+                    "error": "DB_CONNECTION_ERROR" }), 503
+  except Exception as e:
+    app.logger.error(f'Unexpected error in reset_start_score: {str(e)}', exc_info=True)
+    return jsonify({ "success": False,
+                     "message": "Internal server error",
+                     "error": "INTERNAL_SERVER_ERROR"}), 500
+
 @app.route("/getUserStatsToday", methods=['GET', 'POST'])
 def getUserStatsTodayView():
   ''' Returns questionsAnswered and startScore for the requesting user '''
