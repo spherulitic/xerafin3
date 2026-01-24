@@ -70,10 +70,8 @@ def get_user():
   # headers to send to other services
   g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
-  mongo_user = os.environ.get('MONGO_INITDB_ROOT_USERNAME')
-  mongo_pass = os.environ.get('MONGO_INITDB_ROOT_PASSWORD')
   mongo_db_name = os.environ.get('MONGO_INITDB_DATABASE')
-  g.client = MongoClient(f'mongodb://{mongo_user}:{mongo_pass}@lexicon-db:27017/')
+  g.client = MongoClient(f'mongodb://lexicon-db:27017/')
   g.words = g.client[mongo_db_name]['words']
   g.dawg_filename = '/app/data/csw24.dawg'
 

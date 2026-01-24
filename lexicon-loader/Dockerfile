@@ -12,9 +12,6 @@ RUN useradd --no-create-home --shell /bin/false appuser
 # Copy loader script
 COPY loader.py .
 
-# Create data directory for mounted CSV
-#RUN mkdir -p /data
-
 USER appuser
 
 # Run the loader
