@@ -85,3 +85,6 @@ jobs:
             # Quick status check
             echo "Service status"
             systemctl --user --no-pager status xerafin.target --all
+
+            # Fixing a nonstandard dev configuration
+            find ~/.config/containers/systemd/ -name '*.container' -exec sed -i 's|--runtime=/home/linuxbrew/.linuxbrew/bin/crun|--runtime=/usr/bin/crun|g' {} \;
