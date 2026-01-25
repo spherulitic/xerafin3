@@ -87,9 +87,9 @@ jobs:
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.HOST }}
-          username: ${{ secrets.HOST_USERNAME }}
+          username: spherulitic
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "*.env"
+          source: "./*.env"
           target: "/home/spherulitic/.config/xerafin3/"
           strip_components: 1
 
