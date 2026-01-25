@@ -81,6 +81,7 @@ jobs:
           echo MYSQL_USER=${STATS_MYSQL_USER} > stats.env
           echo MYSQL_DB=${STATS_MYSQL_DB} >> stats.env
           echo MYSQL_PWD=${STATS_MYSQL_PWD} >> stats.env
+          ls -als
 
       - name: Copy .env files
         uses: appleboy/scp-action@v1
