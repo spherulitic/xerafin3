@@ -92,6 +92,16 @@ jobs:
             MYSQL_PWD=${STATS_MYSQL_PWD}
             EOF
 
+      - name: Copy .env files
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.HOST_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "*.env"
+          target: "/home/spherulitic/.config/xerafin/"
+          strip_components: 1
+
       - name: Checkout code
         uses: actions/checkout@v6
 
