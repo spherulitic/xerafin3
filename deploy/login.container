@@ -10,8 +10,8 @@ PartOf=xerafin.target
 ContainerName=login
 Image=x-login:latest
 
-EnvironmentFile=/home/spherulitic/xerafin3/config/login.env
-EnvironmentFile=/home/spherulitic/xerafin3/config/mysql.env
+EnvironmentFile=%h/.config/xerafin3/login.env
+EnvironmentFile=%h/.config/xerafin3/mysql.env
 
 # Network settings for service discovery
 Network=systemd-xerafin

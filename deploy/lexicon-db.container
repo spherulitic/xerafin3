@@ -8,7 +8,7 @@ PartOf=xerafin.target
 ContainerName=lexicon-db
 Image=mongo:7-jammy
 
-EnvironmentFile=/home/spherulitic/xerafin3/config/mongo.env
+EnvironmentFile=%h/.config/xerafin3/mongo.env
 Environment=TCMALLOC_PERCPU_CACHE_ENABLED=false
 
 # Network settings for service discovery

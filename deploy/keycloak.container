@@ -19,8 +19,8 @@ PublishPort=8443:8443
 Volume=/home/spherulitic/xerafin3/front-end/ssl/dev:/opt/keycloak/certs:ro
 
 # ENVIRONMENT
-EnvironmentFile=/home/spherulitic/xerafin3/config/keycloak.env
-EnvironmentFile=/home/spherulitic/xerafin3/config/mysql.env
+EnvironmentFile=%h/.config/xerafin3/keycloak.env
+EnvironmentFile=%h/.config/xerafin3/mysql.env
 Environment=CONTAINER_CONMON=/usr/local/bin/conmon
 Environment=CONTAINER_RUNTIME=/home/linuxbrew/.linuxbrew/bin/crun
 

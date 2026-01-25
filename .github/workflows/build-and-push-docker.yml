@@ -45,7 +45,53 @@ jobs:
   deploy-to-droplet:
     runs-on: ubuntu-latest
     needs: build-and-push
+    env:
+      CHAT_MYSQL_PWD: ${{ secrets.CHAT_MYSQL_PWD }}
+      CHAT_MYSQL_USER: ${{ vars.CHAT_MYSQL_USER }}
+      CHAT_MYSQL_DB: ${{ vars.CHAT_MYSQL_DB }}
+      KEYCLOAK_MYSQL_PWD: ${{ secrets.KEYCLOAK_MYSQL_PWD }}
+      LOGIN_MYSQL_PWD: ${{ secrets.LOGIN_MYSQL_PWD }}
+      LOGIN_MYSQL_USER: ${{ vars.LOGIN_MYSQL_USER }}
+      LOGIN_MYSQL_DB: ${{ vars.LOGIN_MYSQL_DB }}
+      QUIZ_MYSQL_PWD: ${{ secrets.QUIZ_MYSQL_PWD }}
+      QUIZ_MYSQL_USER: ${{ vars.QUIZ_MYSQL_USER }}
+      QUIZ_MYSQL_DB: ${{ vars.QUIZ_MYSQL_DB }}
+      SLOTH_MYSQL_PWD: ${{ secrets.SLOTH_MYSQL_PWD }}
+      SLOTH_MYSQL_USER: ${{ vars.SLOTH_MYSQL_USER }}
+      SLOTH_MYSQL_DB: ${{ vars.SLOTH_MYSQL_DB }}
+      STATS_MYSQL_PWD: ${{ secrets.STATS_MYSQL_PWD }}
+      STATS_MYSQL_USER: ${{ vars.STATS_MYSQL_USER }}
+      STATS_MYSQL_DB: ${{ vars.STATS_MYSQL_DB }}
+
     steps:
+      - name: Generate .env files
+        run: |
+          cat > chat.env << EOF
+            MYSQL_USER=${CHAT_MYSQL_USER}
+            MYSQL_DB=${CHAT_MYSQL_DB}
+            MYSQL_PWD=${CHAT_MYSQL_PWD}
+            EOF
+          cat > login.env << EOF
+            MYSQL_USER=${LOGIN_MYSQL_USER}
+            MYSQL_DB=${LOGIN_MYSQL_DB}
+            MYSQL_PWD=${LOGIN_MYSQL_PWD}
+            EOF
+          cat > quiz.env << EOF
+            MYSQL_USER=${QUIZ_MYSQL_USER}
+            MYSQL_DB=${QUIZ_MYSQL_DB}
+            MYSQL_PWD=${QUIZ_MYSQL_PWD}
+            EOF
+          cat > sloth.env << EOF
+            MYSQL_USER=${SLOTH_MYSQL_USER}
+            MYSQL_DB=${SLOTH_MYSQL_DB}
+            MYSQL_PWD=${SLOTH_MYSQL_PWD}
+            EOF
+          cat > stats.env << EOF
+            MYSQL_USER=${STATS_MYSQL_USER}
+            MYSQL_DB=${STATS_MYSQL_DB}
+            MYSQL_PWD=${STATS_MYSQL_PWD}
+            EOF
+
       - name: Checkout code
         uses: actions/checkout@v6
 
@@ -85,3 +131,6 @@ jobs:
             # Quick status check
             echo "Service status"
             systemctl --user --no-pager status xerafin.target --all
+
+            # Fixing a nonstandard dev configuration
+            find ~/.config/containers/systemd/ -name '*.container' -exec sed -i 's|--runtime=/home/linuxbrew/.linuxbrew/bin/crun|--runtime=/usr/bin/crun|g' {} \;

@@ -8,8 +8,8 @@ PartOf=xerafin.target
 
 [Container]
 ContainerName=chat
-EnvironmentFile=/home/spherulitic/xerafin3/config/chat.env
-EnvironmentFile=/home/spherulitic/xerafin3/config/mysql.env
+EnvironmentFile=%h/.config/xerafin3/chat.env
+EnvironmentFile=%h/.config/xerafin3/mysql.env
 Environment=CONTAINER_CONMON=/usr/local/bin/conmon
 
 Image=x-chat:latest
