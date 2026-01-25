@@ -50,9 +50,28 @@ jobs:
       CHAT_MYSQL_USER: ${{ vars.CHAT_MYSQL_USER }}
       CHAT_MYSQL_DB: ${{ vars.CHAT_MYSQL_DB }}
       KEYCLOAK_MYSQL_PWD: ${{ secrets.KEYCLOAK_MYSQL_PWD }}
+      KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME: ${{ secrets.KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME }}
+      KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD }}
+      KEYCLOAK_USER: ${{ vars.KEYCLOAK_USER }}
+      KEYCLOAK_PASSWORD: ${{ secrets.KEYCLOAK_PASSWORD }}
+      KC_LOGLEVEL: ${{ vars.KC_LOGLEVEL }}
+      KC_PROXY: ${{ vars.KC_PROXY }}
+      KC_PROXY_ADDRESS_FORWARDING: ${{ vars.KC_PROXY_ADDRESS_FORWARDING }}
+      KC_HOSTNAME: ${{ vars.KC_HOSTNAME }}
+      KC_HOSTNAME_STRICT: ${{ vars.KC_HOSTNAME_STRICT }}
+      KC_HOSTNAME_URL: ${{ vars.KC_HOSTNAME_URL }}
+      KC_HTTP_ENABLED: ${{ vars.KC_HTTP_ENABLED }}
+      KC_DB: ${{ vars.KC_DB }}
+      KC_DB_URL: ${{ vars.KC_DB_URL }}
+      KC_DB_USERNAME: ${{ vars.KC_DB_USERNAME }}
+      KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+      KEYSTORE_PATH: ${{ vars.KEYSTORE_PATH }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
       LOGIN_MYSQL_PWD: ${{ secrets.LOGIN_MYSQL_PWD }}
       LOGIN_MYSQL_USER: ${{ vars.LOGIN_MYSQL_USER }}
       LOGIN_MYSQL_DB: ${{ vars.LOGIN_MYSQL_DB }}
+      MYSQL_HOST: ${{ vars.MYSQL_HOST }}
+      MYSQL_PORT: ${{ vars.MYSQL_PORT }}
       QUIZ_MYSQL_PWD: ${{ secrets.QUIZ_MYSQL_PWD }}
       QUIZ_MYSQL_USER: ${{ vars.QUIZ_MYSQL_USER }}
       QUIZ_MYSQL_DB: ${{ vars.QUIZ_MYSQL_DB }}
@@ -70,6 +89,25 @@ jobs:
           echo MYSQL_USER=${CHAT_MYSQL_USER} > generated_envs/chat.env
           echo MYSQL_DB=${CHAT_MYSQL_DB} >> generated_envs/chat.env
           echo MYSQL_PWD=${CHAT_MYSQL_PWD} >> generated_envs/chat.env
+          echo KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME=${KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME} > keycloak.env
+          echo KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD} >> keycloak.env
+          echo KEYCLOAK_USER=${KEYCLOAK_USER} >> keycloak.env
+          echo KEYCLOAK_PASSWORD=${KEYCLOAK_PASSWORD} >> keycloak.env
+          echo KC_LOGLEVEL=${KC_LOGLEVEL} >> keycloak.env
+          echo KC_PROXY=${KC_PROXY} >> keycloak.env
+          echo KC_PROXY_ADDRESS_FORWARDING=${KC_PROXY_ADDRESS_FORWARDING} >> keycloak.env
+          echo KC_HOSTNAME=${KC_HOSTNAME} >> keycloak.env
+          echo KC_HOSTNAME_STRICT=${KC_HOSTNAME_STRICT} >> keycloak.env
+          echo KC_HOSTNAME_URL=${KC_HOSTNAME_URL} >> keycloak.env
+          echo KC_HTTP_ENABLED=${KC_HTTP_ENABLED} >> keycloak.env
+          echo KC_DB=${KC_DB} >> keycloak.env
+          echo KC_DB_URL=${KC_DB_URL} >> keycloak.env
+          echo KC_DB_USERNAME=${KC_DB_USERNAME} >> keycloak.env
+          echo KC_DB_PASSWORD=${KC_DB_PASSWORD} >> keycloak.env
+          echo KEYSTORE_PATH=${KEYSTORE_PATH} >> keycloak.env
+          echo KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD} >> keycloak.env
+          echo MYSQL_HOST=${MYSQL_HOST} > mysql.env
+          echo MYSQL_PORT=${MYSQL_PORT} >> mysql.env
           echo MYSQL_USER=${LOGIN_MYSQL_USER} > generated_envs/login.env
           echo MYSQL_DB=${LOGIN_MYSQL_DB} >> generated_envs/login.env
           echo MYSQL_PWD=${LOGIN_MYSQL_PWD} >> generated_envs/login.env

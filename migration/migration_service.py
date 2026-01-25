@@ -20,6 +20,7 @@ class Config:
     """Configuration from environment variables"""
     # MySQL
     mysql_host: str = os.getenv('MYSQL_HOST', '')
+    mysql_port: int = os.getenv('MYSQL_PORT', 3306)
     mysql_user: str = os.getenv('MYSQL_USER', 'xerafin')
     mysql_db: str = os.getenv('MYSQL_DB', 'migration')
     mysql_pwd: str = os.getenv('MYSQL_PWD', '')
@@ -82,6 +83,7 @@ class MigrationService:
         try:
             self.mysql_conn = mysql.connect(
                 host=self.config.mysql_host,
+                port=self.config.mysql_port,
                 user=self.config.mysql_user,
                 password=self.config.mysql_pwd,
                 database=self.config.mysql_db,
