@@ -23,6 +23,7 @@ DROP TABLE IF EXISTS `chat`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `chat` (
+  `chat_id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `userid` varchar(50) DEFAULT NULL,
   `timeStamp` bigint DEFAULT NULL,
   `message` varchar(1000) DEFAULT NULL,
