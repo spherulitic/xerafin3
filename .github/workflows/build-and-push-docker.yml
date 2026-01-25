@@ -66,31 +66,31 @@ jobs:
     steps:
       - name: Generate .env files
         run: |
-          cat > chat.env << EOF
-            MYSQL_USER=${CHAT_MYSQL_USER}
-            MYSQL_DB=${CHAT_MYSQL_DB}
-            MYSQL_PWD=${CHAT_MYSQL_PWD}
-            EOF
-          cat > login.env << EOF
-            MYSQL_USER=${LOGIN_MYSQL_USER}
-            MYSQL_DB=${LOGIN_MYSQL_DB}
-            MYSQL_PWD=${LOGIN_MYSQL_PWD}
-            EOF
-          cat > quiz.env << EOF
-            MYSQL_USER=${QUIZ_MYSQL_USER}
-            MYSQL_DB=${QUIZ_MYSQL_DB}
-            MYSQL_PWD=${QUIZ_MYSQL_PWD}
-            EOF
-          cat > sloth.env << EOF
-            MYSQL_USER=${SLOTH_MYSQL_USER}
-            MYSQL_DB=${SLOTH_MYSQL_DB}
-            MYSQL_PWD=${SLOTH_MYSQL_PWD}
-            EOF
-          cat > stats.env << EOF
-            MYSQL_USER=${STATS_MYSQL_USER}
-            MYSQL_DB=${STATS_MYSQL_DB}
-            MYSQL_PWD=${STATS_MYSQL_PWD}
-            EOF
+cat > chat.env << EOF
+MYSQL_USER=${CHAT_MYSQL_USER}
+MYSQL_DB=${CHAT_MYSQL_DB}
+MYSQL_PWD=${CHAT_MYSQL_PWD}
+EOF
+cat > login.env << EOF
+MYSQL_USER=${LOGIN_MYSQL_USER}
+MYSQL_DB=${LOGIN_MYSQL_DB}
+MYSQL_PWD=${LOGIN_MYSQL_PWD}
+EOF
+cat > quiz.env << EOF
+MYSQL_USER=${QUIZ_MYSQL_USER}
+MYSQL_DB=${QUIZ_MYSQL_DB}
+MYSQL_PWD=${QUIZ_MYSQL_PWD}
+EOF
+cat > sloth.env << EOF
+MYSQL_USER=${SLOTH_MYSQL_USER}
+MYSQL_DB=${SLOTH_MYSQL_DB}
+MYSQL_PWD=${SLOTH_MYSQL_PWD}
+EOF
+cat > stats.env << EOF
+MYSQL_USER=${STATS_MYSQL_USER}
+MYSQL_DB=${STATS_MYSQL_DB}
+MYSQL_PWD=${STATS_MYSQL_PWD}
+EOF
 
       - name: Copy .env files
         uses: appleboy/scp-action@v1
@@ -99,7 +99,7 @@ jobs:
           username: ${{ secrets.HOST_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "*.env"
-          target: "/home/spherulitic/.config/xerafin/"
+          target: "/home/spherulitic/.config/xerafin3/"
           strip_components: 1
 
       - name: Checkout code
