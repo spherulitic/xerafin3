@@ -57,7 +57,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "deploy/*"
           target: "/home/spherulitic/.config/containers/systemd/"
-          strip_components: 0
+          strip_components: 1
 
       - name: Copy mongo config files
         uses: appleboy/scp-action@v1
@@ -67,7 +67,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "lexicon-db/*"
           target: "/var/lib/xerafin/"
-          strip_components: 0
+          strip_components: 1
 
       - name: Reload systemd and restart all services
         uses: appleboy/ssh-action@v1.2.4
