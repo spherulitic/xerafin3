@@ -1,4 +1,4 @@
-name: Build and Push Docker Images
+name: Build, Push, Deploy Docker Images
 
 on:
   push:
@@ -42,3 +42,46 @@ jobs:
             docker build --pull --build-arg KEYCLOAK_URL=${{env.PROD_KEYCLOAK_URL}} -t spherulitic/$image_name:latest $dir
             docker push spherulitic/$image_name:latest
           done
+  deploy-to-droplet:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Copy .container files
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.HOST_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "deploy/*"
+          target: "/home/spherulitic/.config/containers/systemd/"
+          strip_components: 0
+
+      - name: Copy mongo config files
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.HOST_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "lexicon-db/*"
+          target: "/var/lib/xerafin/"
+          strip_components: 0
+
+      - name: Reload systemd and restart all services
+        uses: appleboy/ssh-action@v1.2.4
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.HOST_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            # Reload systemd to pick up unit file changes
+            systemctl --user daemon-reload
+
+            # Restart all services
+            systemctl --user restart xerafin.target
+
+            # Quick status check
+            echo "Service status"
+            systemctl --user --no-pager status xerafin.target --all
