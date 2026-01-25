@@ -12,7 +12,7 @@ PartOf=xerafin.target
 ContainerName=lexicon
 Image=x-lexicon:latest
 
-EnvironmentFile=/home/spherulitic/xerafin3/config/mongo.env
+EnvironmentFile=%h/.config/xerafin3/mongo.env
 
 # Network settings for service discovery
 Network=systemd-xerafin

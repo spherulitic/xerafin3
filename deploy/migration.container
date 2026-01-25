@@ -9,8 +9,8 @@ Requires=xerafin-network.service
 ContainerName=migration
 Image=x-migration:latest
 
-EnvironmentFile=/home/spherulitic/xerafin3/config/migration.env
-#EnvironmentFile=/home/spherulitic/xerafin3/config/mysql.env
+EnvironmentFile=%h/.config/xerafin3/migration.env
+#EnvironmentFile=%h/.config/xerafin3/mysql.env
 Environment=MYSQL_HOST=192.168.1.12 # override because host.containers.internal isn't working
 
 # Network settings for service discovery

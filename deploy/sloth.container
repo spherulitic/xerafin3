@@ -10,8 +10,8 @@ PartOf=xerafin.target
 ContainerName=sloth
 Image=x-sloth:latest
 
-EnvironmentFile=/home/spherulitic/xerafin3/config/sloth.env
-EnvironmentFile=/home/spherulitic/xerafin3/config/mysql.env
+EnvironmentFile=%h/.config/xerafin3/sloth.env
+EnvironmentFile=%h/.config/xerafin3/mysql.env
 
 # Network settings for service discovery
 Network=systemd-xerafin
