@@ -66,30 +66,31 @@ jobs:
     steps:
       - name: Generate .env files
         run: |
-          echo MYSQL_USER=${CHAT_MYSQL_USER} > chat.env
-          echo MYSQL_DB=${CHAT_MYSQL_DB} >> chat.env
-          echo MYSQL_PWD=${CHAT_MYSQL_PWD} >> chat.env
-          echo MYSQL_USER=${LOGIN_MYSQL_USER} > login.env
-          echo MYSQL_DB=${LOGIN_MYSQL_DB} >> login.env
-          echo MYSQL_PWD=${LOGIN_MYSQL_PWD} >> login.env
-          echo MYSQL_USER=${QUIZ_MYSQL_USER} > quiz.env
-          echo MYSQL_DB=${QUIZ_MYSQL_DB} >> quiz.env
-          echo MYSQL_PWD=${QUIZ_MYSQL_PWD} >> quiz.env
-          echo MYSQL_USER=${SLOTH_MYSQL_USER} > sloth.env
-          echo MYSQL_DB=${SLOTH_MYSQL_DB} >> sloth.env
-          echo MYSQL_PWD=${SLOTH_MYSQL_PWD} >> sloth.env
-          echo MYSQL_USER=${STATS_MYSQL_USER} > stats.env
-          echo MYSQL_DB=${STATS_MYSQL_DB} >> stats.env
-          echo MYSQL_PWD=${STATS_MYSQL_PWD} >> stats.env
+          mkdir -p generated_envs
+          echo MYSQL_USER=${CHAT_MYSQL_USER} > generated_envs/chat.env
+          echo MYSQL_DB=${CHAT_MYSQL_DB} >> generated_envs/chat.env
+          echo MYSQL_PWD=${CHAT_MYSQL_PWD} >> generated_envs/chat.env
+          echo MYSQL_USER=${LOGIN_MYSQL_USER} > generated_envs/login.env
+          echo MYSQL_DB=${LOGIN_MYSQL_DB} >> generated_envs/login.env
+          echo MYSQL_PWD=${LOGIN_MYSQL_PWD} >> generated_envs/login.env
+          echo MYSQL_USER=${QUIZ_MYSQL_USER} > generated_envs/quiz.env
+          echo MYSQL_DB=${QUIZ_MYSQL_DB} >> generated_envs/quiz.env
+          echo MYSQL_PWD=${QUIZ_MYSQL_PWD} >> generated_envs/quiz.env
+          echo MYSQL_USER=${SLOTH_MYSQL_USER} > generated_envs/sloth.env
+          echo MYSQL_DB=${SLOTH_MYSQL_DB} >> generated_envs/sloth.env
+          echo MYSQL_PWD=${SLOTH_MYSQL_PWD} >> generated_envs/sloth.env
+          echo MYSQL_USER=${STATS_MYSQL_USER} > generated_envs/stats.env
+          echo MYSQL_DB=${STATS_MYSQL_DB} >> generated_envs/stats.env
+          echo MYSQL_PWD=${STATS_MYSQL_PWD} >> generated_envs/stats.env
           ls -als
 
       - name: Copy .env files
         uses: appleboy/scp-action@v1
         with:
           host: ${{ secrets.HOST }}
-          username: spherulitic
+          username: ${{ secrets.HOST_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "./*.env"
+          source: "generated_envs/*"
           target: "/home/spherulitic/.config/xerafin3/"
           strip_components: 1
 
