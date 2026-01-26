@@ -3,10 +3,10 @@ FROM quay.io/keycloak/keycloak:latest AS builder
 ENV KC_HEALTH_ENABLED=true
 ENV KC_METRICS_ENABLED=true
 
-COPY build.conf /opt/keycloak/conf
+COPY build.conf /opt/keycloak/conf/
 
 WORKDIR /opt/keycloak
-RUN /opt/keycloak/bin/kc.sh build --config-file=/opt/keycloak/conf/build.conf
+RUN /opt/keycloak/bin/kc.sh build
 
 FROM quay.io/keycloak/keycloak:latest
 COPY --from=builder /opt/keycloak/ /opt/keycloak/
