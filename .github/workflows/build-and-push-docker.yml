@@ -45,7 +45,7 @@ jobs:
             echo
             image_name="${dir_to_image[$dir]}"
             if [ "$dir" = "keycloak" ]; then
-              docker build --pull --build-arg KEYCLOAK_URL=${{env.PROD_KEYCLOAK_URL}} -f Dockerfile.prod -t spherulitic/$image_name:latest $dir
+              docker build --pull --build-arg KEYCLOAK_URL=${{env.PROD_KEYCLOAK_URL}} -f $dir/Dockerfile.prod -t spherulitic/$image_name:latest $dir
             else
               docker build --pull --build-arg KEYCLOAK_URL=${{env.PROD_KEYCLOAK_URL}} -t spherulitic/$image_name:latest $dir
             fi
