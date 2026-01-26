@@ -25,9 +25,7 @@ Environment=CONTAINER_CONMON=/usr/local/bin/conmon
 Environment=CONTAINER_RUNTIME=/home/linuxbrew/.linuxbrew/bin/crun
 
 # Keycloak specific
-PodmanArgs=--entrypoint=/opt/keycloak/bin/kc.sh
 PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
-Exec=start-dev
 
 [Service]
 Restart=always
