@@ -38,6 +38,11 @@ jobs:
             ["cardbox"]="x-cardbox"
           )
           for dir in "${!dir_to_image[@]}"; do
+            echo
+            echo '******************'
+            echo "* BUILDING $dir  *"
+            echo '******************'
+            echo
             image_name="${dir_to_image[$dir]}"
             if [ "$dir" = "keycloak" ]; then
               docker build --pull --build-arg KEYCLOAK_URL=${{env.PROD_KEYCLOAK_URL}} -f Dockerfile.prod -t spherulitic/$image_name:latest $dir
