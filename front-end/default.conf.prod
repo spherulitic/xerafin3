@@ -12,7 +12,8 @@ server {
 
 # HTTPS wrapper
 server {
-    listen 443 ssl http2;
+    listen 443 ssl;
+    http2 on;
     server_name x3.xerafin.net;
 
     # SSL for prod
@@ -29,7 +30,8 @@ server {
 }
 
 server {
-  listen 443 ssl http2;
+  listen 443 ssl;
+  http2 on;
   server_name auth.xerafin.net;
 
   # SSL for prod
@@ -56,7 +58,6 @@ server {
         proxy_set_header Connection "upgrade";
 
         proxy_buffering off;
-        proxy_http_version 1.1;
 
     }
 }
