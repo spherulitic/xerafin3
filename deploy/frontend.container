@@ -30,7 +30,10 @@ PublishPort=7443:443
 Network=systemd-xerafin
 NetworkAlias=frontend
 
-Volume=/home/spherulitic/xerafin3/front-end/ssl/dev:/etc/nginx/ssl:ro
+#Volume=/home/spherulitic/xerafin3/front-end/ssl/dev:/etc/nginx/ssl:ro
+Volume=/etc/letsencrypt/archive/x3.xerafin.net/fullchain1.pem:/etc/nginx/ssl/fullchain.pem:ro
+Volume=/etc/letsencrypt/archive/x3.xerafin.net/privkey1.pem:/etc/nginx/ssl/privkey.pem:ro
+
 
 # Ensure the correct runtime and conmon are used
 Environment=CONTAINER_CONMON=/usr/local/bin/conmon

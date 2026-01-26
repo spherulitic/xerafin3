@@ -1,7 +1,7 @@
 # HTTP server for ACME challenges
 server {
     listen 80;
-    server_name xerafin.net www.xerafin.net;
+    server_name x3.xerafin.net auth.xerafin.net;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -13,11 +13,11 @@ server {
 # HTTPS wrapper
 server {
     listen 443 ssl http2;
-    server_name xerafin.net www.xerafin.net;
+    server_name x3.xerafin.net;
 
     # SSL for prod
-    ssl_certificate /etc/letsencrypt/live/xerafin.net/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/xerafin.net/privkey.pem;
+    ssl_certificate /etc/nginx/ssl/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
 
@@ -33,44 +33,30 @@ server {
   server_name auth.xerafin.net;
 
   # SSL for prod
-  ssl_certificate /etc/letsencrypt/live/xerafin.net/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/xerafin.net/privkey.pem;
+  ssl_certificate /etc/nginx/ssl/fullchain.pem;
+  ssl_certificate_key /etc/nginx/ssl/privkey.pem;
 
     # Handle CORS preflight requests in a separate location
     location / {
-        # Handle OPTIONS requests first
-        if ($request_method = 'OPTIONS') {
-            add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE';
-            add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
-            add_header 'Access-Control-Max-Age' 1728000;
-            add_header 'Content-Type' 'text/plain; charset=utf-8';
-            add_header 'Content-Length' 0;
-            return 204;
-        }
 
         proxy_pass http://keycloak:8080;
 
-        # Add CORS headers to actual responses
-        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS, PUT, DELETE' always;
-        add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
-        add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;
-
         proxy_http_version 1.1;
-        proxy_set_header Host                   $host;
+        proxy_set_header Host                   $http_host;
         proxy_set_header X-Real-IP              $remote_addr;
         proxy_set_header X-Forwarded-For        $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto      $scheme;
         proxy_set_header X-Forwarded-Host       $host;
         proxy_set_header X-Forwarded-Port       $server_port;
 
-        proxy_redirect off;
+#        proxy_redirect off;
 
         # WebSocket support
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
 
-        proxy_buffer_size          128k;
-        proxy_buffers              4 256k;
-        proxy_busy_buffers_size    256k;
+        proxy_buffering off;
+        proxy_http_version 1.1;
+
     }
 }

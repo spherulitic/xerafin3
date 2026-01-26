@@ -45,9 +45,9 @@ jobs:
             echo
             image_name="${dir_to_image[$dir]}"
             if [ "$dir" = "keycloak" ]; then
-              docker build --pull --build-arg KEYCLOAK_URL=${{env.PROD_KEYCLOAK_URL}} -f $dir/Dockerfile.prod -t spherulitic/$image_name:latest $dir
+              docker build --pull -f $dir/Dockerfile.prod -t spherulitic/$image_name:latest $dir
             else
-              docker build --pull --build-arg KEYCLOAK_URL=${{env.PROD_KEYCLOAK_URL}} -t spherulitic/$image_name:latest $dir
+              docker build --pull --build-arg NGINX_ENV=prod  --build-arg KEYCLOAK_URL=https://auth.xerafin.net/ -t spherulitic/$image_name:latest $dir
             fi
             docker push spherulitic/$image_name:latest
           done
@@ -70,6 +70,8 @@ jobs:
       LOGIN_MYSQL_PWD: ${{ secrets.LOGIN_MYSQL_PWD }}
       LOGIN_MYSQL_USER: ${{ vars.LOGIN_MYSQL_USER }}
       LOGIN_MYSQL_DB: ${{ vars.LOGIN_MYSQL_DB }}
+      MONGO_INITDB_DATABASE: ${{ vars.MONGO_INITDB_DATABASE }}
+      MONGO_URL: ${{ vars.MONGO_URL }}
       MYSQL_HOST: ${{ vars.MYSQL_HOST }}
       MYSQL_PORT: ${{ vars.MYSQL_PORT }}
       QUIZ_MYSQL_PWD: ${{ secrets.QUIZ_MYSQL_PWD }}
@@ -97,6 +99,8 @@ jobs:
           echo KC_DB_URL=${KC_DB_URL} >> generated_envs/keycloak.env
           echo KC_DB_USERNAME=${KC_DB_USERNAME} >> generated_envs/keycloak.env
           echo KC_DB_PASSWORD=${KC_DB_PASSWORD} >> generated_envs/keycloak.env
+          echo MONGO_INITDB_DATABASE=${MONGO_INITDB_DATABASE} > generated_envs/mongo.env
+          echo MONGO_URL=${MONGO_URL} >> generated_envs/mongo.env
           echo MYSQL_HOST=${MYSQL_HOST} > generated_envs/mysql.env
           echo MYSQL_PORT=${MYSQL_PORT} >> generated_envs/mysql.env
           echo MYSQL_USER=${LOGIN_MYSQL_USER} > generated_envs/login.env
