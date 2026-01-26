@@ -35,6 +35,7 @@ jobs:
             ["login"]="x-login"
             ["quiz"]="x-quiz"
             ["stats"]="x-stats"
+            ["sloth"]="x-sloth"
             ["cardbox"]="x-cardbox"
           )
           for dir in "${!dir_to_image[@]}"; do
