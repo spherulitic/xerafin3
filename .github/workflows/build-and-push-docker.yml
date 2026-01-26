@@ -160,7 +160,7 @@ jobs:
             find ~/.config/containers/systemd/ -name '*.container' -exec sed -i 's|--runtime=/home/linuxbrew/.linuxbrew/bin/crun|--runtime=/usr/bin/crun|g' {} \;
 
             # Fix path to certs for keycloak
-            sed -i 's|Volume=/home/spherulitic/xerafin3/front-end/ssl/dev|Volume=/etc/letsencrypt/live/x3.xerafin.net|' ~/.config/containers/systemd/keycloak.container
+            sed -i 's|Volume=/home/spherulitic/xerafin3/front-end/ssl/dev|Volume=/etc/letsencrypt/archive/x3.xerafin.net|' ~/.config/containers/systemd/keycloak.container
 
             # Reload systemd to pick up unit file changes
             systemctl --user daemon-reload
