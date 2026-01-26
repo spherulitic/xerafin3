@@ -10,7 +10,7 @@ server {
     return 301 https://$host$request_uri;
 }
 
-# HTTPS wrapper
+# HTTPS wrapper for main application
 server {
     listen 443 ssl;
     http2 on;
@@ -20,44 +20,51 @@ server {
     ssl_certificate /etc/nginx/ssl/fullchain.pem;
     ssl_certificate_key /etc/nginx/ssl/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
+    ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+    ssl_prefer_server_ciphers on;
 
-    # Security header
-    add_header Strict-Transport-Security "max-age=63072000";
+    # Security header - HSTS
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
-    # INCLUDE the SAME location blocks
     include /etc/nginx/conf.d/locations.conf;
 }
 
+# Keycloak server
 server {
-  listen 443 ssl;
-  http2 on;
-  server_name auth.xerafin.net;
+    listen 443 ssl;
+    http2 on;
+    server_name auth.xerafin.net;
 
-  # SSL for prod
-  ssl_certificate /etc/nginx/ssl/fullchain.pem;
-  ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+    # SSL for prod
+    ssl_certificate /etc/nginx/ssl/fullchain.pem;
+    ssl_certificate_key /etc/nginx/ssl/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+    ssl_prefer_server_ciphers on;
 
-    # Handle CORS preflight requests in a separate location
+    # Security header for Keycloak domain too
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
     location / {
-
         proxy_pass http://keycloak:8080;
 
-        proxy_http_version 1.1;
-        proxy_set_header Host                   $http_host;
-        proxy_set_header X-Real-IP              $remote_addr;
-        proxy_set_header X-Forwarded-For        $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto      $scheme;
-        proxy_set_header X-Forwarded-Host       $host;
-        proxy_set_header X-Forwarded-Port       $server_port;
-
-#        proxy_redirect off;
+        # ABSOLUTELY CRITICAL for Keycloak
+        proxy_set_header Host               $http_host;       # or $host
+        proxy_set_header X-Real-IP          $remote_addr;
+        proxy_set_header X-Forwarded-For    $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto  $scheme;          # Must be 'https'
+        proxy_set_header X-Forwarded-Host   $host;            # Must be 'auth.xerafin.net'
+        proxy_set_header X-Forwarded-Port   $server_port;
 
         # WebSocket support
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
+        proxy_set_header Upgrade            $http_upgrade;
+        proxy_set_header Connection         "upgrade";
 
+        proxy_http_version 1.1;
         proxy_buffering off;
 
+        # Consider adjusting timeouts for Keycloak admin operations
+        # proxy_read_timeout 300s;
+        # proxy_connect_timeout 75s;
     }
 }
