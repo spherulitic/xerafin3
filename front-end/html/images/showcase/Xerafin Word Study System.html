@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<!-- saved from url=(0051)http://xerafin.cross-tables.com/xerafin/indexRF.php -->
+<html lang="en" style="overflow: auto;"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Xerafin Word Study System</title>
+	<link rel="icon" type="image/png" href="http://xerafin.cross-tables.com/xerafin/images/xerafin.png">
+	<link rel="apple-touch-icon" href="http://xerafin.cross-tables.com/xerafin/apple-icon-144x144.png">
+	<script id="facebook-jssdk" src="./Xerafin Word Study System_files/sdk.js.download"></script><script src="./Xerafin Word Study System_files/protoRF.js.download"></script>
+	<script src="./Xerafin Word Study System_files/jquery-3.3.1.min.js.download"></script>
+	<script src="./Xerafin Word Study System_files/jquery-ui.min.js.download"></script>
+	<script src="./Xerafin Word Study System_files/jquery.ui.touch-punch.min.js.download"></script>
+    <script src="./Xerafin Word Study System_files/polyfill.min.js.download"></script>
+	<!-- Bootstrap code -->
+	<link rel="stylesheet" href="./Xerafin Word Study System_files/bootstrap.min.css">
+	<link rel="stylesheet" href="./Xerafin Word Study System_files/bootstrap-theme.min.css">
+	<script src="./Xerafin Word Study System_files/bootstrap.min.js.download"></script>
+	<link href="./Xerafin Word Study System_files/stylesRF.css" rel="stylesheet" type="text/css">
+	<script>
+<!---Prototypes--->
+
+
+
+<!---Error Reporting------------------------------------------------------------------------------------------->
+window.onerror = function(e,f,g,h,i){
+	if (typeof h!=='undefined'){
+		if (typeof i.stack!=='undefined'){
+			alert(e+" in "+f+" at "+g+","+h+" Stack Trace: "+i.stack);
+		}
+		else {
+			alert(e+" in "+f+" at "+g+","+h+" Error: "+i);
+		}
+	}
+	else {
+		alert(e+" in "+f+" at line "+g);
+	}
+};
+window.onscripterror = function(e){
+	if (typeof e.stack!=='undefined'){
+		alert(e.stack);
+	}
+};
+<!------------------------------------------------------------------------------------------------------------->
+window.fbAsyncInit = function() {
+	FB.init({
+		appId      : '1685551981765809',
+		xfbml      : true,
+		cookie     : true,
+		status     : false,
+		version    : 'v2.7'
+	});
+	FB.getLoginStatus(function(response) {
+		statusChangeCallback(response);
+	});
+};  // end fbAsyncInit
+<!--- JQuery to deal with the bootstrap 3 issue of not auto-closing collapsed menus on small devices ---------->
+$(document).on('click','.navbar-collapse.in',function(e) {
+    if( $(e.target).is('a') && $(e.target).attr('class') != 'dropdown-toggle' ) {
+        $(this).collapse('hide');
+    }
+});
+<!------------------------------------------------------------------------------------------------------------->
+function browserSupportTable(target){
+	var browserArray = new Array();
+	var browserInfo = new Array();
+	var tableElem;
+	var brRowName = document.createElement('td');
+	browserArray = [
+					['Chrome',true,true,31],
+					['Edge',true,false,12],
+					['Firefox',true,false,41],
+					['Opera',true,true,50],
+					['Safari', true,true,9]
+				];
+	browserInfo = ['&nbsp;','&nbsp;','Functions as Expected','Displays as Expected','Earliest Versions Supported'];
+	var brHeading = document.createElement('div');
+	brHeading.className+="browserHeading";
+	brHeading.innerHTML= "Major Browser Support";
+	$('#'+target).append(brHeading);
+	var brTable = document.createElement('table');
+	brTable.className+='browserTable';
+	for (var x=0;x<browserArray[0].length+1;x++){
+		var tableRow = document.createElement('tr');
+		tableElem = document.createElement('td');
+		tableElem.innerHTML=browserInfo[x];
+		tableRow.appendChild(tableElem);
+		for (var y=0;y<browserArray.length;y++){
+			tableElem = document.createElement('td');
+			if (x===0) {
+				var browImg = new Image();
+				browImg.src="images/browsers/"+browserArray[y][0].toLowerCase()+"_128x128.png";
+				browImg.className+="browserImg";
+				tableElem.appendChild(browImg);
+			}
+			else if ((x==2)||(x==3)) {
+				browserArray[y][x-1] == true ? tableElem.innerHTML='<span style="color:green">&#x2714;</span>' : tableElem.innerHTML='<span style="color:red">&#x2717;</span>';
+			}
+			else {tableElem.innerHTML=browserArray[y][x-1];}
+			tableRow.appendChild(tableElem);
+		}
+		brTable.appendChild(tableRow);
+	}
+	$('#'+target).append(brTable);
+}
+<!------------------------------------------------------------------------------------------------------------->
+function debounce(fn, delay) {
+  var timer = null;
+  return function () {
+    var context = this, args = arguments;
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      fn.apply(context, args);
+    }, delay);
+  };
+}
+<!------------------------------------------------------------------------------------------------------------->
+function isMobile() {
+return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+function once(fn, context) {
+	var result;
+	return function() {
+		if (fn) {
+			result = fn.apply(context || this, arguments);
+			fn = null;
+		}
+
+		return result;
+	};
+}
+$('#Area1').ready(function(){getUnloggedStats();});
+$('#Area3').ready(function(){browserSupportTable('Area3');});
+$('#showcase').ready(function(){displayShowcase();});
+$('#rightAreaHome').ready(function(){switch_areas();});
+
+<!------------------------------------------------------------------------------------------------------------->
+		function getUnloggedStats(){
+			$.ajax({
+				type: "POST",
+				url: "getAllTimeStats.py",
+				success: function(response,responseStatus){
+					console.log(response);
+					$('#Area1').html("<div>Since <span style='font-weight:bold;'>11/10/2016</span>, <span style='font-weight:bold;'>"+response[0].users+"</span> Xerafin users have answered <span style='font-weight:bold;'>"+response[0].questions+"</span> alphagrams.  That's an average of <span style='font-weight:bold;'>"+Math.ceil(Number(response[0].questions)/Number(response[0].users))+"</span> per user!</div>");
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					alert("Error, status = " + textStatus + " error: " + errorThrown);
+				}
+			});
+		}
+<!------------------------------------------------------------------------------------------------------------->
+		function displayShowcase(){
+			var showcase = new Showcase ([
+				["What is Xerafin?","images/xerafinNew.png","Xerafin is an online study environment for word games.  The website is under constant development and designed with the concept of word study being a social activity that is both addictive and highly competitive!",{size:'70%'}],
+				["Will this work on my phone?","images/showcase/mobile.png","As long as you have internet access and a supported browser everything should work.  Xerafin adjusts its layout to your desktop, laptop, pad or phone and remains in sync with all of them.",{position:'top',size:'80%'}],
+				["Games: Subword Sloth","images/showcase/Sloth.gif","Find as many subanagrams as you can against the clock.  Review the answers and discover new words to add to your study routine.",{position:'top',size:'75%'}],
+				["So is it an app or a game?","images/showcase/desktopShot.gif","We like to think of it as both, attempting to combine the power of an app with the entertainment value of a game.  We also see Xerafin as a community, with many of our earliest users being familiar with each other from the tournament Scrabble scene.",{size:'100%'}],
+			],
+			'showcase');
+			showcase.init();
+		}
+<!------------------------------------------------------------------------------------------------------------->
+		function URLExists(url) {
+			var http = new XMLHttpRequest();
+			http.open('HEAD', url, false);
+			http.send();
+			return http.status != 404;
+		}
+<!------------------------------------------------------------------------------------------------------------->
+		//var screenOrientation = ($(window).width() > $(window).height())? 90 : 0;
+		$.ajaxSetup({cache: false});
+		if (!isMobile()) {$(window).resize(debounce(function(event){onResize();},50))}
+		else {$(window).resize(function(event){debounce(function(event){switch_areas();},50)})};
+<!------------------------------------------------------------------------------------------------------------->
+		function resizeTiles(){
+			if ($("#alphaSuper").length){
+				resizeHookFontQuiz();
+			}
+			if ($("#tileContainer").length){
+				var subAlpha = '';
+				$.each($('#tileContainer').find('[id^=tile]'), function() {
+					subAlpha += $(this).text();
+				});
+				stringToTiles(subAlpha, '#alphagram');
+			}
+		}
+<!------------------------------------------------------------------------------------------------------------->
+		function switch_areas(){
+			if ($('#mainLayer').length>0){
+			$('#mainLayer').ready(function (){
+				if ($( window ).width()>=991){
+					$( "#leftArea" ).before( $("#middleArea" ) );
+					var y=$(window).height()-$('#mainLayer').offset().top-50;
+					var cols=["#leftArea","#middleArea","#rightArea"];
+					for (var z=0;z<3;z++){
+						$(cols[z]).css('min-height',y);
+						if ($(cols[z]).height() < y){$(cols[z]).css('height',y)};
+					}
+				}
+				else {
+					$( "#middleArea" ).before( $("#leftArea" ) );
+					var cols=["#leftArea","#middleArea","#rightArea"];
+					for (var z=0;z<3;z++){
+						$(cols[z]).css('min-height',15);
+						$(cols[z]).css('height','auto');
+					}
+				}
+			});
+			}
+			if ($('#homeLayer').length>0){
+			$('#homeLayer').ready(function (){
+				if ($( window ).width()>=991){
+					$( "#leftAreaHome" ).before( $("#middleAreaHome" ) );
+					var y=$(window).height()-$('#homeLayer').offset().top-50;
+					var cols=["#leftAreaHome","#middleAreaHome","#rightAreaHome"];
+					for (var z=0;z<3;z++){
+						$(cols[z]).css('min-height',y);
+						if ($(cols[z]).height() < y){$(cols[z]).css('height',y)};
+					}
+				}
+				else {
+					$( "#middleAreaHome" ).before( $("#leftAreaHome" ) );
+					var cols=["#leftAreaHome","#middleAreaHome","#rightAreaHome"];
+					for (var z=0;z<3;z++){
+						$(cols[z]).css('min-height',15);
+						$(cols[z]).css('height','auto');
+					}
+				}
+			});
+			}
+		}
+<!------------------------------------------------------------------------------------------------------------->
+		function onResize(){
+			resizeTiles();
+			if ($('#userDisplayArea').length>0){
+				if ( $( "#userDisplayArea" ).has('img')){displayUserArray(usersArray);}
+
+			}
+			switch_areas();
+			if (typeof announce!=='undefined'){announce.setDimensions();}
+			if (typeof overContainer!=='undefined'){overContainer.draw();}
+
+		}
+		//$('.navbar-collapse ul li a').click(function(){
+		//	$(".navbar-collapse").collapse('hide');
+		//});
+<!------------------------------------------------------------------------------------------------------------->
+		/**Independent Global Variables**/
+		dot = "&#183;";
+		debuglog = "";
+		passThroughs = 0;
+		var leaderboardTimeout;
+		/**localStorage Variable Initialization**/
+		if (!localStorage.qQCounter) {localStorage.qQCounter = 0;}
+		if (!localStorage.qQCorrect) {localStorage.qQCorrect = 0;}
+		if (!localStorage.qQAlpha) {localStorage.qQAlpha = 0;}
+		if (!localStorage.gAlphaSortInput) {localStorage.gAlphaSortInput = 0;}
+		if (!localStorage.gAlphaDisplay) {localStorage.gAlphaDisplay = 0;}
+		if (!localStorage.gSlothPref) {localStorage.gSlothPref = 0;}
+		if (!localStorage.soundEnabled) {localStorage.soundEnabled = true;}
+		if (!localStorage.musicEnabled) {localStorage.musicEnabled = true;}
+		if (!localStorage.middleDefault) {localStorage.middleDefault = 0;}
+		if (typeof localStorage.qCardboxStartScore==='undefined'){
+			localStorage.setItem('qCardboxStartScore','0');
+			localStorage.setItem('qCardboxScore','0');
+			localStorage.setItem('qCardboxQAnswered','0');
+			localStorage.setItem('qCardboxDiff','0');
+		}
+
+<!------------------------------------------------------------------------------------------------------------->
+		function checkLoginState() {
+			FB.getLoginStatus(function(response) {
+				statusChangeCallback(response); } );
+		}
+<!------------------------------------------------------------------------------------------------------------->
+		function statusChangeCallback(response) {
+			appendDebugLog("<br>Client FB Login Status is " + response.status);
+			console.log(response);
+			if (response.status === 'connected')  {
+				overlay=new Overlay({opacity:0.3});
+				$('#fbButton').css('display','none');
+				$('#logProgress').html("Contacting Facebook");
+				<!-- Populate FB Data and some counters -->
+				//fields=id,name,first_name,last_name,birthday,email,location
+			FB.api('me?fields=id,name,first_name,last_name', function(mydata) {
+					FB.api('/me/picture', {redirect:false, height:50, width:50}, function(mypic) {
+						console.log(mydata);
+						console.log(mypic);
+						loginData = {name: mydata.name, firstName:mydata.first_name, lastName:mydata.last_name, photo: mypic.data.url, id: response.authResponse.userID, token: response.authResponse.accessToken}
+						userid = response.authResponse.userID;
+												username = mydata.name;
+						questionCounter = 0;
+						correctCounter = 0;
+						leaderboardPanel = "today";
+						cardboxStatsPanel = "dueNow";
+					$.ajax({
+						type: "POST",
+						url: "getCardboxScore.py",
+						data: JSON.stringify({user: userid}),
+						success: function(response2, responseStatus2) {
+							console.log(response2[0]);
+							if (!localStorage.qQScore) {localStorage.qQScore = response2[0].score;}
+							if (!localStorage.qQAlpha) {localStorage.qQAlpha = 0;}
+						},
+						error: function(jqXHR, textStatus, errorThrown) {
+							console.log("Error getting cardbox score, status = " + textStatus + " error: " + errorThrown); }
+						});
+						$('#logProgress').html("Connecting to Xerafin");
+					$.ajax({
+						type: "POST",
+						url: "login.py",
+						data: JSON.stringify(loginData),
+						success: loginCallback,
+						error: function(jqXHR, textStatus, errorThrown) {
+							alert("Error, status = " + textStatus + " error: " + errorThrown);
+						}
+					});
+				})
+			});
+			}
+			else {
+				$('#unlogged').css("visibility","visible");
+				$('#fbButton').css("display","inline");
+
+				if (passThroughs==0) {generateScripts();}
+				passThroughs++;
+				if (response.status === 'not_authorized') {
+					if (passThroughs>1) {
+						$('#logHint').css("visibility","visible");
+						$('#logHint').html("You need to authorize permissions for Xerafin in order to continue.");
+					}
+				}
+				else {
+					if (passThroughs>1) {
+						$('#logHint').css("visibility","visible");
+						$('#logHint').html("You were unable to connect to Xerafin via Facebook.<br>This may be for any of the following reasons:<ul><li>You are currently not connected to Facebook</li><li>You have not been granted test privileges</li></ul><p>In order to gain test privileges contact Chris.  If you don't know who that is, then 'Sorry, we can't help you!'</p>");
+					}
+				}
+			}
+		}
+<!------------------------------------------------------------------------------------------------------------->
+function appendDebugLog(input) {
+	debugLog=+"<br>"+input;
+}
+<!------------------------------------------------------------------------------------------------------------->
+function logoutUser() {
+	if (confirm('Logging out may in some cases also log you out of Facebook.  Do you wish to logout at this time?')){
+		FB.logout(function(response) {
+			$.ajax({
+				type: "POST",
+				url: "/xerafin/PHP/logout.php",
+				success: function(response, responseStatus) {
+					window.location.reload(true);
+				}
+			});
+		});
+	}
+
+}
+<!------------------------------------------------------------------------------------------------------------->
+		function loginCallback(response, responseStatus) {
+			//appendDebugLog("<u>Session Variables:</u><br>Agent:");
+			//appendDebugLog("IP:<br>User:10153882414837213 TestDB:");
+			//appendDebugLog("Privs:70");
+			//appendDebugLog("Priv Title:Developer");
+			appendDebugLog("Server Confirmation is <u>" + response.status + "</u>");
+			appendDebugLog("<u>Initializing Session</u>");
+			if (response.status === 'success') {
+				$.ajax({
+						type: "POST",
+						url: "/xerafin/PHP/fb-login.php",
+						success: function(response2, responseStatus2) {
+							generateScripts(response2, responseStatus2);
+						},
+						error: function(jqXHR, textStatus, errorThrown) {
+							alert("Error, status = " + textStatus + " error: " + errorThrown);
+						}
+					});
+			}
+			else {
+			}
+		}
+<!------------------------------------------------------------------------------------------------------------->
+		(function(d, s, id){
+			var js, fjs = d.getElementsByTagName(s)[0];
+			if (d.getElementById(id)) {return;}
+			js = d.createElement(s); js.id = id;
+			js.src = "//connect.facebook.net/en_US/sdk.js";
+			fjs.parentNode.insertBefore(js, fjs);
+		}(document, 'script', 'facebook-jssdk'));
+<!------------------------------------------------------------------------------------------------------------->
+		function getPanelMinimizeStatus (value){
+			if ($('#minim_button_'+value+' > span').hasClass("glyphicon-chevron-down")){return true;}
+			else {return false;}
+		}
+<!------------------------------------------------------------------------------------------------------------->
+		function writePanelStatus(panelArray){
+			var newPanelArray=[];
+			for (x=0;x<panelArray.length;x++){
+				if (typeof panelArray[x]!=0){
+					newPanelArray[x]=[];
+					for (y=0;y<panelArray[x].length;y++){
+						if (typeof panelArray[x][y]!=0){
+							var temp=panelArray[x][y].replace('pan_' , '');
+							newPanelArray[x][y]=[temp, getPanelMinimizeStatus(panelArray[x][y])];
+						}
+					}
+				}
+				else {newPanelArray[x][0]=[]}
+			}
+			localStorage.panelPositions=JSON.stringify(newPanelArray);
+			console.log(localStorage.panelPositions);
+		}
+<!------------------------------------------------------------------------------------------------------------->
+		function generatePanels(response, responseStatus){
+
+			$('#logProgress').html("Populating user interface");
+			if (responseStatus=== 'success'){
+				$.ajax({
+				type: "POST",
+				url: "/xerafin/PHP/contentLoggedRF.php",
+				success: function(response2, responseStatus2) {
+
+					appendDebugLog("Content Populated Successfully");
+					$('#pageContent').append(response2);
+					$('#mainLayer').css('opacity','0');
+					//middleDefault, nextTarget, nextMinim no longer needed,
+					//removes will stay for a bit to remove it from user browsers.
+					localStorage.removeItem('middleDefault');
+					localStorage.removeItem('nextTarget');
+					localStorage.removeItem('panelStateArray');
+					localStorage.removeItem('nextMinim');
+					if (typeof localStorage.panelPositions==='undefined'){
+						localStorage.setItem('panelPositions','[ ]');
+						console.log('fired a blank position');
+						startQuiz();
+						initLeaderboard();
+						showCardboxStats();
+						startChat();
+					}
+					else {
+						populatePanelsFromArray();
+
+					}
+					switch_areas();
+					setTimeout(sessionRefresh,600000);
+						$( function() {
+							$('#middleArea, #leftArea, #rightArea').sortable({
+							connectWith:'#middleArea, #leftArea, #rightArea',
+							dropOnEmpty: true,
+							handle: '.dragMe',
+							placeholder: "panelPlaceholder",
+							scrollSensitivity: 5,
+							distance: 10,
+							revert: 200,
+							change: function(event, ui) {
+								ui.placeholder.css({visibility: 'visible'});
+							},
+							start: function (event, ui) {
+
+								ui.item.toggleClass("panelPlaceholder");
+								ui.placeholder.height(50);
+								if (isMobile()===false) {
+									var placeholderHeight = ui.item.outerHeight();
+									ui.placeholder.height(placeholderHeight + 10);
+								}
+							},
+							stop: function (event, ui) {
+								ui.item.toggleClass("panelPlaceholder");
+								var x= [$( "#leftArea" ).sortable( "toArray" ),$( "#middleArea" ).sortable( "toArray" ), $( "#rightArea" ).sortable( "toArray" )];
+								writePanelStatus(x);
+							},
+							tolerance:'touch'});
+						});
+						$('#logProgress').html("Finalising user interface");
+						generateNav(response2, responseStatus2);
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					appendDebugLog("<br><b>Something went wrong whilst loading content!</b>");
+				}
+			});
+			}
+		}
+<!-- Generates Navbar ------------------------------------------------------------------------------------------>
+		function generateNav(response, responseStatus){
+			if (responseStatus === 'success') {
+			$('html').css('overflow','hidden');
+			$.ajax({
+				type: "POST",
+				url: "/xerafin/PHP/generateNavbarRF.php",
+				success: function(response3, responseStatus3) {
+					overlay.clear();
+					$('#logProgress').html("Xerf's up!");
+					appendDebugLog("<br>Navbar Populated Successfully");
+					window.scrollTo(0,0);
+					$('#homeLayer').fadeTo(700,0.01,function(){
+						$('#homeLayer').hide().remove();
+					//.css('display','none')//
+						$('#mainNav').html(response3);
+						window.scrollTo(0,0);
+						$('#mainLayer').css('opacity','0').fadeTo(500,1,function(){
+							$('html').css('overflow','auto');
+						});
+					});
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					appendDebugLog("<br><b>Something went wrong with the Navbar!</b>");
+				}
+			});
+			}
+		}
+<!-- Keeps session alive----------------------------------------------------------------------------------------->
+	function sessionRefresh() {
+		$.ajax({
+			type: "POST",
+			url: "/xerafin/PHP/sessionRefresh.php",
+			success: function(response, responseStatus) {
+				appendDebugLog("Session Refreshed Successfully");
+				setTimeout(sessionRefresh, 600000);
+			},
+			error: function(jqXHR, textStatus, errorThrown) {
+				appendDebugLog("<b>Session Refresh Error!</b>");
+				setTimeout(sessionRefresh, 10000);
+			}
+		});
+	}
+<!-- Generate Function------------------------------------------------------------------------------------------->
+		function deferredFunctionGroup(values){
+			var f = new Array();
+			var g = new Array();
+			$.ajaxSetup({cache:true});
+			values.forEach(function(elem,index){
+				f[index]= elem;
+				g[index] = eval(f[index]);
+			});
+			$.ajaxSetup({cache:false});
+			return g;
+		}
+<!-- Generates Required Scripts---------------------------------------------------------------------------------->
+		function generateScripts(response, responseStatus) {
+			if (responseStatus === 'success') {
+				appendDebugLog("<br>Fetching Scripts...");
+				$('#logProgress').html("Downloading Required Scripts");
+				$.ajax({
+					type: "POST",
+					url: "/xerafin/PHP/generateScriptsRF.php",
+					success: function(response2, responseStatus2) {
+						var data=JSON.parse(response2);
+						console.log(data);
+						var fun = deferredFunctionGroup(data[0]);
+						$.when.apply($, fun).done(
+						function(){
+							console.log("Core Scripts Download Complete");
+							var funTwo = deferredFunctionGroup(data[1]);
+							$.when.apply($, funTwo).done(
+								function(){
+									console.log("App Layer Download Complete");
+									appendDebugLog("<br>Scripts Populated Successfully");
+									//if ("70" === "0") {
+        								//} else {
+										generatePanels(response2, responseStatus2);
+										//}
+								});
+						});
+					},
+					error: function(jqXHR, textStatus, errorThrown) {
+						appendDebugLog("<br><b>Something went wrong whilst generating scripts!</b>");
+					}
+				});
+			}
+		}
+<!----------------------------->
+		function showPrivacy(){
+			$.ajax({
+				type: "POST",
+				url: "privacy.htm",
+				success: function(response, responseStatus) {
+					overlaid=new Overlay({
+						'opacity':0.4,
+						'ident':'overlaid',
+						'content':new OverContainer({
+							'class':'announceWrap',
+							'pare':'overlay',
+							'ident':'overContainer',
+							'content': response
+						}),
+						'clickClear':true
+					});
+				},
+				error: function(jqXHR, textStatus, errorThrown) {
+					return("Privacy Statement Load Error");
+				}
+			});
+		}
+<!-- End of Scripts---------------------------------------------------------------------------------------------->
+
+	</script>
+<style type="text/css">.fb_hidden{position:absolute;top:-10000px;z-index:10001}.fb_reposition{overflow:hidden;position:relative}.fb_invisible{display:none}.fb_reset{background:none;border:0;border-spacing:0;color:#000;cursor:auto;direction:ltr;font-family:"lucida grande", tahoma, verdana, arial, sans-serif;font-size:11px;font-style:normal;font-variant:normal;font-weight:normal;letter-spacing:normal;line-height:1;margin:0;overflow:visible;padding:0;text-align:left;text-decoration:none;text-indent:0;text-shadow:none;text-transform:none;visibility:visible;white-space:normal;word-spacing:normal}.fb_reset>div{overflow:hidden}.fb_link img{border:none}@keyframes fb_transform{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}.fb_animate{animation:fb_transform .3s forwards}
+.fb_dialog{background:rgba(82, 82, 82, .7);position:absolute;top:-10000px;z-index:10001}.fb_reset .fb_dialog_legacy{overflow:visible}.fb_dialog_advanced{padding:10px;border-radius:8px}.fb_dialog_content{background:#fff;color:#333}.fb_dialog_close_icon{background:url(https://static.xx.fbcdn.net/rsrc.php/v3/yq/r/IE9JII6Z1Ys.png) no-repeat scroll 0 0 transparent;cursor:pointer;display:block;height:15px;position:absolute;right:18px;top:17px;width:15px}.fb_dialog_mobile .fb_dialog_close_icon{top:5px;left:5px;right:auto}.fb_dialog_padding{background-color:transparent;position:absolute;width:1px;z-index:-1}.fb_dialog_close_icon:hover{background:url(https://static.xx.fbcdn.net/rsrc.php/v3/yq/r/IE9JII6Z1Ys.png) no-repeat scroll 0 -15px transparent}.fb_dialog_close_icon:active{background:url(https://static.xx.fbcdn.net/rsrc.php/v3/yq/r/IE9JII6Z1Ys.png) no-repeat scroll 0 -30px transparent}.fb_dialog_loader{background-color:#f6f7f9;border:1px solid #606060;font-size:24px;padding:20px}.fb_dialog_top_left,.fb_dialog_top_right,.fb_dialog_bottom_left,.fb_dialog_bottom_right{height:10px;width:10px;overflow:hidden;position:absolute}.fb_dialog_top_left{background:url(https://static.xx.fbcdn.net/rsrc.php/v3/ye/r/8YeTNIlTZjm.png) no-repeat 0 0;left:-10px;top:-10px}.fb_dialog_top_right{background:url(https://static.xx.fbcdn.net/rsrc.php/v3/ye/r/8YeTNIlTZjm.png) no-repeat 0 -10px;right:-10px;top:-10px}.fb_dialog_bottom_left{background:url(https://static.xx.fbcdn.net/rsrc.php/v3/ye/r/8YeTNIlTZjm.png) no-repeat 0 -20px;bottom:-10px;left:-10px}.fb_dialog_bottom_right{background:url(https://static.xx.fbcdn.net/rsrc.php/v3/ye/r/8YeTNIlTZjm.png) no-repeat 0 -30px;right:-10px;bottom:-10px}.fb_dialog_vert_left,.fb_dialog_vert_right,.fb_dialog_horiz_top,.fb_dialog_horiz_bottom{position:absolute;background:#525252;filter:alpha(opacity=70);opacity:.7}.fb_dialog_vert_left,.fb_dialog_vert_right{width:10px;height:100%}.fb_dialog_vert_left{margin-left:-10px}.fb_dialog_vert_right{right:0;margin-right:-10px}.fb_dialog_horiz_top,.fb_dialog_horiz_bottom{width:100%;height:10px}.fb_dialog_horiz_top{margin-top:-10px}.fb_dialog_horiz_bottom{bottom:0;margin-bottom:-10px}.fb_dialog_iframe{line-height:0}.fb_dialog_content .dialog_title{background:#6d84b4;border:1px solid #365899;color:#fff;font-size:14px;font-weight:bold;margin:0}.fb_dialog_content .dialog_title>span{background:url(https://static.xx.fbcdn.net/rsrc.php/v3/yd/r/Cou7n-nqK52.gif) no-repeat 5px 50%;float:left;padding:5px 0 7px 26px}body.fb_hidden{-webkit-transform:none;height:100%;margin:0;overflow:visible;position:absolute;top:-10000px;left:0;width:100%}.fb_dialog.fb_dialog_mobile.loading{background:url(https://static.xx.fbcdn.net/rsrc.php/v3/ya/r/3rhSv5V8j3o.gif) white no-repeat 50% 50%;min-height:100%;min-width:100%;overflow:hidden;position:absolute;top:0;z-index:10001}.fb_dialog.fb_dialog_mobile.loading.centered{width:auto;height:auto;min-height:initial;min-width:initial;background:none}.fb_dialog.fb_dialog_mobile.loading.centered #fb_dialog_loader_spinner{width:100%}.fb_dialog.fb_dialog_mobile.loading.centered .fb_dialog_content{background:none}.loading.centered #fb_dialog_loader_close{color:#fff;display:block;padding-top:20px;clear:both;font-size:18px}#fb-root #fb_dialog_ipad_overlay{background:rgba(0, 0, 0, .45);position:absolute;bottom:0;left:0;right:0;top:0;width:100%;min-height:100%;z-index:10000}#fb-root #fb_dialog_ipad_overlay.hidden{display:none}.fb_dialog.fb_dialog_mobile.loading iframe{visibility:hidden}.fb_dialog_content .dialog_header{-webkit-box-shadow:white 0 1px 1px -1px inset;background:-webkit-gradient(linear, 0% 0%, 0% 100%, from(#738ABA), to(#2C4987));border-bottom:1px solid;border-color:#1d4088;color:#fff;font:14px Helvetica, sans-serif;font-weight:bold;text-overflow:ellipsis;text-shadow:rgba(0, 30, 84, .296875) 0 -1px 0;vertical-align:middle;white-space:nowrap}.fb_dialog_content .dialog_header table{-webkit-font-smoothing:subpixel-antialiased;height:43px;width:100%}.fb_dialog_content .dialog_header td.header_left{font-size:12px;padding-left:5px;vertical-align:middle;width:60px}.fb_dialog_content .dialog_header td.header_right{font-size:12px;padding-right:5px;vertical-align:middle;width:60px}.fb_dialog_content .touchable_button{background:-webkit-gradient(linear, 0% 0%, 0% 100%, from(#4966A6), color-stop(.5, #355492), to(#2A4887));border:1px solid #29487d;-webkit-background-clip:padding-box;-webkit-border-radius:3px;-webkit-box-shadow:rgba(0, 0, 0, .117188) 0 1px 1px inset, rgba(255, 255, 255, .167969) 0 1px 0;display:inline-block;margin-top:3px;max-width:85px;line-height:18px;padding:4px 12px;position:relative}.fb_dialog_content .dialog_header .touchable_button input{border:none;background:none;color:#fff;font:12px Helvetica, sans-serif;font-weight:bold;margin:2px -12px;padding:2px 6px 3px 6px;text-shadow:rgba(0, 30, 84, .296875) 0 -1px 0}.fb_dialog_content .dialog_header .header_center{color:#fff;font-size:16px;font-weight:bold;line-height:18px;text-align:center;vertical-align:middle}.fb_dialog_content .dialog_content{background:url(https://static.xx.fbcdn.net/rsrc.php/v3/y9/r/jKEcVPZFk-2.gif) no-repeat 50% 50%;border:1px solid #555;border-bottom:0;border-top:0;height:150px}.fb_dialog_content .dialog_footer{background:#f6f7f9;border:1px solid #555;border-top-color:#ccc;height:40px}#fb_dialog_loader_close{float:left}.fb_dialog.fb_dialog_mobile .fb_dialog_close_button{text-shadow:rgba(0, 30, 84, .296875) 0 -1px 0}.fb_dialog.fb_dialog_mobile .fb_dialog_close_icon{visibility:hidden}#fb_dialog_loader_spinner{animation:rotateSpinner 1.2s linear infinite;background-color:transparent;background-image:url(https://static.xx.fbcdn.net/rsrc.php/v3/yD/r/t-wz8gw1xG1.png);background-repeat:no-repeat;background-position:50% 50%;height:24px;width:24px}@keyframes rotateSpinner{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+.fb_iframe_widget{display:inline-block;position:relative}.fb_iframe_widget span{display:inline-block;position:relative;text-align:justify}.fb_iframe_widget iframe{position:absolute}.fb_iframe_widget_fluid_desktop,.fb_iframe_widget_fluid_desktop span,.fb_iframe_widget_fluid_desktop iframe{max-width:100%}.fb_iframe_widget_fluid_desktop iframe{min-width:220px;position:relative}.fb_iframe_widget_lift{z-index:1}.fb_hide_iframes iframe{position:relative;left:-10000px}.fb_iframe_widget_loader{position:relative;display:inline-block}.fb_iframe_widget_fluid{display:inline}.fb_iframe_widget_fluid span{width:100%}.fb_iframe_widget_loader iframe{min-height:32px;z-index:2;zoom:1}.fb_iframe_widget_loader .FB_Loader{background:url(https://static.xx.fbcdn.net/rsrc.php/v3/y9/r/jKEcVPZFk-2.gif) no-repeat;height:32px;width:32px;margin-left:-16px;position:absolute;left:50%;z-index:4}
+.fb_customer_chat_bounce_in{animation-duration:250ms;animation-name:fb_bounce_in}.fb_customer_chat_bounce_out{animation-duration:250ms;animation-name:fb_fade_out}.fb_invisible_flow{display:inherit;height:0;overflow-x:hidden;width:0}.fb_mobile_overlay_active{background-color:#fff;height:100%;overflow:hidden;position:fixed;visibility:hidden;width:100%}@keyframes fb_fade_out{from{opacity:1}to{opacity:0}}@keyframes fb_bounce_in{0%{opacity:0;transform:scale(.8, .8);transform-origin:100% 100%}10%{opacity:.1}20%{opacity:.2}30%{opacity:.3}40%{opacity:.4}50%{opacity:.5}60%{opacity:.6}70%{opacity:.7}80%{opacity:.8;transform:scale(1.03, 1.03)}90{opacity:.9}100%{opacity:1;transform:scale(1, 1)}}</style></head>
+<body>
+	<div id="pageContent">
+
+
+		<div id="mainLayer" style="opacity: 1;">
+				<div id="mainNav" class="container-fluid">
+	<div class="container-fluid">
+		<nav class="navbar navbar-inverse navbar-fixed-top metalBThree" id="xeraNav">
+			<img class="navbar-brand noselect" src="./Xerafin Word Study System_files/xerafinNew.png" style="height:50px;padding:5px!important;background:transparent;vertical-align:middle;">
+			<div class="navbar-header" style="padding:0px!important;margin:0px!important;">
+
+				<button type="button" class="navbar-toggle" data-toggle="collapse" data-target="#myNavbar">
+					<span class="icon-bar"></span>
+					<span class="icon-bar"></span>
+					<span class="icon-bar"></span>
+				</button>
+			</div>
+			<div class="collapse navbar-collapse" id="myNavbar">
+				<ul class="nav navbar-nav " style="vertical-align:middle;" id="menuList"><li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="startQuiz()">Basic Quiz</a></li>
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="initSloth()">Subword Sloth!</a></li>
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="initInvaders()">Cardbox Invaders</a></li>
+<li class="dropdown"><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" class="dropdown-toggle" data-toggle="dropdown">Widgets<b class="caret"></b></a>
+<ul class="dropdown-menu">
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="showCardboxStats()">Cardbox Info</a></li>
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="initLeaderboard()">Rankings</a></li>
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="showAlphaStats(toAlpha($.trim(prompt(&quot;Enter a word or alphagram to display&quot;))))">Alphagram Info</a></li>
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="showGameStats()">Game Stats</a></li>
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="showShameList()">List of Shame</a></li>
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="initTournamentStandings()">TSH feed<span style="color:red">&nbsp;NEW!</span></a></li>
+</ul>
+</li>
+<li class="dropdown"><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" class="dropdown-toggle" data-toggle="dropdown">Settings<b class="caret"></b></a>
+<ul class="dropdown-menu">
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="initUserPrefs()">User Prefs</a></li>
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="showManageCardbox()">Cardbox Database File</a></li>
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="">Manage Words to Add<span style="color:red">&nbsp;NEW!</span></a></li>
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="logoutUser()">Logout</a></li>
+</ul>
+</li>
+<li class="dropdown"><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" class="dropdown-toggle" data-toggle="dropdown">Admin<b class="caret"></b></a>
+<ul class="dropdown-menu">
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="initManageUsers()">Manage Users<span style="color:red">&nbsp;NEW!</span></a></li>
+</ul>
+</li>
+<li class="dropdown"><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" class="dropdown-toggle" data-toggle="dropdown">Developer<b class="caret"></b></a>
+<ul class="dropdown-menu">
+<li><a href="http://xerafin.cross-tables.com/xerafin/indexRF.php#" onclick="">Manage Alerts</a></li>
+</ul>
+</li>
+</ul></div></nav></div></div>
+				<div id="contentMain" class="container-fluid">
+				<div class="row">
+					<div class="col-xs-12 col-sm-7 col-md-8">
+						<div class="row">
+							<div id="middleArea" class="col-xs-12 col-sm-12 col-md-6 ui-sortable" style="min-height: 597px;"><div id="pan_5" class=" well well-sm panelStyleDark" style="margin-bottom: 10px;"><div id="header_pan_5" style="display: flex; flex-flow: row nowrap;"><div id="btnGroup_pan_5" class=" btn-group btn-group-sm"><button id="refresh_button_pan_5" class=" btn btn-grey metalBOne"><span class="glyphicon glyphicon-refresh" style="vertical-align:middle"></span></button><button id="help_button_pan_5" class=" btn btn-grey metalBOne" data-original-title="" title=""><span class="glyphicon glyphicon-question-sign" style="vertical-align:middle"></span></button><button id="minim_button_pan_5" class=" btn btn-grey metalBOne"><span class="glyphicon glyphicon-chevron-down" style="vertical-align:middle"></span></button></div><div id="heading_text_pan_5" class="panelHeaderDark dragMe noselect steelRowed ui-sortable-handle" style="flex: 1 0 0%;">Alphagram Info</div><button id="close_button_pan_5" class=" btn btn-grey btn-sm metalBOne" style="flex: 0 0 0%;"><span class="glyphicon glyphicon-remove" style="vertical-align:middle"></span></button></div><div id="content_pan_5" class=" panelContentDefault" style="display: none;"><table class=" lbTable" id="alphaTable" style="width: 80%;"><tbody id="alphaTableBody"><tr><td>Alphagram</td><td><input type="text" class="quizAnswerBox" id="currentAlpha"></td></tr><tr><td>Cardbox</td><td><select id="alphaStatsCardbox" style="width: 25%;"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8">8</option><option value="9">9</option><option value="10">10</option><option value="11">11</option><option value="12">12</option><option value="13">13</option><option value="14">14</option><option value="15">15</option><option value="16">16</option><option value="17">17</option><option value="18">18</option><option value="19">19</option></select></td></tr><tr><td>Next Scheduled</td><td id="alphaStatsDueDate">29 May '18 1:33</td></tr><tr></tr></tbody></table></div></div><div id="pan_4" class=" well well-sm panelStyleDark" style="margin-bottom: 10px;"><div id="header_pan_4" style="display: flex; flex-flow: row nowrap;"><div id="btnGroup_pan_4" class=" btn-group btn-group-sm"><button id="refresh_button_pan_4" class=" btn btn-grey metalBOne"><span class="glyphicon glyphicon-refresh" style="vertical-align:middle"></span></button><button id="help_button_pan_4" class=" btn btn-grey metalBOne" data-original-title="" title=""><span class="glyphicon glyphicon-question-sign" style="vertical-align:middle"></span></button><button id="minim_button_pan_4" class=" btn btn-grey metalBOne"><span class="glyphicon glyphicon-chevron-down" style="vertical-align:middle"></span></button></div><div id="heading_text_pan_4" class=" panelHeaderDark dragMe noselect steelRowed" style="flex: 1 0 0%;">Cardbox Info</div><button id="close_button_pan_4" class=" btn btn-grey btn-sm metalBOne" style="flex: 0 0 0%;"><span class="glyphicon glyphicon-remove" style="vertical-align:middle"></span></button></div><div id="content_pan_4" class=" panelContentDefault" style="visibility: visible;"><div id="cardboxScoreInfo" class="cardboxScoreInfo"><div class="cardboxScoreChild" id="cardboxScoreDiv">Cardbox Value<br><span id="cardboxInfoScore">184303</span></div><div class="cardboxScoreChild" id="cBQTodayDiv">Questions Today<br><span id="cardboxInfoQToday">420</span></div><div class="cardboxScoreChild">Cardbox Movement<br><span id="cardboxInfoDiff">+359</span></div></div><div id="cardboxInfoWrapper" style="display: none;"><ul id="cardboxTab" class=" nav nav-pills nav-justified"><li id="dueTab" class=" active"><a data-toggle="tab" href="http://xerafin.cross-tables.com/xerafin/indexRF.php#dueContent">Questions Due</a></li><li id="coverageTab"><a data-toggle="tab" href="http://xerafin.cross-tables.com/xerafin/indexRF.php#coverageContent">Coverage</a></li></ul><div class=" tab-content"><div id="dueContent" class=" tab-pane fade in active"><table id="cardboxTable" class=" statTable cardboxTable" style="visibility: visible;"><thead><tr><th>Cardbox</th><th></th><th>Total</th><th><div id="periodTemp"><select id="periodDue"><option value="dueNow">Due Now</option><option value="dueToday">Next 24 Hrs</option><option value="dueThisWeek">Next 7 Days</option><option value="overdue">Overdue</option></select></div></th></tr></thead><tbody id="cardboxTableBody"><tr id="cardboxDueRow0"><td id="cardboxNum0">0</td><td id="null"></td><td id="cardboxTotal0">16</td><td id="cardboxDue0"></td></tr><tr id="cardboxDueRow1"><td id="cardboxNum1">1</td><td id="null"></td><td id="cardboxTotal1">12</td><td id="cardboxDue1"></td></tr><tr id="cardboxDueRow2"><td id="cardboxNum2">2</td><td id="null"></td><td id="cardboxTotal2">112</td><td id="cardboxDue2"></td></tr><tr id="cardboxDueRow3"><td id="cardboxNum3">3</td><td id="null"></td><td id="cardboxTotal3">296</td><td id="cardboxDue3"></td></tr><tr id="cardboxDueRow4"><td id="cardboxNum4">4</td><td id="null"></td><td id="cardboxTotal4">1022</td><td id="cardboxDue4"></td></tr><tr id="cardboxDueRow5"><td id="cardboxNum5" class="highlightRow">5</td><td id="null"></td><td id="cardboxTotal5" class="highlightRow">2530</td><td id="cardboxDue5" class="highlightRow">3</td></tr><tr id="cardboxDueRow6"><td id="cardboxNum6">6</td><td id="null"></td><td id="cardboxTotal6">5397</td><td id="cardboxDue6">420</td></tr><tr id="cardboxDueRow7"><td id="cardboxNum7">7</td><td id="null"></td><td id="cardboxTotal7">6254</td><td id="cardboxDue7">158</td></tr><tr id="cardboxDueRow8"><td id="cardboxNum8">8</td><td id="null"></td><td id="cardboxTotal8">10006</td><td id="cardboxDue8"></td></tr><tr id="cardboxDueRow9"><td id="cardboxNum9">9</td><td id="null"></td><td id="cardboxTotal9">1137</td><td id="cardboxDue9"></td></tr><tr id="cardboxDueFoot"><td id="null">Total</td><td id="null"></td><td id="null">26782</td><td id="null">581</td></tr></tbody></table></div><div id="coverageContent" class=" tab-pane fade"><table id="coverageTable" class=" statTable" style="visibility: hidden;"><thead><tr><th>Length</th><th></th><th>Alphagrams</th><th>In Cardbox</th><th>%</th></tr></thead><tbody id="coverageBody"></tbody></table></div></div><div id="cardboxUpdateTimeBox" class=" updateTime">Last Updated 03:32:34</div></div></div></div><div id="pan_3" class=" well well-sm panelStyleDark" style="margin-bottom: 10px;"><div id="header_pan_3" style="display: flex; flex-flow: row nowrap;"><div id="btnGroup_pan_3" class=" btn-group btn-group-sm"><button id="refresh_button_pan_3" class=" btn btn-grey metalBOne"><span class="glyphicon glyphicon-refresh" style="vertical-align:middle"></span></button><button id="help_button_pan_3" class=" btn btn-grey metalBOne" data-original-title="" title=""><span class="glyphicon glyphicon-question-sign" style="vertical-align:middle"></span></button><button id="minim_button_pan_3" class=" btn btn-grey metalBOne"><span class="glyphicon glyphicon-chevron-up" style="vertical-align:middle"></span></button></div><div id="heading_text_pan_3" class="panelHeaderDark dragMe noselect steelRowed ui-sortable-handle" style="flex: 1 0 0%;">Rankings</div><button id="close_button_pan_3" class=" btn btn-grey btn-sm metalBOne" style="flex: 0 0 0%;"><span class="glyphicon glyphicon-remove" style="vertical-align:middle"></span></button></div><div id="content_pan_3" class=" lbContent"><select id="rankList" class=" "><option value="1">Leaderboard</option><option value="2">My Rank</option></select><select id="periodList" class=" "><option value="1">Today</option><option value="2">Yesterday</option><option value="3">Last 7 Days</option><option value="4">This Week</option><option value="5">Last Week</option><option value="6">This Month</option><option value="7">This Year</option></select><div id="lbRows" class=" noselect"><div class=" lbDiv" id="lbdiv0" style="opacity: 1;"><div class=" lbDivchild metalBOne rankSteel">3<sup>rd</sup></div><div class=" lbDivchild rankSilver steelRowed rankSilver"></div><div class=" lbDivchild rankSilver"><img src="./Xerafin Word Study System_files/saved_resource" id="lbImg0" title="Daniel Stembridge" style="padding: 0px;"></div><div class=" lbDivchild rankSilver">Daniel Stembridge</div><div class=" lbDivchild rankSilver">1600</div></div><div class=" lbDiv" id="lbdiv1" style="opacity: 1;"><div class=" lbDivchild metalBOne rankSteel">4<sup>th</sup></div><div class=" lbDivchild rankSilver steelRowed rankSilver"></div><div class=" lbDivchild rankSilver"><img src="./Xerafin Word Study System_files/saved_resource(1)" id="lbImg1" title="Quentin Dabbs Baker" style="padding: 0px;"></div><div class=" lbDivchild rankSilver">Quentin Dabbs Baker</div><div class=" lbDivchild rankSilver">1200</div></div><div class=" lbDiv" id="lbdiv2" style="opacity: 1;"><div class=" lbDivchild metalBOne rankSteel">5<sup>th</sup></div><div class=" lbDivchild rankBronze bronzeRowed rankBronze"></div><div class=" lbDivchild rankBronze"><img src="./Xerafin Word Study System_files/saved_resource(2)" id="lbImg2" title="Chris May" style="padding: 0px;"></div><div class=" lbDivchild rankBronze">Chris May</div><div class=" lbDivchild rankBronze">793</div></div><div class=" lbDiv" id="lbdiv3" style="opacity: 1;"><div class=" lbDivchild metalBOne rankSteel">6<sup>th</sup></div><div class=" lbDivchild rankBronze bronzeRowed rankBronze"></div><div class=" lbDivchild rankBronze"><img src="./Xerafin Word Study System_files/saved_resource(3)" id="lbImg3" title="Dorcas Alexander" style="padding: 0px;"></div><div class=" lbDivchild rankBronze">Dorcas Alexander</div><div class=" lbDivchild rankBronze">570</div></div><div class=" lbDiv" id="lbdiv4" style="opacity: 1;"><div class=" lbDivchild metalBOne rankSteel">7<sup>th</sup></div><div class=" lbDivchild rankBronze bronzeRowed rankBronze"></div><div class=" lbDivchild rankBronze"><img src="./Xerafin Word Study System_files/saved_resource(4)" id="lbImg4" title="Steve Bartlett" style="padding: 0px;"></div><div class=" lbDivchild rankBronze">Steve Bartlett</div><div class=" lbDivchild rankBronze">523</div></div><div class=" lbDiv" id="lbdiv5" style="opacity: 1;"><div class=" lbDivchild metalBOne rankSteel">8<sup>th</sup></div><div class=" lbDivchild rankBronze bronzeRowed rankBronze"></div><div class=" lbDivchild rankBronze highlightRow"><img src="./Xerafin Word Study System_files/saved_resource(5)" id="lbImg5" title="Rick Fawns" style="padding: 0px;"></div><div class=" lbDivchild rankBronze highlightRow">Rick Fawns</div><div class=" lbDivchild rankBronze highlightRow">403</div></div><div class=" lbDiv" id="lbdiv6" style="opacity: 1;"><div class=" lbDivchild metalBOne rankSteel">9<sup>th</sup></div><div class=" lbDivchild rankSteel metalBOne rankSteel"></div><div class=" lbDivchild rankSteel"><img src="./Xerafin Word Study System_files/saved_resource(6)" id="lbImg6" title="Scott Garner" style="padding: 0px;"></div><div class=" lbDivchild rankSteel">Scott Garner</div><div class=" lbDivchild rankSteel">402</div></div><div class=" lbDiv" id="lbdiv7" style="opacity: 1;"><div class=" lbDivchild metalBOne rankSteel">10<sup>th</sup></div><div class=" lbDivchild rankSteel metalBOne rankSteel"></div><div class=" lbDivchild rankSteel"><img src="./Xerafin Word Study System_files/saved_resource(7)" id="lbImg7" title="Vincent Boyle" style="padding: 0px;"></div><div class=" lbDivchild rankSteel">Vincent Boyle</div><div class=" lbDivchild rankSteel">301</div></div><div class=" lbDiv" id="lbdiv8" style="opacity: 1;"><div class=" lbDivchild metalBOne rankSteel">11<sup>th</sup></div><div class=" lbDivchild rankSteel metalBOne rankSteel"></div><div class=" lbDivchild rankSteel"><img src="./Xerafin Word Study System_files/saved_resource(8)" id="lbImg8" title="Randi Dandi" style="padding: 0px;"></div><div class=" lbDivchild rankSteel">Randi Dandi</div><div class=" lbDivchild rankSteel">270</div></div><div class=" lbDiv" id="lbdiv9" style="opacity: 1;"><div class=" lbDivchild metalBOne rankSteel">12<sup>th</sup></div><div class=" lbDivchild rankSteel metalBOne rankSteel"></div><div class=" lbDivchild rankSteel"><img src="./Xerafin Word Study System_files/saved_resource(9)" id="lbImg9" title="Terry Kirk" style="padding: 0px;"></div><div class=" lbDivchild rankSteel">Terry Kirk</div><div class=" lbDivchild rankSteel">261</div></div><div class=" lbDiv" id="lbdiv10" style="opacity: 1;"><div class=" lbDivchild metalBOne rankSteel">13<sup>th</sup></div><div class=" lbDivchild rankSteel metalBOne rankSteel"></div><div class=" lbDivchild rankSteel"><img src="./Xerafin Word Study System_files/saved_resource(10)" id="lbImg10" title="Margaret Staunton" style="padding: 0px;"></div><div class=" lbDivchild rankSteel">Margaret Staunton</div><div class=" lbDivchild rankSteel">227</div></div></div><div id="lbUpdateTimeBox" class=" updateTime">Last Updated 03:30:14</div></div></div></div><div id="leftArea" class="col-xs-12 col-sm-12 col-md-6 ui-sortable" style="min-height: 597px; height: 597px;"><div id="pan_500" class=" well well-sm panelStyleDark" style="margin-bottom: 10px;"><div id="header_pan_500" style="display: flex; flex-flow: row nowrap;"><div id="btnGroup_pan_500" class=" btn-group btn-group-sm"><button id="help_button_pan_500" class=" btn btn-grey metalBOne" data-original-title="" title=""><span class="glyphicon glyphicon-question-sign" style="vertical-align:middle"></span></button><button id="minim_button_pan_500" class=" btn btn-grey metalBOne"><span class="glyphicon glyphicon-chevron-down" style="vertical-align:middle"></span></button></div><div id="heading_text_pan_500" class="panelHeaderDark dragMe noselect steelRowed ui-sortable-handle" style="flex: 1 0 0%;">Manage Users</div><button id="close_button_pan_500" class=" btn btn-grey btn-sm metalBOne" style="flex: 0 0 0%;"><span class="glyphicon glyphicon-remove" style="vertical-align:middle"></span></button></div><div id="content_pan_500" class=" panelContentDefault" style="display: none;"><div id="manageSearchWrap"><select id="searchBox"><option value="name">Name</option><option value="userid">User Id</option><option value="secLevel">Priv Value</option></select><input id="manageSearchInput"></div><div id="searchResultsWrap" class=" well well-sm pre-scrollable quizContent"><table id="userSearchTable" class=" userSearch"><thead><tr><th></th><th>Name</th><th>User Id</th><th>Priv</th></tr></thead><tbody id="searchContent"></tbody></table></div><div id="formWrap" class=" well well-sm pre-scrollable quizContent" style="display: none;"></div></div></div><div id="pan_1_a" class=" well well-sm panelStyleDark" style="margin-bottom: 10px;"><div id="header_pan_1_a" style="display: flex; flex-flow: row nowrap;"><div id="btnGroup_pan_1_a" class=" btn-group btn-group-sm"><button id="help_button_pan_1_a" class=" btn btn-grey metalBOne" data-original-title="" title=""><span class="glyphicon glyphicon-question-sign" style="vertical-align:middle"></span></button><button id="minim_button_pan_1_a" class=" btn btn-grey metalBOne"><span class="glyphicon glyphicon-chevron-up" style="vertical-align:middle"></span></button></div><div id="heading_text_pan_1_a" class="panelHeaderDark dragMe noselect steelRowed ui-sortable-handle" style="flex: 1 0 0%;">Basic Quiz</div></div><div id="content_pan_1_a" class=" panelContentDefault" style="visibility: visible;"><div class=" quizContent" id="quizContent"><div class="quizAlphaSuper blueRowed unanswered" id="alphaSuper"><div class=" quizAlphaContain" id="alphaContainer"><div class=" quizAlphaLeft" id="leftHook" style="width: 0px; font-size: 23.3354px; line-height: 0.7;"></div><div class=" quizAlpha" id="alphagram" style="width: 360px; font-size: 1em;"><div id="tileContainer" class="ui-sortable" style="vertical-align: middle;"><div class="xeraTiles noselect ui-sortable-handle" id="tile0" style="width: 40px; height: 40px; font-size: 26.6667px; line-height: 40px; vertical-align: middle;">A</div><div class="xeraTiles noselect ui-sortable-handle" id="tile1" style="width: 40px; height: 40px; font-size: 26.6667px; line-height: 40px; vertical-align: middle;">A</div><div class="xeraTiles noselect ui-sortable-handle" id="tile2" style="width: 40px; height: 40px; font-size: 26.6667px; line-height: 40px; vertical-align: middle;">C</div><div class="xeraTiles noselect ui-sortable-handle" id="tile3" style="width: 40px; height: 40px; font-size: 26.6667px; line-height: 40px; vertical-align: middle;">I</div><div class="xeraTiles noselect ui-sortable-handle" id="tile4" style="width: 40px; height: 40px; font-size: 26.6667px; line-height: 40px; vertical-align: middle;">Q</div><div class="xeraTiles noselect ui-sortable-handle" id="tile5" style="width: 40px; height: 40px; font-size: 26.6667px; line-height: 40px; vertical-align: middle;">S</div><div class="xeraTiles noselect ui-sortable-handle" id="tile6" style="width: 40px; height: 40px; font-size: 26.6667px; line-height: 40px; vertical-align: middle;">T</div><div class="xeraTiles noselect ui-sortable-handle" id="tile7" style="width: 40px; height: 40px; font-size: 26.6667px; line-height: 40px; vertical-align: middle;">U</div></div></div><div class=" quizAlphaRight" id="rightHook" style="width: 0px; font-size: 23.3354px; line-height: 0.7;"></div></div></div><div class=" quizConnection" id="quizConnect"></div><div class=" quizAnswerRegion" id=""><button class=" btn quizButton quizButtonCorrect highlightRow" id="markAsCorrect" title="Mark as Correct" style=""><span class="glyphicon glyphicon-ok"></span></button><button class=" btn quizButton quizButtonNext blueRowed" id="nextQuestion" title="Next Question" style="float: left; display: none;"><span class="glyphicon glyphicon-arrow-right"></span></button><button class=" btn quizButton quizButtonIncorrect redRowed" id="markAsIncorrect" title="Mark as Incorrect"><span class="glyphicon glyphicon-remove"></span></button><div class=" quizAnswerContain" id="answerContainer"><div class=" quizAnswerNumber" id="answerAmount"><b>Answers:</b> 0  / 1</div><input class=" quizAnswerBox" id="answerBox" type="text" maxlength="15"></div></div><table class=" quizSessionTable" id="sessionInfo"><thead class=" " id="sessionHeader"><th class=" " id="sessionHeaderCell1">questions</th><th class=" quizSessionTableHCardbox" id="sessionHeaderCell2">cardbox</th><th class=" quizSessionTableHDue" id="sessionHeaderCell3">due date</th><th class=" " id="sessionHeaderCell4" title="% of questions answered correctly this session.">score</th><th class=" quizSessionTableHCorrect" id="sessionHeaderCell5">correct</th></thead><tr class=" " id="sessionContent"><td class=" " id="sessionContentCell1"><span id="questionsComplete">6327</span></td><td class=" " id="sessionContentCell2"><span id="cardboxNumber">5</span></td><td class=" " id="sessionContentCell3"><span id="dueDate">29 May '18 1:33</span></td><td class=" " id="sessionContentCell4"><span id="sessionScore">4463</span></td><td class=" " id="sessionContentCell5"><span id="correctPercent">94.82%</span></td></tr></table><div class=" btn-group btn-group-justified quizButtonRow" id="buttonRow"><div class=" btn-group" id=""><button class=" btn btn-default quizSubButton silverRowed" id="shuffleButton" title="Shuffle Tiles"><span class="glyphicon glyphicon-random"></span></button></div><div class=" btn-group" id=""><button class=" btn btn-default quizSubButton silverRowed" id="slothButton" title="Sloth this word!"><img id="imgSloth" src="./Xerafin Word Study System_files/sloth.png" style="width: 28px; height: 28px; margin: auto; padding: 0px; opacity: 1;"></button></div><div class=" btn-group" id=""><button class=" btn btn-default quizSubButton silverRowed" id="skipButton" title="Skip Word"><span class="glyphicon glyphicon-step-forward"></span></button></div><div class=" btn-group" id=""><button class=" btn btn-default quizSubButton silverRowed" id="advancedButton" title="Advanced..."><span class="glyphicon glyphicon-menu-hamburger"></span></button></div></div><div class=" quizAdvancedBox" id="advancedBox"><div class=" btn-group btn-group-justified" id=""><div class=" btn-group" id=""><button class=" btn btn-default quizAdvancedButton silverRowed" id="counterReset" title="Clear Questions, Score and Correct % for this device.">Reset #</button></div><div class=" btn-group" id=""><button class=" btn btn-default quizAdvancedButton silverRowed" id="addHint" title="See one more letter of solution(s).">Hint</button></div><div class=" btn-group" id=""><button class=" btn btn-default quizAdvancedButton silverRowed" id="showQuestionStats" title="Show stats and change cardbox for this question">Stats</button></div><div class=" btn-group quizBlankWrapper" id=""><div class=" quizBlankCheckbox" id="blankQuizBox" title="Blank Quiz"><input class=" " id="blankQuizCheck" type="checkbox" value="1" spellcheck="true"><label class=" noselect" id="blankQuizLabel" for="blankQuizCheck">?</label></div></div></div></div><table class=" wordTable" id="correctAnswers"></table><div class=" wordTableWrong" id="wrongAnswers"></div></div></div></div><br id="leftArea_temp_2"></div>
+
+						</div>
+					</div>
+					<div id="rightArea" class="col-xs-12 col-sm-5 col-md-4 ui-sortable" style="min-height: 597px;">
+					<div id="pan_6" class=" well well-sm panelStyleDark" style="margin-bottom: 10px;"><div id="header_pan_6" style="display: flex; flex-flow: row nowrap;"><div id="btnGroup_pan_6" class=" btn-group btn-group-sm"><button id="refresh_button_pan_6" class=" btn btn-grey metalBOne"><span class="glyphicon glyphicon-refresh" style="vertical-align:middle"></span></button><button id="help_button_pan_6" class=" btn btn-grey metalBOne" data-original-title="" title=""><span class="glyphicon glyphicon-question-sign" style="vertical-align:middle"></span></button><button id="minim_button_pan_6" class=" btn btn-grey metalBOne"><span class="glyphicon glyphicon-chevron-down" style="vertical-align:middle"></span></button></div><div id="heading_text_pan_6" class="panelHeaderDark dragMe noselect steelRowed ui-sortable-handle" style="flex: 1 0 0%;">Game Stats</div><button id="close_button_pan_6" class=" btn btn-grey btn-sm metalBOne" style="flex: 0 0 0%;"><span class="glyphicon glyphicon-remove" style="vertical-align:middle"></span></button></div><div id="content_pan_6" class=" panelContentDefault" style="visibility: visible; display: none;"><ul id="gameStatTab" class=" nav nav-pills nav-justified"><li id="persRecTab" class=" active"><a data-toggle="tab" href="http://xerafin.cross-tables.com/xerafin/indexRF.php#persRec">Personal</a></li><li id="globalRecTab"><a data-toggle="tab" href="http://xerafin.cross-tables.com/xerafin/indexRF.php#globalRec">Global</a></li><li id="indivRecTab"><a data-toggle="tab" href="http://xerafin.cross-tables.com/xerafin/indexRF.php#indivRec">Player Records</a></li></ul><div class=" tab-content"><div id="persRec" class=" tab-pane statTab fade in active"><div id="questionStatsPersHeading">Questions Answered</div><table id="questionStatsPers"><tr id="questionStatsPersRow0"><td id="questionStatsPersRow0Title">Questions answered since joining:</td><td id="questionStatsPersRow0Value">202546</td></tr><tr id="questionStatsPersRow1"><td id="questionStatsPersRow1Title">Questions answered this year:</td><td id="questionStatsPersRow1Value">69254</td></tr><tr id="questionStatsPersRow2"><td id="questionStatsPersRow2Title">Questions answered this month:</td><td id="questionStatsPersRow2Value">13076</td></tr><tr id="questionStatsPersRow3"><td id="questionStatsPersRow3Title">Questions answered this week:</td><td id="questionStatsPersRow3Value">400</td></tr><tr id="questionStatsPersRow4"><td id="questionStatsPersRow4Title">Questions answered yesterday:</td><td id="questionStatsPersRow4Value">450</td></tr><tr id="questionStatsPersRow5"><td id="questionStatsPersRow5Title">Questions answered today:</td><td id="questionStatsPersRow5Value">400</td></tr><tr id="questionStatsPersRow6"><td id="questionStatsPersRow6Title">Most questions in a year:</td><td id="questionStatsPersRow6Value">98950 (2017)</td></tr><tr id="questionStatsPersRow7"><td id="questionStatsPersRow7Title">Most questions in a month:</td><td id="questionStatsPersRow7Value">22830 (Dec 2016)</td></tr><tr id="questionStatsPersRow8"><td id="questionStatsPersRow8Title">Most questions in a week:</td><td id="questionStatsPersRow8Value">8536 (18 Sep 2017-24 Sep 2017)</td></tr><tr id="questionStatsPersRow9"><td id="questionStatsPersRow9Title">Most questions in a day:</td><td id="questionStatsPersRow9Value">3601 (25 Nov 2016)</td></tr><tr id="questionStatsPersRow10"><td id="questionStatsPersRow10Title">Most questions on a Monday:</td><td id="questionStatsPersRow10Value">2000 (19 Feb 2018)</td></tr></table></div><div id="globalRec" class=" tab-pane statTab fade"></div><div id="indivRec" class=" tab-pane statTab fade"></div></div></div></div><div id="pan_2" class=" well well-sm panelStyleDark" style="margin-bottom: 10px;"><div id="header_pan_2" style="display: flex; flex-flow: row nowrap;"><div id="btnGroup_pan_2" class=" btn-group btn-group-sm"><button id="help_button_pan_2" class=" btn btn-grey metalBOne" data-original-title="" title=""><span class="glyphicon glyphicon-question-sign" style="vertical-align:middle"></span></button><button id="minim_button_pan_2" class=" btn btn-grey metalBOne"><span class="glyphicon glyphicon-chevron-up" style="vertical-align:middle"></span></button></div><div id="heading_text_pan_2" class="panelHeaderDark dragMe noselect steelRowed ui-sortable-handle" style="flex: 1 0 0%;">Chat</div></div><div id="content_pan_2" class=" panelContentDefault"><div id="linkNote" class=" linkNote">To keep track of the latest changes and report any problems, please visit our page on Facebook <a href="https://www.facebook.com/groups/xerafin/" target="_blank">[link]</a></div><div id="userDisplayArea" class=" chatActiveUsers"><div class=" activeUserHeading" id="activeUserHeading"><span class="userNumber">6</span> active users</div><div class=" chatActiveUsersContainer"><table class=" chatActiveUsers"><tbody><tr id="userRow"><td style="width: 50px;"><img src="./Xerafin Word Study System_files/saved_resource(11)" id="activeUserImg0" class=" activePic" title="Natalie Zolty" style="height: 50px;"></td><td style="width: 50px;"><img src="./Xerafin Word Study System_files/saved_resource(8)" id="activeUserImg0" class=" activePic" title="Randi Dandi" style="height: 50px;"></td><td style="width: 50px;"><img src="./Xerafin Word Study System_files/saved_resource(5)" id="activeUserImg0" class=" activePic" title="Rick Fawns" style="height: 50px;"></td><td style="width: 50px;"><img src="./Xerafin Word Study System_files/saved_resource(12)" id="activeUserImg0" class=" activePic" title="Rob Robinsky" style="height: 50px;"></td><td style="width: 50px;"><img src="./Xerafin Word Study System_files/saved_resource(13)" id="activeUserImg0" class=" activePic" title="Sue Tremblay" style="height: 50px;"></td><td style="width: 50px;"><img src="./Xerafin Word Study System_files/saved_resource(14)" id="activeUserImg0" class=" activePic" title="Supriya Devnani" style="height: 50px;"></td></tr></tbody></table></div></div><div id="chatRegion"><div class=" input-group" style="margin: 10px 0px;"><span class="input-group-addon primary steelRowed"><i class="glyphicon glyphicon-comment" style="color:#fff;"></i></span><input class=" form-control chatInput" id="chatBox" style="background: inherit;"></div><div id="chatDisplayBox" class=" well well-sm pre-scrollable" style="max-width: 100%; border: 1px solid rgb(0, 0, 0);"><div id="chatTable"><div id="chatRow1527557021000_159615" class=" chatRow"><div id="chatImg1527557021000_692841" class=" chatInfoCol"><div class=" chatInfoWrapper metalBThree"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="3:23:41">3:23</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527557021000_320328"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Sue Tremblay has completed <b>200</b> alphagrams today!</div></div></div></div><div id="chatRow1527556511000_353767" class=" chatRow"><div id="chatImg1527556511000_160372" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="3:15:11">3:15</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527556511000_176467"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Scott Garner has completed <b>400</b> alphagrams today!</div></div></div></div><div id="chatRow1527554761000_54231" class=" chatRow"><div id="chatImg1527554761000_575192" class=" chatInfoCol"><div class=" chatInfoWrapper metalBThree"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="2:46:01">2:46</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527554761000_109672"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Randi Dandi has completed <b>250</b> alphagrams today!</div></div></div></div><div id="chatRow1527554546000_835383" class=" chatRow"><div id="chatImg1527554546000_926864" class=" chatInfoCol"><div class=" chatInfoWrapper metalBThree"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="2:42:26">2:42</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527554546000_654681"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Rick Fawns has completed <b>400</b> alphagrams today!</div></div></div></div><div id="chatRow1527554216409_780657" class=" chatRow"><div id="chatImg1527554216409_413945" class=" chatInfoCol"><div class=" chatInfoWrapper metalBThree"><img class=" chatPic" title="Rick Fawns" src="./Xerafin Word Study System_files/saved_resource(5)"><div class=" chatDateUnder" title="2:36:56">2:36</div></div></div><div id="chat1527554216409_99540" class=" chatTextColWrapper"><div class=" chatTextWrapper" style="float: left;"><div class=" chatTextName chatTextNameMe">Rick Fawns</div><div class=" chatTextCol">Hi Randi. 😀</div></div></div></div><div id="chatRow1527549630000_987516" class=" chatRow"><div id="chatImg1527549630000_134204" class=" chatInfoCol"><div class=" chatInfoWrapper metalBOne"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="1:20:30">1:20</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527549630000_286007"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Calum Edwards has completed <b>4000</b> alphagrams today!</div></div></div></div><div id="chatRow1527548902000_363149" class=" chatRow"><div id="chatImg1527548902000_571752" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="1:08:22">1:08</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527548902000_107575"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Chris May has completed <b>700</b> alphagrams today!</div></div></div></div><div id="chatRow1527545281000_701919" class=" chatRow"><div id="chatImg1527545281000_298146" class=" chatInfoCol"><div class=" chatInfoWrapper metalBOne"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="0:08:01">0:08</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527545281000_346373"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Thomas Conrad has completed <b>100</b> alphagrams today!</div></div></div></div><div id="chatRow1527543258000_851970" class=" chatRow"><div id="chatImg1527543258000_861882" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="23:34:18">23:34</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527543258000_895359"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Jim Brennan has completed <b>50</b> alphagrams today!</div></div></div></div><div id="chatRow1527542494000_611072" class=" chatRow"><div id="chatImg1527542494000_203949" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="23:21:34">23:21</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527542494000_564415"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Jason Keller has completed <b>200</b> alphagrams today!</div></div></div></div><div id="chatRow1527541971000_52967" class=" chatRow"><div id="chatImg1527541971000_938980" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="23:12:51">23:12</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527541971000_236771"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Vincent Boyle has completed <b>300</b> alphagrams today!</div></div></div></div><div id="chatRow1527541365000_716989" class=" chatRow"><div id="chatImg1527541365000_248780" class=" chatInfoCol"><div class=" chatInfoWrapper metalBOne"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="23:02:45">23:02</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527541365000_638873"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Margaret Staunton has completed <b>200</b> alphagrams today!</div></div></div></div><div id="chatRow1527541233000_386423" class=" chatRow"><div id="chatImg1527541233000_944775" class=" chatInfoCol"><div class=" chatInfoWrapper metalBOne"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="23:00:33">23:00</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527541233000_836062"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Quentin Baker has completed <b>1200</b> alphagrams today!</div></div></div></div><div id="chatRow1527539651000_292691" class=" chatRow"><div id="chatImg1527539651000_485577" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="22:34:11">22:34</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527539651000_183023"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Gary Jones has completed <b>200</b> alphagrams today!</div></div></div></div><div id="chatRow1527539022000_642867" class=" chatRow"><div id="chatImg1527539022000_462912" class=" chatInfoCol"><div class=" chatInfoWrapper metalBThree"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="22:23:42">22:23</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527539022000_903873"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Bob Violett has completed <b>100</b> alphagrams today!</div></div></div></div><div id="chatRow1527538587000_27832" class=" chatRow"><div id="chatImg1527538587000_477913" class=" chatInfoCol"><div class=" chatInfoWrapper metalBThree"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="22:16:27">22:16</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527538587000_965294"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Ed Rossiter has completed <b>4400</b> alphagrams today!</div></div></div></div><div id="chatRow1527537512000_45484" class=" chatRow"><div id="chatImg1527537512000_65681" class=" chatInfoCol"><div class=" chatInfoWrapper metalBThree"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="21:58:32">21:58</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527537512000_392577"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Daniel Stembridge has completed <b>1600</b> alphagrams today!</div></div></div></div><div id="chatRow1527531972000_877282" class=" chatRow"><div id="chatImg1527531972000_430276" class=" chatInfoCol"><div class=" chatInfoWrapper metalBOne"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="20:26:12">20:26</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527531972000_965371"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Gunnar Andersson has completed <b>200</b> alphagrams today!</div></div></div></div><div id="chatRow1527529198000_769758" class=" chatRow"><div id="chatImg1527529198000_853809" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="19:39:58">19:39</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527529198000_441774"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Steve Bartlett has completed <b>500</b> alphagrams today!</div></div></div></div><div id="chatRow1527528690000_206109" class=" chatRow"><div id="chatImg1527528690000_875392" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="19:31:30">19:31</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527528690000_244500"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Terry Kirk has completed <b>250</b> alphagrams today!</div></div></div></div><div id="chatRow1527523354000_32583" class=" chatRow"><div id="chatImg1527523354000_351664" class=" chatInfoCol"><div class=" chatInfoWrapper metalBOne"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="18:02:34">18:02</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527523354000_606655"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Natalie Zolty has completed <b>100</b> alphagrams today!</div></div></div></div><div id="chatRow1527522039000_4428" class=" chatRow"><div id="chatImg1527522039000_980919" class=" chatInfoCol"><div class=" chatInfoWrapper metalBOne"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="17:40:39">17:40</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527522039000_285636"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Jason Broersma has completed <b>50</b> alphagrams today!</div></div></div></div><div id="chatRow1527521487966_417025" class=" chatRow"><div id="chatImg1527521487966_343289" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic" title="Daniel Stembridge" src="./Xerafin Word Study System_files/saved_resource"><div class=" chatDateUnder" title="17:31:27">17:31</div></div></div><div id="chat1527521487966_537805" class=" chatTextColWrapper"><div class=" chatTextWrapper" style="float: right;"><div class=" chatTextName">Daniel Stembridge</div><div class=" chatTextCol">Good stuff, Ed.</div></div></div></div><div id="chatRow1527521291592_59750" class=" chatRow"><div id="chatImg1527521291592_38994" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic" title="Ed Rossiter" src="./Xerafin Word Study System_files/saved_resource(15)"><div class=" chatDateUnder" title="17:28:11">17:28</div></div></div><div id="chat1527521291592_640803" class=" chatTextColWrapper"><div class=" chatTextWrapper" style="float: right;"><div class=" chatTextName">Ed Rossiter</div><div class=" chatTextCol">FWIW I broke the individual month earlier too.</div></div></div></div><div id="chatRow1527520348494_794590" class=" chatRow"><div id="chatImg1527520348494_584800" class=" chatInfoCol"><div class=" chatInfoWrapper metalBOne"><img class=" chatPic" title="Daniel Stembridge" src="./Xerafin Word Study System_files/saved_resource"><div class=" chatDateUnder" title="17:12:28">17:12</div></div></div><div id="chat1527520348494_721268" class=" chatTextColWrapper"><div class=" chatTextWrapper" style="float: right;"><div class=" chatTextName">Daniel Stembridge</div><div class=" chatTextCol">The Monthly Record has gone. Top Xerfin' everyone.</div></div></div></div><div id="chatRow1527518895000_519060" class=" chatRow"><div id="chatImg1527518895000_285762" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="16:48:15">16:48</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527518895000_137555"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Mark Francillon has completed <b>50</b> alphagrams today!</div></div></div></div><div id="chatRow1527512842000_644252" class=" chatRow"><div id="chatImg1527512842000_815147" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic" title="Invaders" src="./Xerafin Word Study System_files/cardboxInvaders.png"><div class=" chatDateUnder" title="15:07:22">15:07</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527512842000_539665"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Dorcas Alexander has set a new daily high score of 326 in Cardbox Invaders!</div></div></div></div><div id="chatRow1527512379000_73952" class=" chatRow"><div id="chatImg1527512379000_25105" class=" chatInfoCol"><div class=" chatInfoWrapper metalBOne"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="14:59:39">14:59</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527512379000_796762"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Dorcas Alexander has completed <b>500</b> alphagrams today!</div></div></div></div><div id="chatRow1527500029000_283497" class=" chatRow"><div id="chatImg1527500029000_433763" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic" title="Invaders" src="./Xerafin Word Study System_files/cardboxInvaders.png"><div class=" chatDateUnder" title="11:33:49">11:33</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527500029000_748655"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Dorcas Alexander has set a new daily high score of 145 in Cardbox Invaders!</div></div></div></div><div id="chatRow1527498002000_735140" class=" chatRow"><div id="chatImg1527498002000_74200" class=" chatInfoCol"><div class=" chatInfoWrapper metalBThree"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="11:00:02">11:00</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527498002000_908502"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Good job Xerfers! Yesterday 33 users solved 18738 alphagrams!</div></div></div></div><div id="chatRow1527497462000_548776" class=" chatRow"><div id="chatImg1527497462000_96548" class=" chatInfoCol"><div class=" chatInfoWrapper metalBOne"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="10:51:02">10:51</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527497462000_785717"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Cecil Muscat has completed <b>100</b> alphagrams today!</div></div></div></div><div id="chatRow1527487384000_852355" class=" chatRow"><div id="chatImg1527487384000_3080" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="8:03:04">8:03</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527487384000_392551"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Milosz Meller has completed <b>50</b> alphagrams today!</div></div></div></div><div id="chatRow1527477046000_563379" class=" chatRow"><div id="chatImg1527477046000_263576" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="5:10:46">5:10</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527477046000_400307"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Rob Robinsky has completed <b>100</b> alphagrams today!</div></div></div></div><div id="chatRow1527476561000_552683" class=" chatRow"><div id="chatImg1527476561000_11149" class=" chatInfoCol"><div class=" chatInfoWrapper metalBThree"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="5:02:41">5:02</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527476561000_969229"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Jason Ubeika has completed <b>100</b> alphagrams today!</div></div></div></div><div id="chatRow1527472076000_388710" class=" chatRow"><div id="chatImg1527472076000_330077" class=" chatInfoCol"><div class=" chatInfoWrapper metalBTwo"><img class=" chatPic chatPicBroadcastX" title="Xerafin" src="./Xerafin Word Study System_files/xerafin.png"><div class=" chatDateUnder" title="3:47:56">3:47</div></div></div><div class=" chatTextColWrapperTwo" id="chatXera1527472076000_201436"><div class=" chatXeraBroadcastOuter"><div class=" chatXeraBroadcastInner Absolute-Center">Matt Bernardina has completed <b>500</b> alphagrams today!</div></div></div></div></div></div></div><div id="chatServerTime" class=" updateTime">Server Time:20:32</div></div></div></div>
+				</div>
+			</div>
+		</div>
+</div>
+
+
+<div id="fb-root" class=" fb_reset"><div style="position: absolute; top: -10000px; height: 0px; width: 0px;"><div><iframe name="fb_xdm_frame_http" frameborder="0" allowtransparency="true" allowfullscreen="true" scrolling="no" allow="encrypted-media" id="fb_xdm_frame_http" aria-hidden="true" title="Facebook Cross Domain Communication Frame" tabindex="-1" src="./Xerafin Word Study System_files/oVjM2wVZ10b.html" style="border: none;"></iframe><iframe name="fb_xdm_frame_https" frameborder="0" allowtransparency="true" allowfullscreen="true" scrolling="no" allow="encrypted-media" id="fb_xdm_frame_https" aria-hidden="true" title="Facebook Cross Domain Communication Frame" tabindex="-1" src="./Xerafin Word Study System_files/oVjM2wVZ10b(1).html" style="border: none;"></iframe></div></div><div style="position: absolute; top: -10000px; height: 0px; width: 0px;"><div></div></div></div></body></html>

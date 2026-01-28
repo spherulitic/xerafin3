@@ -1,0 +1,500 @@
+<record>
+	<!-- resource manager options -->
+
+	<!-- dont preload anything in this folder -->
+	<boolean id="preload" value="false"/>
+
+	<!-- logo mappings -->
+	<!-- the following XML maps pictures inside this folder into other positions
+		 in the resource system, which allows this folder to be dropped into any
+		 place in the graphics folder and still have the game pick up the graphics
+		 files from the correct places
+	-->
+
+	<list id="maps">
+
+		<record from="none" to="graphics/pictures/nation/none/flag" />
+
+		<!-- african nations -->
+		<record from="africa/alg" to="graphics/pictures/nation/5/flag"/>
+		<record from="africa/ang" to="graphics/pictures/nation/6/flag"/>
+		<record from="africa/bdi" to="graphics/pictures/nation/10/flag"/>
+		<record from="africa/ben" to="graphics/pictures/nation/7/flag"/>
+		<record from="africa/bfa" to="graphics/pictures/nation/9/flag"/>
+		<record from="africa/bot" to="graphics/pictures/nation/8/flag"/>
+		<record from="africa/cgo" to="graphics/pictures/nation/49/flag"/>
+		<record from="africa/cha" to="graphics/pictures/nation/14/flag"/>
+		<record from="africa/civ" to="graphics/pictures/nation/24/flag"/>
+		<record from="africa/cmr" to="graphics/pictures/nation/11/flag"/>
+		<record from="africa/cod" to="graphics/pictures/nation/53/flag"/>
+		<record from="africa/com" to="graphics/pictures/nation/919586/flag"/>
+		<record from="africa/cpv" to="graphics/pictures/nation/12/flag"/>
+		<record from="africa/cta" to="graphics/pictures/nation/13/flag"/>
+		<record from="africa/dji" to="graphics/pictures/nation/15/flag"/>
+		<record from="africa/egy" to="graphics/pictures/nation/16/flag"/>
+		<record from="africa/eqg" to="graphics/pictures/nation/17/flag"/>
+		<record from="africa/eri" to="graphics/pictures/nation/129511/flag"/>
+		<record from="africa/eth" to="graphics/pictures/nation/18/flag"/>
+		<record from="africa/gab" to="graphics/pictures/nation/19/flag"/>
+		<record from="africa/gam" to="graphics/pictures/nation/20/flag"/>
+		<record from="africa/gha" to="graphics/pictures/nation/21/flag"/>
+		<record from="africa/gnb" to="graphics/pictures/nation/23/flag"/>
+		<record from="africa/gui" to="graphics/pictures/nation/22/flag"/>
+		<record from="africa/ken" to="graphics/pictures/nation/25/flag"/>
+		<record from="africa/lbr" to="graphics/pictures/nation/27/flag"/>
+		<record from="africa/lby" to="graphics/pictures/nation/28/flag"/>
+		<record from="africa/les" to="graphics/pictures/nation/26/flag"/>
+		<record from="africa/mad" to="graphics/pictures/nation/29/flag"/>
+		<record from="africa/mar" to="graphics/pictures/nation/34/flag"/>
+		<record from="africa/may" to="graphics/pictures/nation/918740/flag"/>
+		<record from="africa/mli" to="graphics/pictures/nation/31/flag"/>
+		<record from="africa/moz" to="graphics/pictures/nation/35/flag"/>
+		<record from="africa/mri" to="graphics/pictures/nation/33/flag"/>
+		<record from="africa/mtn" to="graphics/pictures/nation/32/flag"/>
+		<record from="africa/mwi" to="graphics/pictures/nation/30/flag"/>
+		<record from="africa/nam" to="graphics/pictures/nation/36/flag"/>
+		<record from="africa/nga" to="graphics/pictures/nation/38/flag"/>
+		<record from="africa/nig" to="graphics/pictures/nation/37/flag"/>
+		<record from="africa/reu" to="graphics/pictures/nation/917510/flag"/>
+		<record from="africa/rsa" to="graphics/pictures/nation/45/flag"/>
+		<record from="africa/ssd" to="graphics/pictures/nation/13113220/flag"/>
+		<record from="africa/rwa" to="graphics/pictures/nation/39/flag"/>
+		<record from="africa/sen" to="graphics/pictures/nation/41/flag"/>
+		<record from="africa/sey" to="graphics/pictures/nation/42/flag"/>
+		<record from="africa/sle" to="graphics/pictures/nation/43/flag"/>
+		<record from="africa/som" to="graphics/pictures/nation/44/flag"/>
+		<record from="africa/stp" to="graphics/pictures/nation/40/flag"/>
+		<record from="africa/sud" to="graphics/pictures/nation/46/flag"/>
+		<record from="africa/swz" to="graphics/pictures/nation/47/flag"/>
+		<record from="africa/tan" to="graphics/pictures/nation/48/flag"/>
+		<record from="africa/tog" to="graphics/pictures/nation/50/flag"/>
+		<record from="africa/tun" to="graphics/pictures/nation/51/flag"/>
+		<record from="africa/uga" to="graphics/pictures/nation/52/flag"/>
+		<record from="africa/zam" to="graphics/pictures/nation/54/flag"/>
+		<record from="africa/zim" to="graphics/pictures/nation/55/flag"/>
+		<record from="africa/znz" to="graphics/pictures/nation/13100103/flag"/>
+
+		<!-- asian nations -->
+		<record from="asia/afg" to="graphics/pictures/nation/106/flag"/>
+		<record from="asia/ban" to="graphics/pictures/nation/108/flag"/>
+		<record from="asia/bhr" to="graphics/pictures/nation/107/flag"/>
+		<record from="asia/bhu" to="graphics/pictures/nation/131012/flag"/>
+		<record from="asia/bru" to="graphics/pictures/nation/109/flag"/>
+		<record from="asia/cam" to="graphics/pictures/nation/118/flag"/>
+		<record from="asia/chn" to="graphics/pictures/nation/110/flag"/>
+		<record from="asia/gum" to="graphics/pictures/nation/129508/flag"/>
+		<record from="asia/hkg" to="graphics/pictures/nation/111/flag"/>
+		<record from="asia/idn" to="graphics/pictures/nation/113/flag"/>
+		<record from="asia/ind" to="graphics/pictures/nation/112/flag"/>
+		<record from="asia/irn" to="graphics/pictures/nation/114/flag"/>
+		<record from="asia/irq" to="graphics/pictures/nation/115/flag"/>
+		<record from="asia/jor" to="graphics/pictures/nation/117/flag"/>
+		<record from="asia/jpn" to="graphics/pictures/nation/116/flag"/>
+		<record from="asia/kgz" to="graphics/pictures/nation/121/flag"/>
+		<record from="asia/kor" to="graphics/pictures/nation/135/flag"/>
+		<record from="asia/ksa" to="graphics/pictures/nation/133/flag"/>
+		<record from="asia/kuw" to="graphics/pictures/nation/120/flag"/>
+		<record from="asia/lao" to="graphics/pictures/nation/122/flag"/>
+		<record from="asia/lib" to="graphics/pictures/nation/123/flag"/>
+		<record from="asia/mac" to="graphics/pictures/nation/124/flag"/>
+		<record from="asia/mas" to="graphics/pictures/nation/125/flag"/>
+		<record from="asia/mdv" to="graphics/pictures/nation/126/flag"/>
+		<record from="asia/mgl" to="graphics/pictures/nation/129505/flag"/>
+		<record from="asia/mya" to="graphics/pictures/nation/127/flag"/>
+		<record from="asia/nep" to="graphics/pictures/nation/128/flag"/>
+		<record from="asia/nmi" to="graphics/pictures/nation/23008660/flag"/>
+		<record from="asia/oma" to="graphics/pictures/nation/130/flag"/>
+		<record from="asia/pak" to="graphics/pictures/nation/131/flag"/>
+		<record from="asia/pal" to="graphics/pictures/nation/1662/flag"/>
+		<record from="asia/phi" to="graphics/pictures/nation/141/flag"/>
+		<record from="asia/prk" to="graphics/pictures/nation/129/flag"/>
+		<record from="asia/qat" to="graphics/pictures/nation/132/flag"/>
+		<record from="asia/sin" to="graphics/pictures/nation/134/flag"/>
+		<record from="asia/sri" to="graphics/pictures/nation/136/flag"/>
+		<record from="asia/syr" to="graphics/pictures/nation/137/flag"/>
+		<record from="asia/tha" to="graphics/pictures/nation/140/flag"/>
+		<record from="asia/tjk" to="graphics/pictures/nation/139/flag"/>
+		<record from="asia/tkm" to="graphics/pictures/nation/142/flag"/>
+		<record from="asia/tmp" to="graphics/pictures/nation/5626837/flag"/>
+		<record from="asia/tpe" to="graphics/pictures/nation/138/flag"/>
+		<record from="asia/uae" to="graphics/pictures/nation/143/flag"/>
+		<record from="asia/uzb" to="graphics/pictures/nation/144/flag"/>
+		<record from="asia/vie" to="graphics/pictures/nation/145/flag"/>
+		<record from="asia/yem" to="graphics/pictures/nation/146/flag"/>
+
+		<!-- european nations -->
+		<record from="europe/alb" to="graphics/pictures/nation/752/flag"/>
+		<record from="europe/and" to="graphics/pictures/nation/753/flag"/>
+		<record from="europe/arm" to="graphics/pictures/nation/754/flag"/>
+		<record from="europe/aut" to="graphics/pictures/nation/755/flag"/>
+		<record from="europe/aze" to="graphics/pictures/nation/756/flag"/>
+		<record from="europe/bel" to="graphics/pictures/nation/757/flag"/>
+		<record from="europe/bih" to="graphics/pictures/nation/759/flag"/>
+		<record from="europe/blr" to="graphics/pictures/nation/758/flag"/>
+		<record from="europe/bul" to="graphics/pictures/nation/760/flag"/>
+		<record from="europe/cro" to="graphics/pictures/nation/761/flag"/>
+		<record from="europe/cyp" to="graphics/pictures/nation/762/flag"/>
+		<record from="europe/cze" to="graphics/pictures/nation/763/flag"/>
+		<record from="europe/den" to="graphics/pictures/nation/764/flag"/>
+		<record from="europe/eng" to="graphics/pictures/nation/765/flag"/>
+		<record from="europe/esp" to="graphics/pictures/nation/796/flag"/>
+		<record from="europe/est" to="graphics/pictures/nation/766/flag"/>
+		<record from="europe/fin" to="graphics/pictures/nation/768/flag"/>
+		<record from="europe/fra" to="graphics/pictures/nation/769/flag"/>
+		<record from="europe/fro" to="graphics/pictures/nation/767/flag"/>
+		<record from="europe/geo" to="graphics/pictures/nation/770/flag"/>
+		<record from="europe/ger" to="graphics/pictures/nation/771/flag"/>
+		<record from="europe/gre" to="graphics/pictures/nation/772/flag"/>
+		<record from="europe/hun" to="graphics/pictures/nation/773/flag"/>
+		<record from="europe/irl" to="graphics/pictures/nation/789/flag"/>
+		<record from="europe/isl" to="graphics/pictures/nation/774/flag"/>
+		<record from="europe/isr" to="graphics/pictures/nation/775/flag"/>
+		<record from="europe/ita" to="graphics/pictures/nation/776/flag"/>
+		<record from="europe/kaz" to="graphics/pictures/nation/119/flag"/>
+		<record from="europe/lie" to="graphics/pictures/nation/778/flag"/>
+		<record from="europe/ltu" to="graphics/pictures/nation/779/flag"/>
+		<record from="europe/lux" to="graphics/pictures/nation/780/flag"/>
+		<record from="europe/lva" to="graphics/pictures/nation/777/flag"/>
+		<record from="europe/mda" to="graphics/pictures/nation/783/flag"/>
+		<record from="europe/mgo" to="graphics/pictures/nation/62002127/flag"/>
+		<record from="europe/mkd" to="graphics/pictures/nation/781/flag"/>
+		<record from="europe/mlt" to="graphics/pictures/nation/782/flag"/>
+		<record from="europe/mon" to="graphics/pictures/nation/8162661/flag"/>
+		<record from="europe/ned" to="graphics/pictures/nation/784/flag"/>
+		<record from="europe/nir" to="graphics/pictures/nation/785/flag"/>
+		<record from="europe/nor" to="graphics/pictures/nation/786/flag"/>
+		<record from="europe/pol" to="graphics/pictures/nation/787/flag"/>
+		<record from="europe/por" to="graphics/pictures/nation/788/flag"/>
+		<record from="europe/rom" to="graphics/pictures/nation/790/flag"/>
+		<record from="europe/rus" to="graphics/pictures/nation/791/flag"/>
+		<record from="europe/sco" to="graphics/pictures/nation/793/flag"/>
+		<record from="europe/ser" to="graphics/pictures/nation/802/flag"/>
+		<record from="europe/smr" to="graphics/pictures/nation/792/flag"/>
+		<record from="europe/sui" to="graphics/pictures/nation/798/flag"/>
+		<record from="europe/svk" to="graphics/pictures/nation/794/flag"/>
+		<record from="europe/svn" to="graphics/pictures/nation/795/flag"/>
+		<record from="europe/swe" to="graphics/pictures/nation/797/flag"/>
+		<record from="europe/tur" to="graphics/pictures/nation/799/flag"/>
+		<record from="europe/ukr" to="graphics/pictures/nation/800/flag"/>
+		<record from="europe/wal" to="graphics/pictures/nation/801/flag"/>
+
+		<!-- north american nations -->
+		<record from="namerica/aia" to="graphics/pictures/nation/129514/flag"/>
+		<record from="namerica/aru" to="graphics/pictures/nation/360/flag"/>
+		<record from="namerica/atg" to="graphics/pictures/nation/359/flag"/>
+		<record from="namerica/bah" to="graphics/pictures/nation/388/flag"/>
+		<record from="namerica/ber" to="graphics/pictures/nation/363/flag"/>
+		<record from="namerica/blz" to="graphics/pictures/nation/362/flag"/>
+		<record from="namerica/brb" to="graphics/pictures/nation/361/flag"/>
+		<record from="namerica/can" to="graphics/pictures/nation/364/flag"/>
+		<record from="namerica/cay" to="graphics/pictures/nation/365/flag"/>
+		<record from="namerica/crc" to="graphics/pictures/nation/366/flag"/>
+		<record from="namerica/cub" to="graphics/pictures/nation/367/flag"/>
+		<record from="namerica/cuw" to="graphics/pictures/nation/380/flag"/>
+		<record from="namerica/dma" to="graphics/pictures/nation/368/flag"/>
+		<record from="namerica/dom" to="graphics/pictures/nation/142527/flag"/>
+		<record from="namerica/gpe" to="graphics/pictures/nation/917498/flag"/>
+		<record from="namerica/grn" to="graphics/pictures/nation/371/flag"/>
+		<record from="namerica/gua" to="graphics/pictures/nation/373/flag"/>
+		<record from="namerica/guf" to="graphics/pictures/nation/917496/flag"/>
+		<record from="namerica/guy" to="graphics/pictures/nation/374/flag"/>
+		<record from="namerica/hai" to="graphics/pictures/nation/375/flag"/>
+		<record from="namerica/hon" to="graphics/pictures/nation/376/flag"/>
+		<record from="namerica/jam" to="graphics/pictures/nation/377/flag"/>
+		<record from="namerica/lca" to="graphics/pictures/nation/384/flag"/>
+		<record from="namerica/mex" to="graphics/pictures/nation/379/flag"/>
+		<record from="namerica/msr" to="graphics/pictures/nation/129520/flag"/>
+		<record from="namerica/mtq" to="graphics/pictures/nation/917502/flag"/>
+		<record from="namerica/nca" to="graphics/pictures/nation/381/flag"/>
+		<record from="namerica/pan" to="graphics/pictures/nation/382/flag"/>
+		<record from="namerica/pur" to="graphics/pictures/nation/383/flag"/>
+		<record from="namerica/sim" to="graphics/pictures/nation/917506/flag"/>
+		<record from="namerica/skn" to="graphics/pictures/nation/385/flag"/>
+		<record from="namerica/slv" to="graphics/pictures/nation/370/flag"/>
+		<record from="namerica/sma" to="graphics/pictures/nation/917508/flag"/>
+		<record from="namerica/spm" to="graphics/pictures/nation/918748/flag"/>
+		<record from="namerica/sur" to="graphics/pictures/nation/387/flag"/>
+		<record from="namerica/tca" to="graphics/pictures/nation/129526/flag"/>
+		<record from="namerica/tri" to="graphics/pictures/nation/389/flag"/>
+		<record from="namerica/usa" to="graphics/pictures/nation/390/flag"/>
+		<record from="namerica/vgb" to="graphics/pictures/nation/129517/flag"/>
+		<record from="namerica/vin" to="graphics/pictures/nation/386/flag"/>
+		<record from="namerica/vir" to="graphics/pictures/nation/129523/flag"/>
+
+		<!-- oceania nations -->
+		<record from="oceania/asa" to="graphics/pictures/nation/129504/flag"/>
+		<record from="oceania/aus" to="graphics/pictures/nation/1435/flag"/>
+		<record from="oceania/cok" to="graphics/pictures/nation/1436/flag"/>
+		<record from="oceania/fij" to="graphics/pictures/nation/1437/flag"/>
+		<record from="oceania/kir" to="graphics/pictures/nation/209002/flag"/>
+		<record from="oceania/ncl" to="graphics/pictures/nation/129532/flag"/>
+		<record from="oceania/nrm" to="graphics/pictures/nation/23008660/flag"/>
+		<record from="oceania/nzl" to="graphics/pictures/nation/1438/flag"/>
+		<record from="oceania/png" to="graphics/pictures/nation/1439/flag"/>
+		<record from="oceania/sam" to="graphics/pictures/nation/1444/flag"/>
+		<record from="oceania/sol" to="graphics/pictures/nation/1440/flag"/>
+		<record from="oceania/tah" to="graphics/pictures/nation/1441/flag"/>
+		<record from="oceania/tga" to="graphics/pictures/nation/1442/flag"/>
+		<record from="oceania/tuv" to="graphics/pictures/nation/23088616/flag"/>
+		<record from="oceania/van" to="graphics/pictures/nation/1443/flag"/>
+		<record from="oceania/wfi" to="graphics/pictures/nation/918745/flag"/>
+
+		<!-- south american nations -->
+		<record from="samerica/arg" to="graphics/pictures/nation/1649/flag"/>
+		<record from="samerica/bol" to="graphics/pictures/nation/1650/flag"/>
+		<record from="samerica/bra" to="graphics/pictures/nation/1651/flag"/>
+		<record from="samerica/chi" to="graphics/pictures/nation/1652/flag"/>
+		<record from="samerica/col" to="graphics/pictures/nation/1653/flag"/>
+		<record from="samerica/ecu" to="graphics/pictures/nation/1654/flag"/>
+		<record from="samerica/par" to="graphics/pictures/nation/1655/flag"/>
+		<record from="samerica/per" to="graphics/pictures/nation/1656/flag"/>
+		<record from="samerica/uru" to="graphics/pictures/nation/1657/flag"/>
+		<record from="samerica/ven" to="graphics/pictures/nation/1658/flag"/>
+
+		<!-- other nations -->
+		<record from="other/gbr" to="graphics/pictures/nation/145174/flag"/>
+
+
+		<!-- normal sized flags -->
+
+		<!-- african nations -->
+		<record from="africa/alg" to="graphics/pictures/nation/5/logo"/>
+		<record from="africa/ang" to="graphics/pictures/nation/6/logo"/>
+		<record from="africa/bdi" to="graphics/pictures/nation/10/logo"/>
+		<record from="africa/ben" to="graphics/pictures/nation/7/logo"/>
+		<record from="africa/bfa" to="graphics/pictures/nation/9/logo"/>
+		<record from="africa/bot" to="graphics/pictures/nation/8/logo"/>
+		<record from="africa/cgo" to="graphics/pictures/nation/49/logo"/>
+		<record from="africa/cha" to="graphics/pictures/nation/14/logo"/>
+		<record from="africa/civ" to="graphics/pictures/nation/24/logo"/>
+		<record from="africa/cmr" to="graphics/pictures/nation/11/logo"/>
+		<record from="africa/cod" to="graphics/pictures/nation/53/logo"/>
+		<record from="africa/com" to="graphics/pictures/nation/919586/logo"/>
+		<record from="africa/cpv" to="graphics/pictures/nation/12/logo"/>
+		<record from="africa/cta" to="graphics/pictures/nation/13/logo"/>
+		<record from="africa/dji" to="graphics/pictures/nation/15/logo"/>
+		<record from="africa/egy" to="graphics/pictures/nation/16/logo"/>
+		<record from="africa/eqg" to="graphics/pictures/nation/17/logo"/>
+		<record from="africa/eri" to="graphics/pictures/nation/129511/logo"/>
+		<record from="africa/eth" to="graphics/pictures/nation/18/logo"/>
+		<record from="africa/gab" to="graphics/pictures/nation/19/logo"/>
+		<record from="africa/gam" to="graphics/pictures/nation/20/logo"/>
+		<record from="africa/gha" to="graphics/pictures/nation/21/logo"/>
+		<record from="africa/gnb" to="graphics/pictures/nation/23/logo"/>
+		<record from="africa/gui" to="graphics/pictures/nation/22/logo"/>
+		<record from="africa/ken" to="graphics/pictures/nation/25/logo"/>
+		<record from="africa/lbr" to="graphics/pictures/nation/27/logo"/>
+		<record from="africa/lby" to="graphics/pictures/nation/28/logo"/>
+		<record from="africa/les" to="graphics/pictures/nation/26/logo"/>
+		<record from="africa/mad" to="graphics/pictures/nation/29/logo"/>
+		<record from="africa/mar" to="graphics/pictures/nation/34/logo"/>
+		<record from="africa/may" to="graphics/pictures/nation/918740/logo"/>
+		<record from="africa/mli" to="graphics/pictures/nation/31/logo"/>
+		<record from="africa/moz" to="graphics/pictures/nation/35/logo"/>
+		<record from="africa/mri" to="graphics/pictures/nation/33/logo"/>
+		<record from="africa/mtn" to="graphics/pictures/nation/32/logo"/>
+		<record from="africa/mwi" to="graphics/pictures/nation/30/logo"/>
+		<record from="africa/nam" to="graphics/pictures/nation/36/logo"/>
+		<record from="africa/nga" to="graphics/pictures/nation/38/logo"/>
+		<record from="africa/nig" to="graphics/pictures/nation/37/logo"/>
+		<record from="africa/reu" to="graphics/pictures/nation/917510/logo"/>
+		<record from="africa/rsa" to="graphics/pictures/nation/45/logo"/>
+		<record from="africa/rwa" to="graphics/pictures/nation/39/logo"/>
+		<record from="africa/sen" to="graphics/pictures/nation/41/logo"/>
+		<record from="africa/sey" to="graphics/pictures/nation/42/logo"/>
+		<record from="africa/sle" to="graphics/pictures/nation/43/logo"/>
+		<record from="africa/som" to="graphics/pictures/nation/44/logo"/>
+		<record from="africa/stp" to="graphics/pictures/nation/40/logo"/>
+		<record from="africa/sud" to="graphics/pictures/nation/46/logo"/>
+		<record from="africa/swz" to="graphics/pictures/nation/47/logo"/>
+		<record from="africa/tan" to="graphics/pictures/nation/48/logo"/>
+		<record from="africa/tog" to="graphics/pictures/nation/50/logo"/>
+		<record from="africa/tun" to="graphics/pictures/nation/51/logo"/>
+		<record from="africa/uga" to="graphics/pictures/nation/52/logo"/>
+		<record from="africa/zam" to="graphics/pictures/nation/54/logo"/>
+		<record from="africa/zim" to="graphics/pictures/nation/55/logo"/>
+		<record from="africa/znz" to="graphics/pictures/nation/13100103/logo"/>
+
+		<!-- asian nations -->
+		<record from="asia/afg" to="graphics/pictures/nation/106/logo"/>
+		<record from="asia/ban" to="graphics/pictures/nation/108/logo"/>
+		<record from="asia/bhr" to="graphics/pictures/nation/107/logo"/>
+		<record from="asia/bhu" to="graphics/pictures/nation/131012/logo"/>
+		<record from="asia/bru" to="graphics/pictures/nation/109/logo"/>
+		<record from="asia/cam" to="graphics/pictures/nation/118/logo"/>
+		<record from="asia/chn" to="graphics/pictures/nation/110/logo"/>
+		<record from="asia/gum" to="graphics/pictures/nation/129508/logo"/>
+		<record from="asia/hkg" to="graphics/pictures/nation/111/logo"/>
+		<record from="asia/idn" to="graphics/pictures/nation/113/logo"/>
+		<record from="asia/ind" to="graphics/pictures/nation/112/logo"/>
+		<record from="asia/irn" to="graphics/pictures/nation/114/logo"/>
+		<record from="asia/irq" to="graphics/pictures/nation/115/logo"/>
+		<record from="asia/jor" to="graphics/pictures/nation/117/logo"/>
+		<record from="asia/jpn" to="graphics/pictures/nation/116/logo"/>
+		<record from="asia/kgz" to="graphics/pictures/nation/121/logo"/>
+		<record from="asia/kor" to="graphics/pictures/nation/135/logo"/>
+		<record from="asia/ksa" to="graphics/pictures/nation/133/logo"/>
+		<record from="asia/kuw" to="graphics/pictures/nation/120/logo"/>
+		<record from="asia/lao" to="graphics/pictures/nation/122/logo"/>
+		<record from="asia/lib" to="graphics/pictures/nation/123/logo"/>
+		<record from="asia/mac" to="graphics/pictures/nation/124/logo"/>
+		<record from="asia/mas" to="graphics/pictures/nation/125/logo"/>
+		<record from="asia/mdv" to="graphics/pictures/nation/126/logo"/>
+		<record from="asia/mgl" to="graphics/pictures/nation/129505/logo"/>
+		<record from="asia/mya" to="graphics/pictures/nation/127/logo"/>
+		<record from="asia/nep" to="graphics/pictures/nation/128/logo"/>
+		<record from="asia/nmi" to="graphics/pictures/nation/23008660/flag"/>
+		<record from="asia/oma" to="graphics/pictures/nation/130/logo"/>
+		<record from="asia/pak" to="graphics/pictures/nation/131/logo"/>
+		<record from="asia/pal" to="graphics/pictures/nation/1662/logo"/>
+		<record from="asia/phi" to="graphics/pictures/nation/141/logo"/>
+		<record from="asia/prk" to="graphics/pictures/nation/129/logo"/>
+		<record from="asia/qat" to="graphics/pictures/nation/132/logo"/>
+		<record from="asia/sin" to="graphics/pictures/nation/134/logo"/>
+		<record from="asia/sri" to="graphics/pictures/nation/136/logo"/>
+		<record from="asia/syr" to="graphics/pictures/nation/137/logo"/>
+		<record from="asia/tha" to="graphics/pictures/nation/140/logo"/>
+		<record from="asia/tjk" to="graphics/pictures/nation/139/logo"/>
+		<record from="asia/tkm" to="graphics/pictures/nation/142/logo"/>
+		<record from="asia/tmp" to="graphics/pictures/nation/5626837/logo"/>
+		<record from="asia/tpe" to="graphics/pictures/nation/138/logo"/>
+		<record from="asia/uae" to="graphics/pictures/nation/143/logo"/>
+		<record from="asia/uzb" to="graphics/pictures/nation/144/logo"/>
+		<record from="asia/vie" to="graphics/pictures/nation/145/logo"/>
+		<record from="asia/yem" to="graphics/pictures/nation/146/logo"/>
+
+		<!-- european nations -->
+		<record from="europe/alb" to="graphics/pictures/nation/752/logo"/>
+		<record from="europe/and" to="graphics/pictures/nation/753/logo"/>
+		<record from="europe/arm" to="graphics/pictures/nation/754/logo"/>
+		<record from="europe/aut" to="graphics/pictures/nation/755/logo"/>
+		<record from="europe/aze" to="graphics/pictures/nation/756/logo"/>
+		<record from="europe/bel" to="graphics/pictures/nation/757/logo"/>
+		<record from="europe/bih" to="graphics/pictures/nation/759/logo"/>
+		<record from="europe/blr" to="graphics/pictures/nation/758/logo"/>
+		<record from="europe/bul" to="graphics/pictures/nation/760/logo"/>
+		<record from="europe/cro" to="graphics/pictures/nation/761/logo"/>
+		<record from="europe/cyp" to="graphics/pictures/nation/762/logo"/>
+		<record from="europe/cze" to="graphics/pictures/nation/763/logo"/>
+		<record from="europe/den" to="graphics/pictures/nation/764/logo"/>
+		<record from="europe/eng" to="graphics/pictures/nation/765/logo"/>
+		<record from="europe/esp" to="graphics/pictures/nation/796/logo"/>
+		<record from="europe/est" to="graphics/pictures/nation/766/logo"/>
+		<record from="europe/fin" to="graphics/pictures/nation/768/logo"/>
+		<record from="europe/fra" to="graphics/pictures/nation/769/logo"/>
+		<record from="europe/fro" to="graphics/pictures/nation/767/logo"/>
+		<record from="europe/geo" to="graphics/pictures/nation/770/logo"/>
+		<record from="europe/ger" to="graphics/pictures/nation/771/logo"/>
+		<record from="europe/gre" to="graphics/pictures/nation/772/logo"/>
+		<record from="europe/hun" to="graphics/pictures/nation/773/logo"/>
+		<record from="europe/irl" to="graphics/pictures/nation/789/logo"/>
+		<record from="europe/isl" to="graphics/pictures/nation/774/logo"/>
+		<record from="europe/isr" to="graphics/pictures/nation/775/logo"/>
+		<record from="europe/ita" to="graphics/pictures/nation/776/logo"/>
+		<record from="europe/kaz" to="graphics/pictures/nation/119/logo"/>
+		<record from="europe/lie" to="graphics/pictures/nation/778/logo"/>
+		<record from="europe/ltu" to="graphics/pictures/nation/779/logo"/>
+		<record from="europe/lux" to="graphics/pictures/nation/780/logo"/>
+		<record from="europe/lva" to="graphics/pictures/nation/777/logo"/>
+		<record from="europe/mda" to="graphics/pictures/nation/783/logo"/>
+		<record from="europe/mgo" to="graphics/pictures/nation/62002127/logo"/>
+		<record from="europe/mkd" to="graphics/pictures/nation/781/logo"/>
+		<record from="europe/mlt" to="graphics/pictures/nation/782/logo"/>
+		<record from="europe/mon" to="graphics/pictures/nation/8162661/logo"/>
+		<record from="europe/ned" to="graphics/pictures/nation/784/logo"/>
+		<record from="europe/nir" to="graphics/pictures/nation/785/logo"/>
+		<record from="europe/nor" to="graphics/pictures/nation/786/logo"/>
+		<record from="europe/pol" to="graphics/pictures/nation/787/logo"/>
+		<record from="europe/por" to="graphics/pictures/nation/788/logo"/>
+		<record from="europe/rom" to="graphics/pictures/nation/790/logo"/>
+		<record from="europe/rus" to="graphics/pictures/nation/791/logo"/>
+		<record from="europe/sco" to="graphics/pictures/nation/793/logo"/>
+		<record from="europe/ser" to="graphics/pictures/nation/802/logo"/>
+		<record from="europe/smr" to="graphics/pictures/nation/792/logo"/>
+		<record from="europe/sui" to="graphics/pictures/nation/798/logo"/>
+		<record from="europe/svk" to="graphics/pictures/nation/794/logo"/>
+		<record from="europe/svn" to="graphics/pictures/nation/795/logo"/>
+		<record from="europe/swe" to="graphics/pictures/nation/797/logo"/>
+		<record from="europe/tur" to="graphics/pictures/nation/799/logo"/>
+		<record from="europe/ukr" to="graphics/pictures/nation/800/logo"/>
+		<record from="europe/wal" to="graphics/pictures/nation/801/logo"/>
+
+		<!-- north american nations -->
+		<record from="namerica/aia" to="graphics/pictures/nation/129514/logo"/>
+		<record from="namerica/aru" to="graphics/pictures/nation/360/logo"/>
+		<record from="namerica/atg" to="graphics/pictures/nation/359/logo"/>
+		<record from="namerica/bah" to="graphics/pictures/nation/388/logo"/>
+		<record from="namerica/ber" to="graphics/pictures/nation/363/logo"/>
+		<record from="namerica/blz" to="graphics/pictures/nation/362/logo"/>
+		<record from="namerica/brb" to="graphics/pictures/nation/361/logo"/>
+		<record from="namerica/can" to="graphics/pictures/nation/364/logo"/>
+		<record from="namerica/cay" to="graphics/pictures/nation/365/logo"/>
+		<record from="namerica/crc" to="graphics/pictures/nation/366/logo"/>
+		<record from="namerica/cub" to="graphics/pictures/nation/367/logo"/>
+		<record from="namerica/cuw" to="graphics/pictures/nation/380/logo"/>
+		<record from="namerica/dma" to="graphics/pictures/nation/368/logo"/>
+		<record from="namerica/dom" to="graphics/pictures/nation/142527/logo"/>
+		<record from="namerica/gpe" to="graphics/pictures/nation/917498/logo"/>
+		<record from="namerica/grn" to="graphics/pictures/nation/371/logo"/>
+		<record from="namerica/gua" to="graphics/pictures/nation/373/logo"/>
+		<record from="namerica/guf" to="graphics/pictures/nation/917496/logo"/>
+		<record from="namerica/guy" to="graphics/pictures/nation/374/logo"/>
+		<record from="namerica/hai" to="graphics/pictures/nation/375/logo"/>
+		<record from="namerica/hon" to="graphics/pictures/nation/376/logo"/>
+		<record from="namerica/jam" to="graphics/pictures/nation/377/logo"/>
+		<record from="namerica/lca" to="graphics/pictures/nation/384/logo"/>
+		<record from="namerica/mex" to="graphics/pictures/nation/379/logo"/>
+		<record from="namerica/msr" to="graphics/pictures/nation/129520/logo"/>
+		<record from="namerica/mtq" to="graphics/pictures/nation/917502/logo"/>
+		<record from="namerica/nca" to="graphics/pictures/nation/381/logo"/>
+		<record from="namerica/pan" to="graphics/pictures/nation/382/logo"/>
+		<record from="namerica/pur" to="graphics/pictures/nation/383/logo"/>
+		<record from="namerica/sim" to="graphics/pictures/nation/917506/logo"/>
+		<record from="namerica/skn" to="graphics/pictures/nation/385/logo"/>
+		<record from="namerica/slv" to="graphics/pictures/nation/370/logo"/>
+		<record from="namerica/sma" to="graphics/pictures/nation/917508/logo"/>
+		<record from="namerica/spm" to="graphics/pictures/nation/918748/logo"/>
+		<record from="namerica/sur" to="graphics/pictures/nation/387/logo"/>
+		<record from="namerica/tca" to="graphics/pictures/nation/129526/logo"/>
+		<record from="namerica/tri" to="graphics/pictures/nation/389/logo"/>
+		<record from="namerica/usa" to="graphics/pictures/nation/390/logo"/>
+		<record from="namerica/vgb" to="graphics/pictures/nation/129517/logo"/>
+		<record from="namerica/vin" to="graphics/pictures/nation/386/logo"/>
+		<record from="namerica/vir" to="graphics/pictures/nation/129523/logo"/>
+
+		<!-- oceania nations -->
+		<record from="oceania/asa" to="graphics/pictures/nation/129504/logo"/>
+		<record from="oceania/aus" to="graphics/pictures/nation/1435/logo"/>
+		<record from="oceania/cok" to="graphics/pictures/nation/1436/logo"/>
+		<record from="oceania/fij" to="graphics/pictures/nation/1437/logo"/>
+		<record from="oceania/kir" to="graphics/pictures/nation/209002/logo"/>
+		<record from="oceania/ncl" to="graphics/pictures/nation/129532/logo"/>
+		<record from="oceania/nrm" to="graphics/pictures/nation/23008660/logo"/>
+		<record from="oceania/nzl" to="graphics/pictures/nation/1438/logo"/>
+		<record from="oceania/png" to="graphics/pictures/nation/1439/logo"/>
+		<record from="oceania/sam" to="graphics/pictures/nation/1444/logo"/>
+		<record from="oceania/sol" to="graphics/pictures/nation/1440/logo"/>
+		<record from="oceania/tah" to="graphics/pictures/nation/1441/logo"/>
+		<record from="oceania/tga" to="graphics/pictures/nation/1442/logo"/>
+		<record from="oceania/tuv" to="graphics/pictures/nation/23088616/logo"/>
+		<record from="oceania/van" to="graphics/pictures/nation/1443/logo"/>
+		<record from="oceania/wfi" to="graphics/pictures/nation/918745/logo"/>
+
+		<!-- south american nations -->
+		<record from="samerica/arg" to="graphics/pictures/nation/1649/logo"/>
+		<record from="samerica/bol" to="graphics/pictures/nation/1650/logo"/>
+		<record from="samerica/bra" to="graphics/pictures/nation/1651/logo"/>
+		<record from="samerica/chi" to="graphics/pictures/nation/1652/logo"/>
+		<record from="samerica/col" to="graphics/pictures/nation/1653/logo"/>
+		<record from="samerica/ecu" to="graphics/pictures/nation/1654/logo"/>
+		<record from="samerica/par" to="graphics/pictures/nation/1655/logo"/>
+		<record from="samerica/per" to="graphics/pictures/nation/1656/logo"/>
+		<record from="samerica/uru" to="graphics/pictures/nation/1657/logo"/>
+		<record from="samerica/ven" to="graphics/pictures/nation/1658/logo"/>
+
+		<!-- other nations -->
+		<record from="other/gbr" to="graphics/pictures/nation/145174/logo"/>
+
+
+	</list>
+</record>
