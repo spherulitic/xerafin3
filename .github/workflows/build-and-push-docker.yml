@@ -48,7 +48,7 @@ jobs:
             if [ "$dir" = "keycloak" ]; then
               docker build --pull -f $dir/Dockerfile.prod -t spherulitic/$image_name:latest $dir
             else
-              docker build --pull --build-arg NGINX_ENV=prod  --build-arg KEYCLOAK_URL=https://auth.xerafin.net/ -t spherulitic/$image_name:latest $dir
+              docker build --pull --build-arg NGINX_ENV=prod  --build-arg KEYCLOAK_URL=https://auth.xerafin.net -t spherulitic/$image_name:latest $dir
             fi
             docker push spherulitic/$image_name:latest
           done
