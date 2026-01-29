@@ -253,8 +253,8 @@ def getUserLexicons():
 
   query = f'''SELECT name, country, replaced_by
               FROM lexicon_info l
-             WHERE lexicon = "{lexicon+version}"'''
-  g.con.execute(query)
+             WHERE lexicon = %s'''
+  g.con.execute(query,(lexicon+version,))
   row = g.con.fetchone()
   result["name"] = row[0]
   result["country"] = row[1]
