@@ -244,8 +244,8 @@ def getUserLexicons():
     version = '24'
     default = 1
     query = f'''insert into user_lexicon_master (userid, lexicon, version, is_default)
-             values ("{g.uuid}", "{lexicon}", "{version}", {default})'''
-    g.con.execute(query)
+             values (%s, %s, %s, %s)'''
+    g.con.execute(query, (g.uuid, lexicon, version, default))
   else:
     lexicon = row[0]
     version = row[1]
