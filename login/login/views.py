@@ -236,8 +236,8 @@ def getUserLexicons():
   result = { }
   # eventually when we have multiple language support, this will be a list of results
   # for now we assume one
-  query = f'select lexicon, version, is_default from user_lexicon_master where userid = "{g.uuid}"'
-  g.con.execute(query)
+  query = f'select lexicon, version, is_default from user_lexicon_master where userid = %s'
+  g.con.execute(query, (g.uuid,))
   row = g.con.fetchone()
   if row is None:
     lexicon = 'CSW' # hard coded default; fix this someday
