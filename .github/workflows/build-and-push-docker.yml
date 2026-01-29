@@ -60,8 +60,6 @@ jobs:
       CHAT_MYSQL_USER: ${{ vars.CHAT_MYSQL_USER }}
       CHAT_MYSQL_DB: ${{ vars.CHAT_MYSQL_DB }}
       KEYCLOAK_MYSQL_PWD: ${{ secrets.KEYCLOAK_MYSQL_PWD }}
-      KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME: ${{ secrets.KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME }}
-      KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD }}
       KEYCLOAK_USER: ${{ vars.KEYCLOAK_USER }}
       KEYCLOAK_PASSWORD: ${{ secrets.KEYCLOAK_PASSWORD }}
       KC_LOGLEVEL: ${{ vars.KC_LOGLEVEL }}
@@ -92,8 +90,6 @@ jobs:
           echo MYSQL_USER=${CHAT_MYSQL_USER} > generated_envs/chat.env
           echo MYSQL_DB=${CHAT_MYSQL_DB} >> generated_envs/chat.env
           echo MYSQL_PWD=${CHAT_MYSQL_PWD} >> generated_envs/chat.env
-          echo KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME=${KEYCLOAK_BOOTSTRAP_ADMIN_USERNAME} > generated_envs/keycloak.env
-          echo KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_BOOTSTRAP_ADMIN_PASSWORD} >> generated_envs/keycloak.env
           echo KEYCLOAK_USER=${KEYCLOAK_USER} >> generated_envs/keycloak.env
           echo KEYCLOAK_PASSWORD=${KEYCLOAK_PASSWORD} >> generated_envs/keycloak.env
           echo KC_LOGLEVEL=${KC_LOGLEVEL} >> generated_envs/keycloak.env
@@ -107,6 +103,8 @@ jobs:
           echo MYSQL_USER=${LOGIN_MYSQL_USER} > generated_envs/login.env
           echo MYSQL_DB=${LOGIN_MYSQL_DB} >> generated_envs/login.env
           echo MYSQL_PWD=${LOGIN_MYSQL_PWD} >> generated_envs/login.env
+          echo KEYCLOAK_USER=${KEYCLOAK_USER} >> generated_envs/login.env
+          echo KEYCLOAK_PASSWORD=${KEYCLOAK_PASSWORD} >> generated_envs/login.env
           echo MYSQL_USER=${QUIZ_MYSQL_USER} > generated_envs/quiz.env
           echo MYSQL_DB=${QUIZ_MYSQL_DB} >> generated_envs/quiz.env
           echo MYSQL_PWD=${QUIZ_MYSQL_PWD} >> generated_envs/quiz.env
