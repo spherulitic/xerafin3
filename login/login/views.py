@@ -156,7 +156,7 @@ def getLoggedInUsers():
       # This is the service account
       continue
     row["name"] = f'{userInfo["firstName"]} {userInfo["lastName"]}'
-    row["photo"] = userInfo['attributes'].get('photo', 'images/unknown_player.gif')
+    row["photo"] = userInfo.get('attributes', {}).get('photo', 'images/unknown_player.gif')
     result.append(row)
 
   return jsonify(result)
@@ -197,8 +197,8 @@ def getUserNamesAndPhotos():
       try:
         userInfo = keycloak_admin.get_user(uuid)
         userDict["name"] = f'{userInfo["firstName"]} {userInfo["lastName"]}'
-        userDict["photo"] = userInfo['attributes'].get('photo', 'images/unknown_player.gif')
-        userDict["countryId"] = userInfo['attributes'].get('countryId', 0)
+        userDict["photo"] = userInfo.get('attributes', {}).get('photo', 'images/unknown_player.gif')
+        userDict["countryId"] = userInfo.get('attributes', {}).get('countryId', 0)
         result.append(userDict)
 
       except Exception as user_error:
