@@ -39,6 +39,14 @@ jobs:
             echo "Force rebuild all containers requested"
             CHANGED_CONTAINERS="chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox"
           else
+            echo "=== DEBUG INFO ==="
+            echo "Event name: ${{ github.event_name }}"
+            echo "Event ref: ${{ github.ref }}"
+            echo "Event before: ${{ github.event.before }}"
+            echo "Event after: ${{ github.event.after }}"
+            echo "Head commit message:"
+            git log -1 --pretty=format:"%s"
+            echo "=== END DEBUG ==="
             BASE_SHA="${{ github.event.before }}"
             HEAD_SHA="${{ github.event.after }}"
             CHANGED_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA 2>/dev/null || echo "")
