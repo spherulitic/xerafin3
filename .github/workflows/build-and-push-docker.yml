@@ -57,6 +57,20 @@ jobs:
             mv versions.json.tmp versions.json
             echo "Updated $container to version $NEW_VERSION"
           done
+            # Create a new branch and PR instead of pushing to main
+          BRANCH_NAME="version-update-$(date +%Y%m%d-%H%M%S)"
+          git checkout -b "$BRANCH_NAME"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add versions.json
+          git commit -m "ci: Increment version tags for: $CHANGED_CONTAINERS"
+          git push origin "$BRANCH_NAME"
+          echo "Creating pull request..."
+          gh pr create \
+            --title "Version updates for changed containers" \
+            --body "Automated version increment for: $CHANGED_CONTAINERS" \
+            --base main \
+            --head "$BRANCH_NAME"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@github.com"
           git add versions.json
