@@ -16,7 +16,7 @@ PublishPort=8080:8080
 PublishPort=8443:8443
 
 # VOLUMES
-Volume=/home/spherulitic/xerafin3/front-end/ssl/dev:/opt/keycloak/certs:ro
+Volume=/home/spherulitic/xerafin3/frontend/ssl/dev:/opt/keycloak/certs:ro
 
 # ENVIRONMENT
 EnvironmentFile=%h/.config/xerafin3/keycloak.env
