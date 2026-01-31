@@ -196,7 +196,7 @@ jobs:
       - name: Extract new versions from previous job
         id: get-versions
         run: |
-          echo '${{ needs.build-and-version.outputs.NEW_VERSIONS_JSON }}' > new_versions.json
+          echo '${{ needs.build-and-version.outputs.json }}' > new_versions.json
 
       - name: Update .container files with NEW versions
         run: |
