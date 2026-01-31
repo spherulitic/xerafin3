@@ -78,7 +78,12 @@ jobs:
             --head "$BRANCH_NAME"
         env: 
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
+      - name: Create version output
+        id: set-versions
+        run: |
+          NEW_VERSIONS_JSON=$(jq -c '.' versions.json)
+          echo "json=$NEW_VERSIONS_JSON" >> $GITHUB_OUTPUT
+         
       - name: Build and Push Services
         if: env.CHANGED_CONTAINERS != ''
         run: |
@@ -188,12 +193,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Update quadlets with version tag
+      - name: Extract new versions from previous job
+        id: get-versions
         run: |
-            for container in chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox; do
-              VERSION=$(jq -r ".\"$container\"" versions.json)
-              sed -i "s/:latest/:$VERSION/" deploy/$container.container
-            done
+          echo '${{ needs.build-and-version.outputs.new_versions_json }}' > new_versions.json
+
+      - name: Update .container files with NEW versions
+        run: |
+          # Read versions from the JSON file we created
+          for container in chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox; do
+            NEW_VERSION=$(jq -r ".\"$container\"" new_versions.json)
+            echo "Updating $container to version $NEW_VERSION"
+            sed -i "s|:latest|:$NEW_VERSION|g" deploy/$container.container
+          done
 
       - name: Copy .container files
         uses: appleboy/scp-action@v1
