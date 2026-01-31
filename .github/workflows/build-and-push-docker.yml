@@ -41,8 +41,8 @@ jobs:
                CHANGED_CONTAINERS="$CHANGED_CONTAINERS $container"
              fi
            done
+          fi
            CHANGED_CONTAINERS="${CHANGED_CONTAINERS# }"
-         fi
            echo "changed_containers=$CHANGED_CONTAINERS" >> $GITHUB_ENV
            echo "Changed Containers: $CHANGED_CONTAINERS"
 
