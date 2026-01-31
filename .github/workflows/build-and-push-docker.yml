@@ -4,8 +4,13 @@ on:
   push:
     branches:
       - main
-#on:
-#  workflow_dispatch: # Allows manual triggering
+  workflow_dispatch: # Allows manual triggering
+    inputs:
+      force_rebuild_all:
+        description: "Force rebuild all containers"
+        required: false
+        default: 'false'
+        type: boolean
 env:
   PROD_KEYCLOAK_URL: 'https://auth.xerafin.net'
 
@@ -24,7 +29,11 @@ jobs:
 
       - name: Detect changed containers
         run: |
-           CHANGED_CONTAINERS=""
+          CHANGED_CONTAINERS=""
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
+            echo "Force rebuild all containers requested"
+            CHANGED_CONTAINERS="chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox"
+          else
            git fetch origin main
            CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
            for container in chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox; do
