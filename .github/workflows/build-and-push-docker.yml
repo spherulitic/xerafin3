@@ -34,6 +34,11 @@ jobs:
 
       - name: Detect changed containers
         run: |
+          echo "Current branch: $(git branch --show-current)"
+          echo "HEAD SHA: $(git rev-parse HEAD)"
+          echo "origin/main SHA: $(git rev-parse origin/main)"
+          echo "github.event.before: ${{ github.event.before }}"
+          echo "github.event.after: ${{ github.event.after }}"
           CHANGED_CONTAINERS=""
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
             echo "Force rebuild all containers requested"
