@@ -20,6 +20,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    outputs:
+      new_versions_json: ${{ steps.set-versions.outputs.json }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -196,8 +198,8 @@ jobs:
       - name: Extract new versions from previous job
         id: get-versions
         run: |
-          echo '${{ needs.build-and-version.outputs.json }}' > new_versions.json
-
+          echo '${{ needs.build-and-push.outputs.new_versions_json }}' > new_versions.json
+          
       - name: Update .container files with NEW versions
         run: |
           # Read versions from the JSON file we created
