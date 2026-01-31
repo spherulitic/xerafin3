@@ -43,7 +43,7 @@ jobs:
            done
           fi
            CHANGED_CONTAINERS="${CHANGED_CONTAINERS# }"
-           echo "changed_containers=$CHANGED_CONTAINERS" >> $GITHUB_ENV
+           echo "CHANGED_CONTAINERS=$CHANGED_CONTAINERS" >> $GITHUB_ENV
            echo "Changed Containers: $CHANGED_CONTAINERS"
 
       - name: Increment version tags for changed containers
