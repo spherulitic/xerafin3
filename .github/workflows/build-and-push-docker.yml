@@ -33,23 +33,21 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Detect changed containers
-        run: |
-          BASE_SHA="${{ github.event.before }}"
-          HEAD_SHA="${{ github.event.after }}"
-          CHANGED_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA 2>/dev/null || echo "")
+        run:     |
           CHANGED_CONTAINERS=""
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
             echo "Force rebuild all containers requested"
             CHANGED_CONTAINERS="chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox"
           else
-           git fetch origin main
-           CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
-           echo "Changed files: $CHANGED_FILES"
-           for container in chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox; do
-             if echo "$CHANGED_FILES" | grep -q "^$container/"; then
-               CHANGED_CONTAINERS="$CHANGED_CONTAINERS $container"
-             fi
-           done
+            BASE_SHA="${{ github.event.before }}"
+            HEAD_SHA="${{ github.event.after }}"
+            CHANGED_FILES=$(git diff --name-only $BASE_SHA $HEAD_SHA 2>/dev/null || echo "")
+            echo "Changed files: $CHANGED_FILES"
+            for container in chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox; do
+              if echo "$CHANGED_FILES" | grep -q "^$container/"; then
+                CHANGED_CONTAINERS="$CHANGED_CONTAINERS $container"
+              fi
+            done
           fi
            CHANGED_CONTAINERS="${CHANGED_CONTAINERS# }"
            echo "CHANGED_CONTAINERS=$CHANGED_CONTAINERS" >> $GITHUB_ENV
