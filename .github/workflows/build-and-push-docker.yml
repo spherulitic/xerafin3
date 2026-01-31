@@ -50,9 +50,10 @@ jobs:
         if: env.changed_containers != ''
         run: |
           for container in $CHANGED_CONTAINERS; do
+            echo "Incrementing version for $container"
             CURRENT_VERSION=$(jq -r ".\"$container\"" versions.json)
             NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{printf "%s.%s.%d", $1, $2, $3+1}')
-            jq ".$container = \"$NEW_VERSION\"" versions.json > versions.json.tmp
+            jq ".\"$container\" = \"$NEW_VERSION\"" versions.json > versions.json.tmp
             mv versions.json.tmp versions.json
             echo "Updated $container to version $NEW_VERSION"
           done
