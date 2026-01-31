@@ -103,7 +103,7 @@ jobs:
             echo '******************'
             echo
             image_name="${dir_to_image[$dir]}"
-            VERSION=$(jq -r ".$dir" versions.json)
+            VERSION=$(jq -r ".\"$dir\"" versions.json)
             if [ "$dir" = "keycloak" ]; then
               docker build --pull -f $dir/Dockerfile.prod -t spherulitic/$image_name:$VERSION $dir
             else
