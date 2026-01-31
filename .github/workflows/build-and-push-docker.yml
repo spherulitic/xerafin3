@@ -35,7 +35,7 @@ jobs:
            echo "Changed Containers: $CHANGED_CONTAINERS"
 
       - name: Increment version tags for changed containers
-        if: env.changed_containers != ""
+        if: env.changed_containers != ''
         run: |
           for container in $CHANGED_CONTAINERS; do
             CURRENT_VERSION=$(jq -r ".$container" versions.json)
@@ -51,7 +51,7 @@ jobs:
           git push
 
       - name: Build and Push Services
-        if: env.changed_containers != ""
+        if: env.changed_containers != ''
         run: |
           declare -A dir_to_image
           dir_to_image=(
