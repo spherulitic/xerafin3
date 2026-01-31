@@ -22,35 +22,65 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
+      - name: Detect changed containers
+        run: |
+           CHANGED_CONTAINERS=""
+           for container in chat keycloak cron frontend lexicon lexicon_loader login quiz stats sloth cardbox; do
+             if git diff --name-only HEAD~1 HEAD | grep -q "^$container/"; then
+               CHANGED_CONTAINERS="$CHANGED_CONTAINERS $container"
+             fi
+           done
+           CHANGED_CONTAINERS="${CHANGED_CONTAINERS# }"
+           echo "changed_containers=$CHANGED_CONTAINERS" >> $GITHUB_ENV
+           echo "Changed Containers: $CHANGED_CONTAINERS"
+
+      - name: Increment version tags for changed containers
+        if: env.changed_containers != ""
+        run: |
+          for container in $CHANGED_CONTAINERS; do
+            CURRENT_VERSION=$(jq -r ".$container" versions.json)
+            NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{print "$1"."$2"."$3+1"}')
+            jq ".$container = \"$NEW_VERSION\"" versions.json > versions.json.tmp
+            mv versions.json.tmp versions.json
+            echo "Updated $container to version $NEW_VERSION"
+          done
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@github.com"
+          git add versions.json
+          git commit -m "ci: Incremented version tags for $CHANGED_CONTAINERS"
+          git push
+
       - name: Build and Push Services
+        if: env.changed_containers != ""
         run: |
           declare -A dir_to_image
           dir_to_image=(
             ["chat"]="x-chat"
             ["keycloak"]="x-keycloak"
             ["cron"]="x-cron"
-            ["front-end"]="x-frontend"
+            ["frontend"]="x-frontend"
             ["lexicon"]="x-lexicon"
-            ["lexicon-loader"]="x-lexicon-loader"
+            ["lexicon_loader"]="x-lexicon-loader"
             ["login"]="x-login"
             ["quiz"]="x-quiz"
             ["stats"]="x-stats"
             ["sloth"]="x-sloth"
             ["cardbox"]="x-cardbox"
           )
-          for dir in "${!dir_to_image[@]}"; do
+          for dir in $CHANGED_CONTAINERS; do
             echo
             echo '******************'
             echo "* BUILDING $dir  *"
             echo '******************'
             echo
             image_name="${dir_to_image[$dir]}"
+            VERSION=$(jq -r ".$dir" versions.json)
             if [ "$dir" = "keycloak" ]; then
-              docker build --pull -f $dir/Dockerfile.prod -t spherulitic/$image_name:latest $dir
+              docker build --pull -f $dir/Dockerfile.prod -t spherulitic/$image_name:$VERSION $dir
             else
-              docker build --pull --build-arg NGINX_ENV=prod  --build-arg KEYCLOAK_URL=https://auth.xerafin.net -t spherulitic/$image_name:latest $dir
+              docker build --pull --build-arg NGINX_ENV=prod  --build-arg KEYCLOAK_URL=https://auth.xerafin.net -t spherulitic/$image_name:$VERSION $dir
             fi
-            docker push spherulitic/$image_name:latest
+            docker push spherulitic/$image_name:$VERSION
           done
   deploy-to-droplet:
     runs-on: ubuntu-latest
@@ -129,6 +159,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Update quadlets with version tag
+        run: |
+            for container in chat keycloak cron frontend lexicon lexicon_loader login quiz stats sloth cardbox; do
+              VERSION=$(jq -r ".$container" versions.json)
+              sed -i "s/:latest/:$VERSION/" deploy/$container.container
+            done
+
       - name: Copy .container files
         uses: appleboy/scp-action@v1
         with:
@@ -163,7 +200,7 @@ jobs:
             find ~/.config/containers/systemd/ -name '*.container' -exec sed -i 's|--runtime=/home/linuxbrew/.linuxbrew/bin/crun|--runtime=/usr/bin/crun|g' {} \;
 
             # Fix path to certs for keycloak
-            sed -i 's|Volume=/home/spherulitic/xerafin3/front-end/ssl/dev|Volume=/etc/letsencrypt/archive/x3.xerafin.net|' ~/.config/containers/systemd/keycloak.container
+            sed -i 's|Volume=/home/spherulitic/xerafin3/frontend/ssl/dev|Volume=/etc/letsencrypt/archive/x3.xerafin.net|' ~/.config/containers/systemd/keycloak.container
 
             # Reload systemd to pick up unit file changes
             systemctl --user daemon-reload

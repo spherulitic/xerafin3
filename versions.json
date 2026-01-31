@@ -1,0 +1,13 @@
+{
+"chat": "0.9.0",
+"keycloak": "0.9.0",
+"cron": "0.9.0",
+"frontend": "0.9.0",
+"lexicon": "0.9.0",
+"lexicon_loader": "0.9.0",
+"login": "0.9.0",
+"quiz": "0.9.0",
+"stats": "0.9.0",
+"sloth": "0.9.0",
+"cardbox": "0.9.0"
+}

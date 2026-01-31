@@ -1,6 +1,6 @@
 *.pyc
-front-end/localhost*
-front-end/ssl
+frontend/localhost*
+frontend/ssl
 lex_upd/prob
 lex_upd/json
 word-data
