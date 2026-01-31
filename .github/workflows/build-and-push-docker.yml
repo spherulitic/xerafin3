@@ -40,7 +40,7 @@ jobs:
         if: env.changed_containers != ''
         run: |
           for container in $CHANGED_CONTAINERS; do
-            CURRENT_VERSION=$(jq -r ".$container" versions.json)
+            CURRENT_VERSION=$(jq -r ".\"$container\"" versions.json)
             NEW_VERSION=$(echo $CURRENT_VERSION | awk -F. '{print "$1"."$2"."$3+1"}')
             jq ".$container = \"$NEW_VERSION\"" versions.json > versions.json.tmp
             mv versions.json.tmp versions.json
@@ -164,7 +164,7 @@ jobs:
       - name: Update quadlets with version tag
         run: |
             for container in chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox; do
-              VERSION=$(jq -r ".$container" versions.json)
+              VERSION=$(jq -r ".\"$container\"" versions.json)
               sed -i "s/:latest/:$VERSION/" deploy/$container.container
             done
 
