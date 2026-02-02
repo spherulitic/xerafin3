@@ -579,15 +579,17 @@ font-family:'Montserrat',sans-serif;
 
 .wordTable {width:95% !important;margin:auto;margin-top:5px;text-align:left;font-family: 'Montserrat', sans-serif;font-size:0.9em;}
 .wordTable tr {border-bottom: 1px solid #ccc;width:100%;margin:auto;}
-.wordTable tr td:nth-child(1), .wordTable tr td:nth-child(5) {font-size:1em;line-height:1em;font-variant:small-caps;width:1px;vertical-align:middle;}
+.wordTable tr td:nth-child(1), .wordTable tr td:nth-child(6) {font-size:1.2em;line-height:0.85em;font-variant:small-caps;width:1px;transform:translateY(-5%)}
 .wordTable tr td:nth-child(1) {padding-right:5px;text-align:right;}
 .wordTable tr td:nth-child(2) {padding-right:0px;font-weight:bold;text-align:right;width:1px;}
-.wordTable tr td:nth-child(3) {padding:0px;text-align:center;margin:0px;width:3%;color:#000;font-weight:bold;vertical-align:middle;}
+.wordTable tr td:nth-child(3) {padding:0px;text-align:center;margin:0px;width:3%;color:#000;font-weight:bold;}
 .wordTable tr td:nth-child(4) {padding-left:0px;font-weight:bold;text-align:left;width:1px;}
-.wordTable tr td:nth-child(5) {padding-left:5px;text-align:left;}
-.wordTable tr td:nth-child(6) {padding-left:10px;}
-.wordTable tr td:nth-child(6) span {color:rgba(95,127,47,1);text-decoration:underline;cursor:pointer;}
-.wordTable tr td:nth-child(6) span:hover {color:rgba(111,143,47,1);text-decoration:underline;cursor:pointer;}
+.wordTable tr td:nth-child(5) {padding-left:1px;font-weight:bold;text-align:center;width:1px;}
+.wordTable tr td:nth-child(5):empty {width:0;padding:0;min-width:0;border:none;}
+.wordTable tr td:nth-child(6) {padding-left:5px;text-align:left;}
+.wordTable tr td:nth-child(7) {padding-left:10px;}
+.wordTable tr td:nth-child(7) span {color:rgba(95,127,47,1);text-decoration:underline;cursor:pointer;}
+.wordTable tr td:nth-child(7) span:hover {color:rgba(111,143,47,1);text-decoration:underline;cursor:pointer;}
 .wordTableCycle {border: 1px solid #222;}
 .wordTableHighlight {background-color: rgba(240,240,240,0.7);}
 .wordTableHighlightWrong {background-color: rgba(210,210,210,0.95);}

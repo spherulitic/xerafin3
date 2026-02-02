@@ -25,7 +25,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-        with: 
+        with:
           fetch-depth: 2
 
       - name: Log in to DockerHub
@@ -76,18 +76,18 @@ jobs:
           git push origin "$BRANCH_NAME"
           echo "Creating pull request..."
           gh pr create \
-            --title "Version updates for changed containers" \
+            --title "Version updates for changed containers [skip ci]" \
             --body "Automated version increment for: $CHANGED_CONTAINERS" \
             --base main \
             --head "$BRANCH_NAME"
-        env: 
+        env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Create version output
         id: set-versions
         run: |
           NEW_VERSIONS_JSON=$(jq -c '.' versions.json)
           echo "json=$NEW_VERSIONS_JSON" >> $GITHUB_OUTPUT
-         
+
       - name: Build and Push Services
         if: env.CHANGED_CONTAINERS != ''
         run: |
@@ -201,7 +201,7 @@ jobs:
         id: get-versions
         run: |
           echo '${{ needs.build-and-push.outputs.new_versions_json }}' > new_versions.json
-          
+
       - name: Update .container files with NEW versions
         run: |
           # Read versions from the JSON file we created
