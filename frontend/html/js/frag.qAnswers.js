@@ -41,9 +41,9 @@ QAnswers.prototype = {
     this.rows[key] = {};
     this.rows[key].output = document.createElement('tr');
     var y = new Array();
-    var temp = data[4] || "";
-    var list = [data[0],(data[3][0] ? dot : ""),key,(data[3][1] ? dot : "")+temp,data[1],this.findWordLinks(this.findExtLinks(data[2],key))];
-    for (var x=0;x<6;x++){
+    var lex_symbol = data[4] || "";
+    var list = [data[0],(data[3][0] ? dot : ""),key,(data[3][1] ? dot : ""),lex_symbol,data[1],this.findWordLinks(this.findExtLinks(data[2],key))];
+    for (var x=0;x<7;x++){
       y[x]= document.createElement('td');
       $(y[x]).html(list[x]);
       $(that.rows[key].output).append(y[x]);
