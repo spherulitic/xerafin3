@@ -150,7 +150,14 @@ def getLoggedInUsers():
   clientId = keycloak_admin.get_client_id('x-client')
   sessions = keycloak_admin.get_client_all_sessions(clientId)
   sessionList = [{"userId": x["userId"], "lastAccess": x["lastAccess"]} for x in sessions]
+  # Take only the newest session for each user; people can have multiple
+  sessionList.sort(key=lambda x: x["lastAccess"], reverse=True)
+  processed_users = set()
   for row in sessionList:
+    if row["userId"] in processed_users:
+      continue
+
+    processed_users.add(row["userId"])
     userInfo = keycloak_admin.get_user(row["userId"])
     if userInfo['username'] == 'chris@xerafin.net':
       # This is the service account
