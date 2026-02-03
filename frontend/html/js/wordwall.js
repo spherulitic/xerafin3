@@ -4,8 +4,6 @@ quizinfo = {
   'quizname': xerafin.storage.data.overview.currentQuizName
 })
 {
- /// parameter from Overview is an object
-  console.log(quizinfo);
   // in case a quiz was underway
   stopScrollTimer();
   resetHookWidthsQuiz();
@@ -396,8 +394,8 @@ function Wordwall() {
        self.menu.menuItemHeight = self.INVH/12;
        self.menu.fontSize = Math.ceil(self.INVH/23);
        if (self.quizid == -1) { // cardbox quiz
-         self.menu.displayTypes = ["Untimed", "2 Minute", "5 Minute", "Scramble"];
-         } else { self.menu.displayTypes = ["Untimed", "2 Minute", "5 Minute"];}
+         self.menu.displayTypes = ["Untimed", "2 Minute", "5 Minute", "10 Minute", "Scramble"];
+         } else { self.menu.displayTypes = ["Untimed", "2 Minute", "5 Minute", "10 Minute"];}
            },
        display: function(elapsed) {
         var ctx = document.getElementById("wordwallCanvas").getContext('2d');
@@ -423,7 +421,7 @@ function Wordwall() {
      },
      click: function(e) { if (this.mouseover(e)) this.transition(); },
      transition: function() {
-       var quizid = this.quizid;
+       var quizid = self.quizid;
        var type = this.displayTypes[this.selectedType];
        self.gameState = "active";
        self.grid.init();
@@ -447,6 +445,12 @@ function Wordwall() {
         self.timer.timeLeft = 300000; // milliseconds
         self.timer.totalTime = 300000; // milliseconds
        break;
+       case "10 Minute":
+        self.timed = true;
+        self.isScramble = false;
+        self.timer.timeLeft = 600000; // milliseconds
+        self.timer.totalTime = 600000; // milliseconds
+       break;
        case "Scramble":
         self.timed = true;
         self.isScramble = true;
@@ -457,6 +461,9 @@ function Wordwall() {
        default:  // Untimed
         self.timed = false;
         self.isScramble = false;
+        if (quizid == -1) {
+          console.log('DEBUG: Untimed Cardbox');
+          self.grid.autoRefill = false; }
        break;
       } // end switch on  type
       self.q.loadQuestions(self.QUIZ_SIZE);
