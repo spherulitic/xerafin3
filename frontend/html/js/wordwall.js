@@ -462,7 +462,6 @@ function Wordwall() {
         self.timed = false;
         self.isScramble = false;
         if (quizid == -1) {
-          console.log('DEBUG: Untimed Cardbox');
           self.grid.autoRefill = false; }
        break;
       } // end switch on  type
