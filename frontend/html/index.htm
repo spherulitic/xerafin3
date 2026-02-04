@@ -312,32 +312,30 @@ function appendDebugLog(input){
 
 
 <!-- Generates Navbar ------------------------------------------------------------------------------------------>
-    function generateNav(response){
-      console.log("Generate Nav");
-//      $('html').css('overflow','hidden');
-      $.ajax({
-        type: "GET",
-        url: "getNavbar",
-        headers: {"Accept": "application/json", "Authorization": keycloak.token},
-        success: function(response, responseStatus) {
-          overlay.clear();
-          $('#logProgress').html("Xerf's up!");
-          appendDebugLog("Navbar Populated Successfully");
+    function generateNav(){
+      fetchWithAuth("getNavbar", {method: "GET"})
+      .then(response => {
+        if (!response.ok) { throw new Error(`HTTP ${response.status}`); }
+        // this response is HTML, not JSON
+        return response.text(); })
+      .then(responseData => {
+        overlay.clear();
+        $('#logProgress').html("Xerf's up!");
+        appendDebugLog("Navbar Populated Successfully");
+        window.scrollTo(0,0);
+        $('#homeLayer').fadeTo(300,0.01,function(){
+          $('#homeLayer').hide().remove();
+          $('#mainNav').html(responseData);
           window.scrollTo(0,0);
-          $('#homeLayer').fadeTo(300,0.01,function(){
-            $('#homeLayer').hide().remove();
-            $('#mainNav').html(response);
-            window.scrollTo(0,0);
-            $('body').css({'margin-top':'60px'});
-            $('#mainLayer').css('opacity','0').fadeTo(500,1,function(){
-//              $('html').css('overflow','auto');
-            });
+          $('body').css({'margin-top':'60px'});
+          $('#mainLayer').css('opacity','0').fadeTo(500,1,function(){
           });
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-          appendDebugLog("<b>Something went wrong with the Navbar!</b>");
-        }
-      });
+        });
+       })
+      .catch(error => {
+         console.error("Error creating navbar:", error);
+         appendDebugLog("<b>Something went wrong with the Navbar!");
+       });
     }
 <!-- Generates Required Scripts---------------------------------------------------------------------------------->
 //    async function generateScripts(response, responseStatus) {

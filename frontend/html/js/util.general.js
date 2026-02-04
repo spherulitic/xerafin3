@@ -22,6 +22,10 @@ function getBool(str) {
   return str === 'true';
 }
 
+function logoutUser() {
+  window.keycloak.logout();
+}
+
 async function fetchWithAuth(url, options = {}) {
     const headers = {
         'Authorization': keycloak.token,
