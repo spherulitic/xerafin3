@@ -279,7 +279,7 @@ def getNavbar():
   contents = [
     {'title': 'Basic Quiz', 'onClick': 'overview.setGoAction({context:"MY",value:0});overviewUI.update("MY_GO_SET_DEFAULT",0);overviewUI.update("SEARCH_GO_SET_DEFAULT",0);overview.go("MY");', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
     {'title': 'Subword Sloth!', 'onClick': 'initSloth()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
-    {'title': 'Cardbox Invaders', 'onClick': 'initInvaders()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
+#    {'title': 'Cardbox Invaders', 'onClick': 'initInvaders()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
     {'title': 'Wall of Words', 'onClick': 'overview.setGoAction({context:"MY",value:1});overviewUI.update("MY_GO_SET_DEFAULT",1);overviewUI.update("SEARCH_GO_SET_DEFAULT",1);overview.go("MY");', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
     {'title': 'Widgets', 'onClick': '', 'hasChildren': True, 'privLevel': 1, 'lastChild': False, 'new': False},
 #    {'title': 'Cardbox & Chill', 'onClick': 'initTogether()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': True},
@@ -288,11 +288,8 @@ def getNavbar():
     {'title': 'Rankings', 'onClick': 'initLeaderboard()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
     {'title': 'Debug', 'onClick': 'initDebug()', 'hasChildren': False, 'privLevel': 42, 'lastChild': False, 'new': True},
     {'title': 'Game Stats', 'onClick': 'showGameStats()', 'hasChildren': False, 'privLevel': 1, 'lastChild': True, 'new': False},
-#    {'title': 'TSH feed', 'onClick': 'initTournamentStandings()', 'hasChildren': False, 'privLevel': 1, 'lastChild': True, 'new': True},
-    {'title': 'Settings', 'onClick': '', 'hasChildren': True, 'privLevel': 1, 'lastChild': False, 'new': False},
     {'title': 'User Prefs', 'onClick': 'initUserPrefs()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
-    {'title': 'Manage Words to Add', 'onClick': '', 'hasChildren': False, 'privLevel': 60, 'lastChild': False, 'new': True},
-    {'title': 'Logout', 'onClick': 'logoutUser()', 'hasChildren': False, 'privLevel': 1, 'lastChild': True, 'new': False},
+    {'title': 'Logout', 'onClick': 'logoutUser()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
     {'title': 'Admin', 'onClick': '', 'hasChildren': True, 'privLevel': 60, 'lastChild': False, 'new': False},
     {'title': 'Manage', 'onClick': 'initManageUsers()', 'hasChildren': False, 'privLevel': 60, 'lastChild': False, 'new': True},
     {'title': 'Manage Users', 'onClick': 'initOldManageUsers()', 'hasChildren': False, 'privLevel': 60, 'lastChild': True, 'new': False}

@@ -357,77 +357,72 @@ function generatePanel(ident, data, targ, refresher, closure){
       console.log("New Panel Config Written");
     }
 <!------------------------------------------------------------------------------------------------------------->
-    function generatePanels(){
+function generatePanels(){
 
-      console.log("Start generatePanels");
-      $('#logProgress').html("Populating user interface");
-      if (true){
-        $.ajax({
-        type: "GET",
-        url: "PHP/contentLogged.htm",
-        success: function(response2, responseStatus2) {
-          // NB panel positions is an array which contains three arrays -- one per column
-          //  with each element in the column array is an array: [panel_id, isCollapsed]
+  $('#logProgress').html("Populating user interface");
+  if (true){
+    fetchWithAuth("contentLogged.html", {method: "GET"})
+    .then(response => {
+       if (!response.ok) { throw new Error(`HTTP ${response.status}`); }
+          return response.text(); })
+    .then(responseData => {
 
-          if (typeof localStorage.panelPositions!=='undefined') {
-          var pp = JSON.parse(localStorage.panelPositions);
-          var hasOverview = false;
-          // Panel 0 is the overview
-          for (var x=0;x<pp.length;x++) {
+    // NB panel positions is an array which contains three arrays -- one per column
+    //  with each element in the column array is an array: [panel_id, isCollapsed]
+
+      if (typeof localStorage.panelPositions!=='undefined') {
+        var pp = JSON.parse(localStorage.panelPositions);
+        var hasOverview = false;
+        // Panel 0 is the overview
+        for (var x=0;x<pp.length;x++) {
             hasOverview = hasOverview || pp[x].map(x => x[0]).includes("0");
-          }
-          if (!hasOverview) {
-            console.log("Missing Overview");
-            localStorage.removeItem('panelPositions');
-          } else {
-            console.log("Overview Found");
-          }
-          }
-
-    if (typeof localStorage.panelPositions==='undefined'){
-      xerafin.error.log.add('Panels config initialized as blank.','comment');
-      localStorage.setItem('panelPositions','[[["4",true],["1_b",false]],[["0",false]],[["2",false],["3",false]]]');
-    }
-    appendDebugLog("Content Populated Successfully");
-    $('#pageContent').append(response2);
-    $('#mainLayer').css('opacity','0');
-    populatePanelsFromArray();
-    switch_areas();
-            $( function() {
-              $('#middleArea, #leftArea, #rightArea').sortable({
-              connectWith:'#middleArea, #leftArea, #rightArea',
-              dropOnEmpty: true,
-              handle: '.dragMe',
-              placeholder: "panelPlaceholder",
-              scrollSensitivity: 5,
-              distance: 10,
-              revert: 200,
-              change: function(event, ui) {
-                ui.placeholder.css({visibility: 'visible'});
-              },
-              start: function (event, ui) {
-
-                ui.item.toggleClass("panelPlaceholder");
-                ui.placeholder.height(50);
-                if (isMobile()===false) {
-                  var placeholderHeight = ui.item.outerHeight();
-                  ui.placeholder.height(placeholderHeight + 10);
-                }
-              },
-              stop: function (event, ui) {
-                ui.item.toggleClass("panelPlaceholder");
-                var x= [$( "#leftArea" ).sortable( "toArray" ),$( "#middleArea" ).sortable( "toArray" ), $( "#rightArea" ).sortable( "toArray" )];
-                writePanelStatus(x);
-              },
-              tolerance:'touch'});
-            });
-            $('#logProgress').html("Finalising user interface");
-            generateNav(response2);
-
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-          appendDebugLog("<b>Something went wrong whilst loading content!</b>");
         }
-      });
+        if (!hasOverview) { localStorage.removeItem('panelPositions'); }
       }
-    }
+
+      if (typeof localStorage.panelPositions==='undefined'){
+        xerafin.error.log.add('Panels config initialized as blank.','comment');
+        localStorage.setItem('panelPositions','[[["4",true],["1_b",false]],[["0",false]],[["2",false],["3",false]]]');
+      }
+      appendDebugLog("Content Populated Successfully");
+      $('#pageContent').append(responseData);
+      $('#mainLayer').css('opacity','0');
+      populatePanelsFromArray();
+      switch_areas();
+      $( function() {
+        $('#middleArea, #leftArea, #rightArea').sortable({
+           connectWith:'#middleArea, #leftArea, #rightArea',
+           dropOnEmpty: true,
+           handle: '.dragMe',
+           placeholder: "panelPlaceholder",
+           scrollSensitivity: 5,
+           distance: 10,
+           revert: 200,
+           change: function(event, ui) {
+             ui.placeholder.css({visibility: 'visible'});
+           },
+           start: function (event, ui) {
+             ui.item.toggleClass("panelPlaceholder");
+             ui.placeholder.height(50);
+             if (isMobile()===false) {
+               var placeholderHeight = ui.item.outerHeight();
+               ui.placeholder.height(placeholderHeight + 10);
+             }
+           },
+           stop: function (event, ui) {
+             ui.item.toggleClass("panelPlaceholder");
+             var x= [$( "#leftArea" ).sortable( "toArray" ),$( "#middleArea" ).sortable( "toArray" ), $( "#rightArea" ).sortable( "toArray" )];
+             writePanelStatus(x);
+           },
+           tolerance:'touch'
+        });
+      });
+      $('#logProgress').html("Finalising user interface");
+      generateNav();
+    })
+    .catch(error => {
+       console.error("Error loading context:", error);
+       appendDebugLog("<b>Something went wrong whilst loading content!</b>");
+    });
+  }
+}
