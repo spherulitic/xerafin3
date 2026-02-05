@@ -6,6 +6,8 @@ import json
 import urllib
 import requests
 import jwt
+import time
+from typing import Dict, Any, Tuple
 from flask import request, jsonify, g
 from dateutil.relativedelta import relativedelta, MO
 import xerafinUtil.xerafinUtil as xu
@@ -280,11 +282,6 @@ def getUserData(uuidList):
   url = 'http://login:5000/getUserNamesAndPhotos'
   resp = requests.get(url, headers=g.headers, json={"userList": uuidList}).json()
   return resp
-
-from flask import Blueprint, jsonify, g
-from datetime import datetime, timedelta
-import time
-from typing import Dict, Any, Tuple
 
 def get_users_by_period(period: str, con) -> int:
   """

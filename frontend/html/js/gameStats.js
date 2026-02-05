@@ -8,14 +8,9 @@ function refreshGameStats() {
 }
 function getGameStats(value){
   switch (value) {
-    case 1:url='get_site_records';
-      break;
-    case 2:url='get_individual_records';
-      break;
-    case 3:url='get_my_records';
-      break;
-//    case 2:data={userrecords:true, usertotals:true};break;
-//    case 3:data={indivrecords:true};break;
+    case 1:url='get_site_records'; break;
+    case 2:url='get_my_records'; break;
+    case 3:url='get_individual_records'; break;
   }
   fetchWithAuth(url, {method:"GET"})
   .then(response => {
