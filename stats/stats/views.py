@@ -7,9 +7,10 @@ import urllib
 import requests
 import jwt
 import time
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 from flask import request, jsonify, g
 from dateutil.relativedelta import relativedelta, MO
+import traceback
 import xerafinUtil.xerafinUtil as xu
 from stats import app
 
@@ -279,6 +280,11 @@ def getUserStatsToday():
   return {'questionsAnswered': questionsAnswered, 'startScore': startScore}
 
 def getUserData(uuidList):
+  ''' Takes in a list of uuids
+     Returns a list of dicts
+     [ {"userid": uuid, "name": name, "photo": photo}, { .... } ]
+   '''
+
   url = 'http://login:5000/getUserNamesAndPhotos'
   resp = requests.get(url, headers=g.headers, json={"userList": uuidList}).json()
   return resp
@@ -604,6 +610,187 @@ def get_site_records_view():
   except Exception as ex:
     error["status"] = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args}"
     return jsonify({"error": error}), 500
+
+def get_user_info_from_keycloak(user_ids):
+  """
+  Get user information from Keycloak for the given list of user IDs.
+  Returns a dictionary mapping user_id -> {"name": ..., "photo": ...}
+  """
+  if not user_ids:
+    return {}
+
+  try:
+    users_data = getUserData(user_ids)  # This returns the list of dicts
+
+    # Convert list of dicts to a dictionary for easy lookup
+    user_info_map = {}
+    for user_data in users_data:
+      user_id = user_data.get("userid")
+      if user_id:
+        user_info_map[user_id] = {
+          "name": user_data.get("name", ""),
+          "photo": user_data.get("photo", "images/unknown_player.gif")
+        }
+
+    return user_info_map
+
+  except Exception as e:
+    print(f"Error getting user data from Keycloak: {e}")
+    return {}
+
+def get_individual_records_data(con) -> Dict[str, Any]:
+  """
+  Get individual records for best performers in different time periods.
+  Now uses Keycloak instead of the login table.
+  """
+  indivrecords = {}
+  user_ids_to_fetch = {}
+
+  # Collect user IDs from both queries
+  queries = []
+
+  # Queries for day and weekday periods
+  queries.append(("day", """
+    SELECT userid, questionsAnswered, dateStamp
+    FROM leaderboard
+    ORDER BY questionsAnswered DESC
+    LIMIT 1
+  """))
+
+  queries.append(("weekday", """
+    SELECT userid, questionsAnswered, dateStamp
+    FROM leaderboard
+    WHERE DATE_FORMAT(dateStamp, '%a') = DATE_FORMAT(CURDATE(), '%a')
+    ORDER BY questionsAnswered DESC
+    LIMIT 1
+  """))
+
+  # Queries for week, month, year, and eternity periods
+  period_queries = [
+    ("week", "%Y%u", """
+      SELECT userid, SUM(questionsAnswered) as total, MIN(dateStamp) as period_start
+      FROM leaderboard
+      GROUP BY userid, DATE_FORMAT(dateStamp, %s)
+      ORDER BY total DESC
+      LIMIT 1
+    """),
+    ("month", "%Y%m", """
+      SELECT userid, SUM(questionsAnswered) as total, MIN(dateStamp) as period_start
+      FROM leaderboard
+      GROUP BY userid, DATE_FORMAT(dateStamp, %s)
+      ORDER BY total DESC
+      LIMIT 1
+    """),
+    ("year", "%Y", """
+      SELECT userid, SUM(questionsAnswered) as total, MIN(dateStamp) as period_start
+      FROM leaderboard
+      GROUP BY userid, DATE_FORMAT(dateStamp, %s)
+      ORDER BY total DESC
+      LIMIT 1
+    """),
+    ("eternity", None, """
+      SELECT userid, SUM(questionsAnswered) as total, NULL as period_start
+      FROM leaderboard
+      GROUP BY userid
+      ORDER BY total DESC
+      LIMIT 1
+    """)
+  ]
+
+  # First pass: execute all queries and collect user IDs
+  period_results = {}
+
+  for period, query in queries:
+    con.execute(query)
+    row = con.fetchone()
+    if row and row[0] and row[1]:  # userid and questionsAnswered
+      user_id = str(row[0])
+      period_results[period] = {
+        "user_id": user_id,
+        "answered": int(row[1]),
+        "date": str(row[2]) if row[2] else "None"
+      }
+      user_ids_to_fetch[user_id] = True
+
+  for period, date_mask, query_template in period_queries:
+    if period == "eternity":
+      con.execute(query_template)
+    else:
+      con.execute(query_template, (date_mask,))
+
+    row = con.fetchone()
+    if row and row[0] and row[1]:  # userid and total
+      user_id = str(row[0])
+      period_results[period] = {
+        "user_id": user_id,
+        "answered": int(row[1]),
+        "date": str(row[2]) if row[2] and row[2] != "None" else "None"
+      }
+      user_ids_to_fetch[user_id] = True
+
+  # Get all user info from Keycloak in one batch
+  user_info_map = get_user_info_from_keycloak(list(user_ids_to_fetch.keys()))
+
+  # Build the response structure with user info
+  for period, data in period_results.items():
+    user_id = data["user_id"]
+    user_info = user_info_map.get(user_id, {})
+
+    indivrecords[period] = {
+      "name": user_info.get("name", "Unknown Player"),
+      "photo": user_info.get("photo", "images/unknown_player.gif"),
+      "answered": data["answered"],
+      "date": data["date"]
+    }
+
+  # Ensure all periods exist in the response (even if empty)
+  for period in ["day", "weekday", "week", "month", "year", "eternity"]:
+    if period not in indivrecords:
+      indivrecords[period] = {}
+
+  # Format dates according to the specified format
+  date_formats = {
+    "year": "%Y",
+    "month": "%b %Y",
+    "week": "%d %b %Y",
+    "day": "%d %b %Y",
+    "weekday": "%d %b %Y"
+  }
+
+  for period, date_format in date_formats.items():
+    if (period in indivrecords and indivrecords[period] and
+      "date" in indivrecords[period] and indivrecords[period]["date"] != "None"):
+      try:
+        dt = datetime.strptime(indivrecords[period]["date"], "%Y-%m-%d")
+        indivrecords[period]["date"] = dt.strftime(date_format)
+
+        # Add week end date for weekly records
+        if period == "week":
+          week_end = dt + timedelta(days=6)
+          indivrecords[period]["dateEnd"] = week_end.strftime(date_format)
+
+        # Add weekday name for weekday records
+        if period == "weekday":
+          indivrecords[period]["weekday"] = dt.strftime("%A")
+
+      except (ValueError, KeyError) as e:
+        # Log error but don't crash
+        app.logger.error(f"Error formatting date for {period}: {e}")
+        # Keep original date format
+        pass
+
+  return indivrecords
+
+@app.route('/get_individual_records', methods=['GET'])
+def get_individual_records():
+  try:
+    indivrecords = get_individual_records_data(g.con)
+    response_data = [{"indivrecords": indivrecords}, {}]
+    return jsonify(response_data)
+  except Exception as ex:
+    app.logger.error(f'Error in get_individual_records endpoint: {ex}')
+    app.logger.error(traceback.format_exc())
+    return jsonify({"error": str(ex)}), 500
 
 class Metaranks():
   def __init__(self, data):
