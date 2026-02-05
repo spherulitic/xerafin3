@@ -281,6 +281,333 @@ def getUserData(uuidList):
   resp = requests.get(url, headers=g.headers, json={"userList": uuidList}).json()
   return resp
 
+from flask import Blueprint, jsonify, g
+from datetime import datetime, timedelta
+import time
+from typing import Dict, Any, Tuple
+
+def get_users_by_period(period: str, con) -> int:
+  """
+  Helper function to get user counts for different periods.
+  This replaces the getUsersByPeriod function from the legacy code.
+  """
+  today = datetime.now().date()
+
+  if period == "thisWeek":
+    # Start of week (Monday)
+    start_of_week = today - timedelta(days=today.weekday())
+    query = """
+      SELECT COUNT(DISTINCT userid)
+      FROM leaderboard
+      WHERE dateStamp >= %s AND dateStamp <= %s
+    """
+    con.execute(query, (start_of_week, today))
+
+  elif period == "thisMonth":
+    start_of_month = today.replace(day=1)
+    query = """
+      SELECT COUNT(DISTINCT userid)
+      FROM leaderboard
+      WHERE dateStamp >= %s AND dateStamp <= %s
+    """
+    con.execute(query, (start_of_month, today))
+
+  elif period == "thisYear":
+    start_of_year = today.replace(month=1, day=1)
+    query = """
+      SELECT COUNT(DISTINCT userid)
+      FROM leaderboard
+      WHERE dateStamp >= %s AND dateStamp <= %s
+    """
+    con.execute(query, (start_of_year, today))
+
+  elif period == "eternity":
+    query = "SELECT COUNT(DISTINCT userid) FROM leaderboard"
+    con.execute(query)
+
+  else:
+    return 0
+
+  row = con.fetchone()
+  return int(row[0]) if row else 0
+
+
+def get_global_stats(con) -> Dict[str, Any]:
+  """Get global statistics about questions answered and users."""
+  globe = {"questions": {}, "users": {}}
+
+  # Today's sitewide totals
+  today = datetime.now().date()
+  query = """
+    SELECT
+      IFNULL(SUM(questionsAnswered), 0),
+      IFNULL(COUNT(DISTINCT userid), 0)
+    FROM leaderboard
+    WHERE dateStamp = CURDATE()
+  """
+  con.execute(query)
+  row = con.fetchone()
+  today_questions = int(row[0]) if row else 0
+  today_users = int(row[1]) if row else 0
+
+  globe["questions"]["today"] = today_questions
+  globe["users"]["today"] = today_users
+
+  # Yesterday's sitewide totals
+  query = """
+    SELECT
+      IFNULL(SUM(questionsAnswered), 0),
+      IFNULL(COUNT(DISTINCT userid), 0)
+    FROM leaderboard
+    WHERE dateStamp = CURDATE() - INTERVAL 1 DAY
+  """
+  con.execute(query)
+  row = con.fetchone()
+  yesterday_questions = int(row[0]) if row else 0
+  yesterday_users = int(row[1]) if row else 0
+
+  globe["questions"]["yesterday"] = yesterday_questions
+  globe["users"]["yesterday"] = yesterday_users
+
+  # Weekly totals
+  weekday = datetime.now().strftime("%A")
+  if weekday == "Monday":
+    this_week_questions = today_questions
+  elif weekday == "Tuesday":
+    this_week_questions = today_questions + yesterday_questions
+  else:
+    query = """
+      SELECT IFNULL(SUM(questionsAnswered), 0)
+      FROM lb_summary
+      WHERE period = 'DAY'
+      AND dateStamp < CURDATE() - INTERVAL 1 DAY
+      AND YEARWEEK(dateStamp, 5) = YEARWEEK(CURDATE(), 5)
+    """
+    con.execute(query)
+    row = con.fetchone()
+    if row and row[0]:
+      this_week_questions = int(row[0]) + yesterday_questions + today_questions
+    else:
+      this_week_questions = yesterday_questions + today_questions
+
+  globe["questions"]["thisWeek"] = this_week_questions
+  globe["users"]["thisWeek"] = get_users_by_period("thisWeek", con)
+
+  # Monthly totals
+  day_of_month = datetime.now().strftime("%d")
+  if day_of_month == "01":
+    this_month_questions = today_questions
+  elif day_of_month == "02":
+    this_month_questions = today_questions + yesterday_questions
+  else:
+    query = """
+      SELECT IFNULL(SUM(questionsAnswered), 0)
+      FROM lb_summary
+      WHERE period = 'DAY'
+      AND dateStamp < CURDATE() - INTERVAL 1 DAY
+      AND DATE_FORMAT(dateStamp, '%Y%m') = DATE_FORMAT(CURDATE(), '%Y%m')
+    """
+    con.execute(query)
+    row = con.fetchone()
+    if row and row[0]:
+      this_month_questions = int(row[0]) + yesterday_questions + today_questions
+    else:
+      this_month_questions = yesterday_questions + today_questions
+
+  globe["questions"]["thisMonth"] = this_month_questions
+  globe["users"]["thisMonth"] = get_users_by_period("thisMonth", con)
+
+  # Annual totals
+  month = datetime.now().strftime("%m")
+  if month == "01":
+    this_year_questions = this_month_questions
+  else:
+    query = """
+      SELECT IFNULL(SUM(questionsAnswered), 0)
+      FROM lb_summary
+      WHERE period = 'MONTH'
+      AND DATE_FORMAT(dateStamp, '%Y') = DATE_FORMAT(CURDATE(), '%Y')
+    """
+    con.execute(query)
+    row = con.fetchone()
+    if row and row[0]:
+      this_year_questions = int(row[0]) + this_month_questions
+    else:
+      this_year_questions = this_month_questions
+
+  globe["questions"]["thisYear"] = this_year_questions
+  globe["users"]["thisYear"] = get_users_by_period("thisYear", con)
+
+  # Eternity totals
+  query = "SELECT IFNULL(SUM(questionsAnswered), 0) FROM lb_summary WHERE period = 'YEAR'"
+  con.execute(query)
+  row = con.fetchone()
+  if row and row[0]:
+    eternity_questions = int(row[0]) + this_year_questions
+  else:
+    eternity_questions = this_year_questions
+
+  globe["questions"]["eternity"] = eternity_questions
+  globe["users"]["eternity"] = get_users_by_period("eternity", con)
+
+  return globe
+
+
+def get_site_records(con) -> Dict[str, Any]:
+  """Get site records for maximum questions and users."""
+  siterecords = {"maxUsers": {}, "maxQuestions": {}}
+
+  # Get records for each period
+  for period in ['DAY', 'WEEK', 'MONTH', 'YEAR']:
+    # Max questions
+    query = """
+      SELECT dateStamp, questionsAnswered
+      FROM lb_summary
+      WHERE period = %s
+      ORDER BY questionsAnswered DESC, dateStamp DESC
+      LIMIT 1
+    """
+    con.execute(query, (period,))
+    row = con.fetchone()
+    period_key = period.lower()
+
+    if row and row[0] and row[1]:
+      siterecords["maxQuestions"][period_key] = {
+        "date": str(row[0]),
+        "questions": int(row[1])
+      }
+    else:
+      siterecords["maxQuestions"][period_key] = {
+        "date": "1969-12-31",
+        "questions": 0
+      }
+
+    # Max users
+    query = """
+      SELECT dateStamp, numUsers
+      FROM lb_summary
+      WHERE period = %s
+      ORDER BY numUsers DESC, dateStamp DESC
+      LIMIT 1
+    """
+    con.execute(query, (period,))
+    row = con.fetchone()
+
+    if row and row[0] and row[1]:
+      siterecords["maxUsers"][period_key] = {
+        "date": str(row[0]),
+        "users": int(row[1])
+      }
+    else:
+      siterecords["maxUsers"][period_key] = {
+        "date": "1969-12-31",
+        "users": 0
+      }
+
+  # Weekday records
+  query = """
+    SELECT dateStamp, questionsAnswered
+    FROM lb_summary
+    WHERE DATE_FORMAT(dateStamp, '%a') = DATE_FORMAT(CURDATE(), '%a')
+    AND period = 'DAY'
+    ORDER BY questionsAnswered DESC, dateStamp DESC
+    LIMIT 1
+  """
+  con.execute(query)
+  row = con.fetchone()
+
+  if row and row[0] and row[1]:
+    siterecords["maxQuestions"]["weekday"] = {
+      "date": str(row[0]),
+      "questions": int(row[1])
+    }
+  else:
+    siterecords["maxQuestions"]["weekday"] = {
+      "date": "1969-12-31",
+      "questions": 0
+    }
+
+  query = """
+    SELECT dateStamp, numUsers
+    FROM lb_summary
+    WHERE DATE_FORMAT(dateStamp, '%a') = DATE_FORMAT(CURDATE(), '%a')
+    AND period = 'DAY'
+    ORDER BY numUsers DESC, dateStamp DESC
+    LIMIT 1
+  """
+  con.execute(query)
+  row = con.fetchone()
+
+  if row and row[0] and row[1]:
+    siterecords["maxUsers"]["weekday"] = {
+      "date": str(row[0]),
+      "users": int(row[1])
+    }
+  else:
+    siterecords["maxUsers"]["weekday"] = {
+      "date": "1969-12-31",
+      "users": 0
+    }
+
+  # Format dates
+  date_formats = {
+    "year": "%Y",
+    "month": "%b %Y",
+    "week": "%d %b %Y",
+    "day": "%d %b %Y",
+    "weekday": "%d %b %Y"
+  }
+
+  for record_type in ["maxQuestions", "maxUsers"]:
+    for period_key, date_format in date_formats.items():
+      if period_key in siterecords[record_type]:
+        try:
+          dt = datetime.strptime(siterecords[record_type][period_key]["date"], "%Y-%m-%d")
+          siterecords[record_type][period_key]["date"] = dt.strftime(date_format)
+
+          if period_key == "week":
+            week_end = dt + timedelta(days=6)
+            siterecords[record_type][period_key]["dateEnd"] = week_end.strftime(date_format)
+
+          if period_key == "weekday":
+            siterecords[record_type][period_key]["weekday"] = dt.strftime("%A")
+        except (ValueError, KeyError):
+          # Handle date parsing errors gracefully
+          pass
+
+  return siterecords
+
+
+@app.route('/get_site_records', methods=['GET'])
+def get_site_records_view():
+  """
+  Endpoint to get global statistics and site records.
+  Returns the same structure as the legacy endpoint.
+  """
+  result = {}
+  error = {"status": None}
+
+  try:
+    # Use the connection from Flask's g context
+    con = g.con
+
+    # Get global stats
+    globe = get_global_stats(con)
+    result["globe"] = globe
+
+    # Get site records
+    siterecords = get_site_records(con)
+    result["siterecords"] = siterecords
+
+    # Add empty object at the end to match legacy output
+    response_data = [result, {}]
+
+    return jsonify(response_data)
+
+  except Exception as ex:
+    error["status"] = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args}"
+    return jsonify({"error": error}), 500
+
 class Metaranks():
   def __init__(self, data):
     # default to the MySQL function curdate()

@@ -8,25 +8,25 @@ function refreshGameStats() {
 }
 function getGameStats(value){
   switch (value) {
-    case 1:data={userid:userid, globe:true, siterecords:true};break;
-    case 2:data={userid:userid, userrecords:true, usertotals:true};break;
-    case 3:data={userid:userid, indivrecords:true};break;
+    case 1:url='get_site_records';
+      break;
+    case 2:url='get_individual_records';
+      break;
+    case 3:url='get_my_records';
+      break;
+//    case 2:data={userrecords:true, usertotals:true};break;
+//    case 3:data={indivrecords:true};break;
   }
-  $.ajax({
-    type: "POST",
-    url: "getLeaderboardStats.py",
-    data: JSON.stringify(data),
-    beforeSend: function(){
-            $("#heading_text_pan_6").html('Game Stats <img src="images/ajaxLoad.gif" style="height:0.8em">');
-    },
-    success: function(response, responseStatus){
-          //console.log("Game stat return:"+JSON.stringify(response));
-          $("#heading_text_pan_6").html("Game Stats");
-          showStatTable(response, responseStatus, value);
-    },
-    error: function(jqXHR, textStatus, errorThrown) {
-      console.log("Error getting game stats, status = " + textStatus + " error: " + errorThrown);
-    }
+  fetchWithAuth(url, {method:"GET"})
+  .then(response => {
+    if (!response.ok) {throw new Error(`HTTP ${response.status}`);}
+    return response.json(); })
+  .then(responseData => {
+    $("#heading_text_pan_6").html("Game Stats");
+    showStatTable(responseData, value);
+  })
+  .catch(error => {
+    console.error("Error getting game stats:", error);
   });
 }
 
@@ -79,7 +79,7 @@ function returnMaxGameStats(values1, values2){
   if (values1[0]>=values2[0]){return values1;}
   else {return values2;}
 }
-function showStatTable(response, responseStatus, value){
+function showStatTable(response, value){
     var data = response[0];
     var statValues = new Array();
     var maxValue = new Array();
