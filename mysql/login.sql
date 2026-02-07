@@ -53,21 +53,6 @@ CREATE TABLE `lexicon_info` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
---
--- Table structure for table `user_lexicon_master`
---
-
-DROP TABLE IF EXISTS `user_lexicon_master`;
-/*!40101 SET @saved_cs_client     = @@character_set_client */;
-/*!50503 SET character_set_client = utf8mb4 */;
-CREATE TABLE `user_lexicon_master` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `userid` varchar(50) DEFAULT NULL,
-  `lexicon` varchar(4) DEFAULT NULL,
-  `version` varchar(4) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=1375 DEFAULT CHARSET=utf8mb4;
-/*!40101 SET character_set_client = @saved_cs_client */;
 /*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
 
 /*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
