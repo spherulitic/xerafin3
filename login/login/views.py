@@ -28,6 +28,9 @@ dictConfig({
     }
 })
 
+DEFAULT_LEXICON = 'csw'
+LATEST_LEXICON_VERSION = '24'
+
 @lru_cache(maxsize=1)
 def get_public_key():
     public_key_url = 'http://keycloak:8080/realms/Xerafin'
@@ -54,6 +57,9 @@ def get_user():
     auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
     g.uuid = auth_token["sub"]
     g.name = auth_token.get("name", "Unknown")
+    attributes = auth_token.get("cardboxPrefs", { })
+    g.user_lexicon = attributes.get('lexicon', DEFAULT_LEXICON)
+    g.user_lexicon_version = attributes.get('lexiconVersion', LATEST_LEXICON_VERSION)
   except jwt.ExpiredSignatureError:
     return jsonify({'error': 'Token has expired'}), 401
   except jwt.InvalidTokenError as e:
@@ -241,35 +247,19 @@ def getUserLexicons():
       In theory someday we can support multiple languages but this may be tricky
   '''
   result = { }
-  # eventually when we have multiple language support, this will be a list of results
-  # for now we assume one
-  query = f'select lexicon, version, is_default from user_lexicon_master where userid = %s'
-  g.con.execute(query, (g.uuid,))
-  row = g.con.fetchone()
-  if row is None:
-    lexicon = 'CSW' # hard coded default; fix this someday
-    version = '24'
-    default = 1
-    query = f'''insert into user_lexicon_master (userid, lexicon, version, is_default)
-             values (%s, %s, %s, %s)'''
-    g.con.execute(query, (g.uuid, lexicon, version, default))
-  else:
-    lexicon = row[0]
-    version = row[1]
-    default = row[2]
-
+  # I have no idea how we would implement multiple lexicon support
   query = f'''SELECT name, country, replaced_by
               FROM lexicon_info l
              WHERE lexicon = %s'''
-  g.con.execute(query,(lexicon+version,))
+  g.con.execute(query,(g.user_lexicon+g.user_lexicon_version,))
   row = g.con.fetchone()
   result["name"] = row[0]
   result["country"] = row[1]
   result["replaced_by"] = row[2]
-  result["lexicon"] = lexicon
-  result["version"] = version
-  result["default"] = default
-  result["update"] = '24' # latest version of the lexicon. Hardcoded for now
+  result["lexicon"] = g.user_lexicon
+  result["version"] = g.user_lexicon_version
+  result["default"] = 1
+  result["update"] = LATEST_LEXICON_VERSION
 
   return jsonify([result])
 
