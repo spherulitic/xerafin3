@@ -104,6 +104,7 @@ jobs:
             ["stats"]="x-stats"
             ["sloth"]="x-sloth"
             ["cardbox"]="x-cardbox"
+            ["cron"]="x-cron"
           )
           for dir in $CHANGED_CONTAINERS; do
             echo
@@ -127,6 +128,8 @@ jobs:
       CHAT_MYSQL_PWD: ${{ secrets.CHAT_MYSQL_PWD }}
       CHAT_MYSQL_USER: ${{ vars.CHAT_MYSQL_USER }}
       CHAT_MYSQL_DB: ${{ vars.CHAT_MYSQL_DB }}
+      CRON_KUSER: ${{ vars.CRON_KUSER }}
+      CRON_KPASS: ${{ secrets.CRON_KPASS }}
       KEYCLOAK_MYSQL_PWD: ${{ secrets.KEYCLOAK_MYSQL_PWD }}
       KEYCLOAK_USER: ${{ vars.KEYCLOAK_USER }}
       KEYCLOAK_PASSWORD: ${{ secrets.KEYCLOAK_PASSWORD }}
@@ -158,6 +161,8 @@ jobs:
           echo MYSQL_USER=${CHAT_MYSQL_USER} > generated_envs/chat.env
           echo MYSQL_DB=${CHAT_MYSQL_DB} >> generated_envs/chat.env
           echo MYSQL_PWD=${CHAT_MYSQL_PWD} >> generated_envs/chat.env
+          echo CRON_KUSER=${CRON_KUSER} > generated_envs/cron.env
+          echo CRON_KPASS=${CRON_KPASS} >> generated_envs/cron.env
           echo KEYCLOAK_USER=${KEYCLOAK_USER} >> generated_envs/keycloak.env
           echo KEYCLOAK_PASSWORD=${KEYCLOAK_PASSWORD} >> generated_envs/keycloak.env
           echo KC_LOGLEVEL=${KC_LOGLEVEL} >> generated_envs/keycloak.env
