@@ -1,3 +1,3 @@
 mysqlclient==2.1.0
-keycloak
+python-keycloak
 requests
