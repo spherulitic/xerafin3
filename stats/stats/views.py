@@ -792,6 +792,236 @@ def get_individual_records():
     app.logger.error(traceback.format_exc())
     return jsonify({"error": str(ex)}), 500
 
+@app.route('/get_my_records', methods=['GET'])
+def get_my_records():
+  """
+  Endpoint for user's personal records and totals.
+  Returns both userrecords and usertotals.
+  """
+  result = {}
+
+  try:
+
+    user_id = g.uuid
+    con = g.con
+
+    # ===== USER TOTALS =====
+    usertotals = {"questions": {}}
+
+    # Today
+    query = """
+      SELECT questionsAnswered
+      FROM leaderboard
+      WHERE dateStamp = CURDATE() AND userid = %s
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    today_questions = int(row[0]) if row and row[0] is not None else 0
+
+    # Yesterday
+    query = """
+      SELECT questionsAnswered
+      FROM leaderboard
+      WHERE dateStamp = CURDATE() - INTERVAL 1 DAY AND userid = %s
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    yesterday_questions = int(row[0]) if row and row[0] is not None else 0
+
+    # This week
+    weekday = time.strftime("%A")
+    if weekday == "Monday":
+      this_week_questions = today_questions
+    elif weekday == "Tuesday":
+      this_week_questions = today_questions + yesterday_questions
+    else:
+      query = """
+        SELECT SUM(questionsAnswered)
+        FROM leaderboard
+        WHERE YEARWEEK(dateStamp, 5) = YEARWEEK(CURDATE(), 5) AND userid = %s
+      """
+      con.execute(query, (user_id,))
+      row = con.fetchone()
+      this_week_questions = int(row[0]) if row and row[0] is not None else 0
+
+    # This month
+    day_of_month = time.strftime("%d")
+    if day_of_month == "01":
+      this_month_questions = today_questions
+    elif day_of_month == "02":
+      this_month_questions = today_questions + yesterday_questions
+    else:
+      query = """
+        SELECT SUM(questionsAnswered)
+        FROM leaderboard
+        WHERE DATE_FORMAT(dateStamp, '%%Y%%m') = DATE_FORMAT(CURDATE(), '%%Y%%m')
+        AND userid = %s
+      """
+      con.execute(query, (user_id,))
+      row = con.fetchone()
+      this_month_questions = int(row[0]) if row and row[0] is not None else 0
+
+    # This year
+    month = time.strftime("%m")
+    if month == "01":
+      this_year_questions = this_month_questions
+    else:
+      query = """
+        SELECT SUM(questionsAnswered)
+        FROM leaderboard
+        WHERE DATE_FORMAT(dateStamp, '%%Y') = DATE_FORMAT(CURDATE(), '%%Y')
+        AND userid = %s
+      """
+      con.execute(query, (user_id,))
+      row = con.fetchone()
+      this_year_questions = int(row[0]) if row and row[0] is not None else 0
+
+    # Eternity (all time)
+    query = """
+      SELECT SUM(questionsAnswered)
+      FROM leaderboard
+      WHERE userid = %s
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    eternity_questions = int(row[0]) if row and row[0] is not None else 0
+
+    # Build usertotals dictionary
+    usertotals["questions"] = {
+      "today": today_questions,
+      "yesterday": yesterday_questions,
+      "thisWeek": this_week_questions,
+      "thisMonth": this_month_questions,
+      "thisYear": this_year_questions,
+      "eternity": eternity_questions
+    }
+
+    result["usertotals"] = usertotals
+
+    # ===== USER RECORDS =====
+    userrecords = {}
+
+    # Weekday record (best for current weekday)
+    query = """
+      SELECT dateStamp, questionsAnswered
+      FROM leaderboard
+      WHERE DATE_FORMAT(dateStamp, '%%a') = DATE_FORMAT(CURDATE(), '%%a')
+      AND userid = %s
+      ORDER BY questionsAnswered DESC, dateStamp DESC
+      LIMIT 1
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    if row and row[0] and row[1] is not None:
+      userrecords["weekday"] = {
+        "date": str(row[0]),
+        "questions": int(row[1])
+      }
+
+    # Day record (best single day)
+    query = """
+      SELECT dateStamp, questionsAnswered
+      FROM leaderboard
+      WHERE userid = %s
+      ORDER BY questionsAnswered DESC, dateStamp DESC
+      LIMIT 1
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    if row and row[0] and row[1] is not None:
+      userrecords["day"] = {
+        "date": str(row[0]),
+        "questions": int(row[1])
+      }
+
+    # Week record (best week)
+    query = """
+      SELECT MIN(dateStamp), SUM(questionsAnswered)
+      FROM leaderboard
+      WHERE userid = %s
+      GROUP BY YEARWEEK(dateStamp, 5)
+      ORDER BY SUM(questionsAnswered) DESC, MIN(dateStamp) DESC
+      LIMIT 1
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    if row and row[0] and row[1] is not None:
+      userrecords["week"] = {
+        "date": str(row[0]),
+        "questions": int(row[1])
+      }
+
+    # Month record (best month)
+    query = """
+      SELECT MIN(dateStamp), SUM(questionsAnswered)
+      FROM leaderboard
+      WHERE userid = %s
+      GROUP BY DATE_FORMAT(dateStamp, '%%Y%%m')
+      ORDER BY SUM(questionsAnswered) DESC, MIN(dateStamp) DESC
+      LIMIT 1
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    if row and row[0] and row[1] is not None:
+      userrecords["month"] = {
+        "date": str(row[0]),
+        "questions": int(row[1])
+      }
+
+    # Year record (best year)
+    query = """
+      SELECT MIN(dateStamp), SUM(questionsAnswered)
+      FROM leaderboard
+      WHERE userid = %s
+      GROUP BY DATE_FORMAT(dateStamp, '%%Y')
+      ORDER BY SUM(questionsAnswered) DESC, MIN(dateStamp) DESC
+      LIMIT 1
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    if row and row[0] and row[1] is not None:
+      userrecords["year"] = {
+        "date": str(row[0]),
+        "questions": int(row[1])
+      }
+
+    # Format dates
+    date_formats = {
+      "year": "%Y",
+      "month": "%b %Y",
+      "week": "%d %b %Y",
+      "day": "%d %b %Y",
+      "weekday": "%d %b %Y"
+    }
+
+    for period, date_format in date_formats.items():
+      if period in userrecords and userrecords[period]:
+        try:
+          dt = datetime.strptime(userrecords[period]["date"], "%Y-%m-%d")
+          userrecords[period]["date"] = dt.strftime(date_format)
+
+          if period == "week":
+            week_end = dt + timedelta(days=6)
+            userrecords[period]["dateEnd"] = week_end.strftime(date_format)
+
+          if period == "weekday":
+            userrecords[period]["weekday"] = dt.strftime("%A")
+        except (ValueError, KeyError) as e:
+          app.logger.error(f"Error formatting date for {period}: {e}")
+          # Keep original date format
+
+    result["userrecords"] = userrecords
+
+    # Return in legacy format: list with data dict and empty dict
+    response_data = [result, {}]
+    return jsonify(response_data)
+
+  except Exception as ex:
+    app.logger.error(f"Error in get_my_records: {ex}")
+    app.logger.error(traceback.format_exc())
+    error_msg = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args}"
+    return jsonify({"error": error_msg}), 500
+
 class Metaranks():
   def __init__(self, data):
     # default to the MySQL function curdate()
