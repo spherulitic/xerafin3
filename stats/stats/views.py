@@ -201,67 +201,228 @@ def getUserStatsTodayView():
   ''' Returns questionsAnswered and startScore for the requesting user '''
   return jsonify(getUserStatsToday())
 
-@app.route("/dailySummary", methods=['GET', 'POST'])
-def dailySummary():
-  ''' Executes end-of day routine -- puts summary data in lb_summary, then posts chat to user '''
-  # Insert today's data into lb_summary
-  query = '''SELECT COUNT(*), SUM(questionsAnswered) FROM leaderboard
-             WHERE dateStamp = curdate() - interval 1 day group by dateStamp'''
-  g.con.execute(query)
-  row = g.con.fetchone()
-  if row:
-    users = row[0]
-    questions = row[1]
-  else:
-    users = 0
-    questions = 0
-  query = f'''INSERT INTO lb_summary (period, dateStamp, questionsAnswered, numUsers)
-              VALUES ("DAY", CURDATE() - INTERVAL 1 DAY, {questions}, {users})'''
-  g.con.execute(query)
-  # Post daily chat to users
-  url = 'http://chat:5000/submitChat'
-  message = f'Good job Xerfers! Today {users} users solved {questions} alphagrams!'
-  data = { 'userid': 0, 'chatText': message, 'expire': False }
-  requests.post(url, headers=g.headers, json=data)
+from datetime import datetime, timedelta
+import math
+from flask import request, jsonify, g
+import requests
 
-  if users == 0:
-    return jsonify([])
+# Add this helper function at the top of your module
+def get_period_date_range(period: str):
+    """
+    Returns the start and end dates for the given period.
+    All periods end at 'yesterday' since we run after midnight.
+    """
+    today = datetime.now().date()
+    yesterday = today - timedelta(days=1)
 
-  # Calculate daily awards
+    if period.upper() == 'DAILY':
+        # Yesterday's date
+        start_date = yesterday
+        end_date = yesterday
 
-  command = '''select userid, questionsAnswered from leaderboard
-            where dateStamp = curdate() - interval 1 day order by questionsAnswered desc'''
-  awards = [users, 1000, 100, 20, 8, 4];
-  awardNames = ["emerald", "ruby", "sapphire", "gold", "silver", "bronze"]
-  awardRanks = [math.ceil(float(users)/x) for x in awards]
-  g.con.execute(command)
-  results = g.con.fetchall()
-  awardIdx = 0
-  for rank, row in enumerate(results[:awardRanks[-1]]):
-    # This will never run off the end of the array
-    while rank >= awardsRanks[awardIdx]:
-      awardIdx += 1
-    # USER_COIN_LOG:
-    # userid, dateStamp, amount, period, reason, coinType, data
-    cl_userid = row[0]
-    cl_amount = 1
-    cl_period = 'DAY'
-    cl_reason = 'QA'
-    cl_coinType = awardIdx
-    cl_data = f'{row[1]}-{rank}'
+    elif period.upper() == 'WEEKLY':
+        # Week ending yesterday (Monday to Sunday)
+        # Find the most recent Monday
+        days_since_monday = yesterday.weekday()  # Monday=0, Sunday=6
+        start_date = yesterday - timedelta(days=days_since_monday)
+        end_date = yesterday
 
-    command = f'''INSERT INTO user_coin_log VALUES ({cl_userid}, curdate() - interval 1 day,
-                  {cl_amount}, "{cl_period}", "{cl_reason}", {cl_coinType}, "{cl_data}")'''
-    g.con.execute(command)
-    command = f'SELECT COUNT(*) FROM user_coin_total WHERE userid = "{cl_userid}"'
-    g.con.execute(command)
+    elif period.upper() == 'MONTHLY':
+        # Month ending yesterday
+        start_date = yesterday.replace(day=1)  # First day of month
+        end_date = yesterday
+
+    elif period.upper() == 'YEARLY':
+        # Year ending yesterday
+        start_date = yesterday.replace(month=1, day=1)  # Jan 1 of this year
+        end_date = yesterday
+
+    else:
+        raise ValueError(f"Invalid period: {period}")
+
+    return start_date, end_date
+
+def get_week_number(date_obj):
+    """Get week number using YEARWEEK mode 5 for consistency with legacy system"""
+    query = "SELECT YEARWEEK(%s, 5)"
+    g.con.execute(query, (date_obj,))
+    result = g.con.fetchone()
+    return result[0] if result else None
+
+@app.route("/periodicSummary", methods=['POST'])
+def periodicSummary():
+  """
+  Executes end-of-period routine for daily, weekly, monthly, or yearly.
+  Inserts summary data into lb_summary, calculates awards, returns stats.
+
+  Request body: {"period": "daily"} (or "weekly", "monthly", "yearly")
+  Returns: {"users": X, "questions": Y}
+  """
+  try:
+    # Get period from request body
+    data = request.get_json()
+    if not data or 'period' not in data:
+      return jsonify({"error": "Missing 'period' in request body"}), 400
+
+    period = data['period'].upper()
+    valid_periods = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY']
+    if period not in valid_periods:
+      return jsonify({"error": f"Invalid period. Must be one of: {valid_periods}"}), 400
+
+    # Get date range for this period
+    start_date, end_date = get_period_date_range(period)
+
+    # Calculate summary statistics for the period
+    if period == 'DAILY':
+      # Simple daily query
+      query = '''SELECT COUNT(DISTINCT userid), SUM(questionsAnswered)
+             FROM leaderboard
+             WHERE dateStamp = %s'''
+      g.con.execute(query, (end_date,))
+
+    else:
+      # Weekly, monthly, yearly - need to aggregate
+      query = '''SELECT COUNT(DISTINCT userid), SUM(questionsAnswered)
+             FROM leaderboard
+             WHERE dateStamp BETWEEN %s AND %s'''
+      g.con.execute(query, (start_date, end_date))
+
+    row = g.con.fetchone()
+    if row:
+      users = row[0] or 0
+      questions = row[1] or 0
+    else:
+      users = 0
+      questions = 0
+
+    # Insert summary into lb_summary table
+    # For weekly periods, we need to use YEARWEEK format
+    if period == 'WEEKLY':
+      # Get week number using YEARWEEK mode 5
+      week_number = get_week_number(end_date)
+      period_value = f"WEEK-{week_number}"
+    else:
+      # Map period to database format
+      period_db_map = {
+        'DAILY': 'DAY',
+        'MONTHLY': 'MONTH',
+        'YEARLY': 'YEAR'
+      }
+      period_value = period_db_map[period]
+
+    # Check if entry already exists (prevent duplicates)
+    check_query = '''SELECT COUNT(*) FROM lb_summary
+             WHERE period = %s AND dateStamp = %s'''
+    g.con.execute(check_query, (period_value, end_date))
     if g.con.fetchone()[0] == 0:
-      command = 'INSERT INTO user_coin_total VALUES ("{cl_userid}", 0, 0, 0, 0, 0, 0, 0, 0, curdate() - interval 1 day)'
-      g.con.execute(command)
-    command = f'''UPDATE user_coin_total SET {awardNames[awardIdx]} = {awardNames[awardIdx]} + 1
-                WHERE userid = "{cl_userid}"'''
-    g.con.execute(command)
-  return jsonify([])
+      query = '''INSERT INTO lb_summary (period, dateStamp, questionsAnswered, numUsers)
+             VALUES (%s, %s, %s, %s)'''
+      g.con.execute(query, (period_value, end_date, questions, users))
+
+    # Calculate awards if there were users
+    if users > 0:
+      # Get top users for this period
+      if period == 'DAILY':
+        award_query = '''SELECT userid, questionsAnswered
+                 FROM leaderboard
+                 WHERE dateStamp = %s
+                 ORDER BY questionsAnswered DESC'''
+        g.con.execute(award_query, (end_date,))
+      else:
+        award_query = '''SELECT userid, SUM(questionsAnswered) as total_questions
+                 FROM leaderboard
+                 WHERE dateStamp BETWEEN %s AND %s
+                 GROUP BY userid
+                 ORDER BY total_questions DESC'''
+        g.con.execute(award_query, (start_date, end_date))
+
+      results = g.con.fetchall()
+
+      # Award configuration - matching your schema order
+      # user_coin_total columns: bronze, silver, gold, platinum, emerald, sapphire, ruby, diamond
+      # platinum and diamond currently unused
+      award_columns = ["emerald", "ruby", "sapphire", "gold", "silver", "bronze"]
+
+      # Using original award thresholds but extended for 8 tiers instead of 6
+      # Adjust thresholds as needed for your game balance
+      award_thresholds = [users, 1000, 100, 20, 8, 4]  # Added more tiers
+      award_ranks = [math.ceil(float(users) / x) for x in award_thresholds]
+
+      # Coin amounts per period (adjust as needed)
+      coin_amounts = {
+        'DAILY': 1,
+        'WEEKLY': 3,
+        'MONTHLY': 6,
+        'YEARLY': 30
+      }
+      coin_amount = coin_amounts[period]
+
+      # Map period for database (matching your varchar field)
+      period_db_value = {
+        'DAILY': 'DAY',
+        'WEEKLY': 'WEEK',
+        'MONTHLY': 'MONTH',
+        'YEARLY': 'YEAR'
+      }[period]
+
+      # Process awards
+      award_idx = 0
+      max_awards = min(len(results), award_ranks[-1])
+
+      for rank, row in enumerate(results[:max_awards]):
+        # Move to next award tier if we've exceeded current tier's rank limit
+        while award_idx < len(award_ranks) - 1 and rank >= award_ranks[award_idx]:
+          award_idx += 1
+
+        user_id = row[0]
+        user_questions = row[1]
+
+        # Insert into user_coin_log
+        coin_log_query = '''INSERT INTO user_coin_log
+                  (userid, dateStamp, amount, period, reason, coinType, data)
+                  VALUES (%s, %s, %s, %s, %s, %s, %s)'''
+
+        g.con.execute(coin_log_query, (
+          user_id,
+          end_date,
+          coin_amount,
+          period_db_value,
+          'QA',  # Questions Answered
+          award_idx,  # 0=bronze, 1=silver, etc.
+          f'{user_questions}-{rank + 1}'  # Rank is 1-indexed for display
+        ))
+
+        # Ensure user exists in user_coin_total
+        check_query = 'SELECT COUNT(*) FROM user_coin_total WHERE userid = %s'
+        g.con.execute(check_query, (user_id,))
+        if g.con.fetchone()[0] == 0:
+          # Insert with all coin types set to 0
+          init_query = '''INSERT INTO user_coin_total
+                  (userid, bronze, silver, gold, platinum, emerald, sapphire, ruby, diamond, dateStamp)
+                  VALUES (%s, 0, 0, 0, 0, 0, 0, 0, 0, %s)'''
+          g.con.execute(init_query, (user_id, end_date))
+
+        # Update user's award count
+        award_column = award_columns[award_idx]
+        update_query = f'''UPDATE user_coin_total
+                   SET {award_column} = {award_column} + {coin_amount},
+                     dateStamp = %s
+                   WHERE userid = %s'''
+        g.con.execute(update_query, (end_date, user_id))
+
+    # Return statistics for chat message
+    return jsonify({
+      "users": users,
+      "questions": questions,
+      "period": period.lower(),
+      "date": end_date.isoformat()
+    })
+
+  except Exception as e:
+    print(f"Error in periodicSummary: {e}")
+    import traceback
+    traceback.print_exc()
+    return jsonify({"error": str(e)}), 500
 
 def getUserStatsToday():
   ''' Fetches questionsAnswered and startScore for the requesting user '''

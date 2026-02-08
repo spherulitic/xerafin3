@@ -1,17 +1,17 @@
-FROM python:3.11.1-slim-bullseye
+#syntax=docker/dockerfile:1
 
-WORKDIR /cron
-RUN apt-get update && apt-get -y install cron
+FROM python:3.11.1-slim-bullseye
+WORKDIR /app
 COPY requirements.txt requirements.txt
+RUN apt-get update
+RUN apt-get install -y gcc
+RUN apt-get install -y default-libmysqlclient-dev
 RUN pip3 install -r requirements.txt
 
-COPY crontab /etc/cron.d/crontab
-COPY script .
-COPY entrypoint.sh .
-RUN chmod 0775 *.py
-RUN chmod 0755 entrypoint.sh
+RUN useradd --no-create-home --shell /bin/false appuser
 
-RUN chmod 0644 /etc/cron.d/crontab
-RUN crontab /etc/cron.d/crontab
+COPY cron.py .
+RUN chown -R appuser:appuser .
 
-CMD ["/cron/entrypoint.sh"]
+USER appuser
+CMD ["tail", "-f", "/dev/null"]

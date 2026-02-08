@@ -59,6 +59,7 @@ def get_user():
     auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
     g.uuid = auth_token["sub"]
     g.name = auth_token.get("name", "Unknown")
+    g.headers = {"Accept": "application/json", "Authorization": raw_token}
   except jwt.ExpiredSignatureError:
     return jsonify({'error': 'Token has expired'}), 401
   except jwt.InvalidTokenError as e:
@@ -70,12 +71,7 @@ def get_user():
   except Exception as e:
     return jsonify({'error': f'Authentication failed: {str(e)}'}), 401
 
-  g.raw_token = request.headers["Authorization"]
-  g.auth_token = jwt.decode(g.raw_token, public_key, audience="x-client", algorithms=['RS256'])
-  g.uuid = g.auth_token["sub"]
-
   # headers to send to keycloak
-  g.headers = {"Accept": "application/json", "Authorization": g.raw_token}
 
   return None
 

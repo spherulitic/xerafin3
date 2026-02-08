@@ -18,7 +18,7 @@ Network=systemd-xerafin
 NetworkAlias=quiz
 
 # Stores canned quizzes
-Volume=/var/lib/xerafin/quizjson:/app/quizjson
+Volume=/var/lib/xerafin/quizjson:/app/quizjson:rw,U
 
 # Ensure the correct runtime and conmon are used
 Environment=CONTAINER_CONMON=/usr/local/bin/conmon
