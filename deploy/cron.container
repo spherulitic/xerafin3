@@ -1,0 +1,29 @@
+[Unit]
+Description=Xerafin Cron Service
+After=keycloak.service
+After=xerafin-network.service
+Requires=keycloak.service
+Requires=xerafin-network.service
+PartOf=xerafin.target
+
+[Container]
+ContainerName=cron
+Image=x-cron:latest
+
+#x No environment variables needed here
+EnvironmentFile=%h/.config/xerafin3/cron.env
+
+# Network settings for service discovery
+Network=systemd-xerafin
+NetworkAlias=cron
+
+# Ensure the correct runtime and conmon are used
+Environment=CONTAINER_CONMON=/usr/local/bin/conmon
+PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
+PodmanArgs=--read-only
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=xerafin.target

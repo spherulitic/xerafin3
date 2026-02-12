@@ -1,4 +1,4 @@
-requests
+mysqlclient==2.1.0
 python-keycloak
-python-jose
+requests
 urllib3
