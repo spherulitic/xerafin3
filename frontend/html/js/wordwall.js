@@ -462,7 +462,9 @@ function Wordwall() {
         self.timed = false;
         self.isScramble = false;
         if (quizid == -1) {
-          self.grid.autoRefill = false; }
+          self.grid.autoRefill = false;
+          document.getElementById("leftButton").disabled = false;
+          }
        break;
       } // end switch on  type
       self.q.loadQuestions(self.QUIZ_SIZE);
