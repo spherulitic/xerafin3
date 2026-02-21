@@ -16,6 +16,8 @@ Image=x-chat:latest
 Network=systemd-xerafin
 NetworkAlias=chat
 
+Volume=/var/lib/xerafin/chat-data:/app/chat-data:rw,U
+
 PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
 
 [Service]
