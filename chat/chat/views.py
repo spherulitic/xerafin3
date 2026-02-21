@@ -31,7 +31,7 @@ dictConfig({
     }
 })
 
-CHAT_DIR = '/app/chatdata'
+CHAT_DIR = '/app/chat-data'
 
 @lru_cache(maxsize=1)
 def get_public_key():
