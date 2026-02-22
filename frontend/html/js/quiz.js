@@ -12,33 +12,34 @@ class QuizList {
   if (typeof(d.searchType) === 'undefined' || d.searchType == 'emptyList') {
      this.initialized = true;
   } else {
-  $.ajax({ type: "POST",
-           data: JSON.stringify(d),
-           headers: {"Accept": "application/json", "Authorization": keycloak.token},
-           url: "getQuizList",
-           success: function(response, responseStatus) { self.quizList = response;
-                                                         self.initialized = true; },
-           error: function(jqXHR, textStatus, errorThrown) {
-           var msg = "error, status = " + textStatus + " error: " + errorThrown;
-           appendDebugLog(msg); }
-           });
+    fetchWithAuth("getQuizList", {
+                  method: "POST",
+                  body: JSON.stringify(d) })
+    .then(response => {if (!response.ok)
+                           { throw new Error(`HTTP ${response.status}` ); }
+                          return response.json(); })
+    .then(responseData => { this.quizList = responseData;
+                            this.initialized = true; })
+    .catch(error => {
+            console.error("Error fetching getQuizList:", error);
+            });
    } // end if emptyList
      } // end constructor
+
   refreshQuizList(d) {
     var self = this;
     this.initialized = false;
-  $.ajax({ type: "POST",
-           data: JSON.stringify(d),
-           headers: {"Accept": "application/json", "Authorization": keycloak.token},
-           url: "getQuizList",
-           success: function(response, responseStatus) { self.quizList = response;
-                                                         self.initialized = true;
-     },
-     error: function(jqXHR, textStatus, errorThrown) {
-           var msg = "error, status = " + textStatus + " error: " + errorThrown;
-           appendDebugLog(msg); }
-           });
-
+    fetchWithAuth("getQuizList", {
+                  method: "POST",
+                  body: JSON.stringify(d) })
+    .then(response => {if (!response.ok)
+                           { throw new Error(`HTTP ${response.status}` ); }
+                          return response.json(); })
+    .then(responseData => { this.quizList = responseData;
+                            this.initialized = true; })
+    .catch(error => {
+            console.error("Error fetching getQuizList:", error);
+            });
   }
 
   discardBookmark(quizid) {
@@ -87,25 +88,16 @@ class QuizList {
     let self = this;
     self.initialized = false;
     let d = { quizidList: quizidList };
-    $.ajax({type: "POST",
-    data: JSON.stringify(d),
-    headers: {"Accept": "application/json", "Authorization": keycloak.token},
-    url: "activateQuiz",
-    success: function(response, responseStatus) {
-      self.refreshQuizList(self.data);
-      delete self.connectionAttempts;
-    },
-    error: function(jqHXR, textStatus, errorThrown) {
-      var msg = "error, status = " + textStatus + " error: " + errorThrown;
-      appendDebugLog(msg);
-      if (self.connectionAttempts > 9){
-        appendDebugLog("Quiz Activation Failed. IDs: ["+quizidList+"]");
-      }
-      else {
-        self.retryActivate = setTimeout(QuizList.prototype.activateQuizzes.bind(this,quizidList),500);
-      }
-    }
-  });
+
+    fetchWithAuth("activateQuiz", {method: "POST", body: JSON.stringify(d)})
+      .then(response => {
+              if (!response.ok) {throw new Error(`HTTP ${response.status}`); }
+              return reponse.json(); })
+      .then(responseData => {
+              this.refreshQuizList(this.data);
+              delete this.connectionAttempts;
+            })
+      .catch(error => { console.error("Error activating quiz: ", error); });
    }
 
    addQuizToCardbox(quizid, action, after=function(){}) {
@@ -127,13 +119,9 @@ class QuizList {
 
       },
       error: function(jqHXR, textStatus, errorThrown) {
-        //let msg = "error, status = " + textStatus + " error: " + errorThrown;
-        //console.log(msg);
-        //appendDebugLog(msg);
         if (self.addAttempts > 9){
           appendDebugLog("Quiz Activation Failed. ID: ["+quizid+", "+action+"]");
         }
-        //self.retryActivate = setTimeout(QuizList.prototype.activateQuizzes.bind(this,quizid, action, after),500);
       }
     });
    }
@@ -153,20 +141,18 @@ class Quiz {
   isCardbox: isCardbox,
   quizid: (isCardbox ? -1 : quizid)
     };
-    $.ajax({ type: "POST",
-             data: JSON.stringify(d),
-             headers: {"Accept": "application/json", "Authorization": keycloak.token},
-              url: "newQuiz",
-     success: function(response, responseStatus) { self.initialized = true;
-                                                 //console.log("New Quiz initialization done");
-                                                 self.quizName = response.quizName;
-                               gUpdateCardboxScores(response, 0);
-               },
-   error: function(jqXHR, textStatus, errorThrown) {
-        gNetworkErrorReport(jqXHR.status, '#quizConnect');
-        var msg = "error, status = " + textStatus + " error: " + errorThrown;
-        appendDebugLog(msg); }
-                              });
+
+    fetchWithAuth("newQuiz", {method:"POST",body:JSON.stringify(d)})
+      .then(response => { if (!response.ok) { throw new Error(`HTTP ${response.status}`);}
+                          return response.json(); })
+      .then(responseData => { this.initialized = true;
+              this.quizName = responseData.quizName;
+              gUpdateCardboxScores(responseData, 0);
+              })
+      .catch(error => {
+               console.error("Error initializing newQuiz:", error);
+              });
+
     this.questions = [ ];
     this.questionsLoaded = 0;
     this.submitStrict = submitStrict;
@@ -181,22 +167,6 @@ class Quiz {
      // does a wrong guess cause the word to be autosubmitted as "wrong" by default?
      this.submitStrict = val; }
 
-   prepareNew() {
-       var d = { userid: userid };
-       $.ajax({
-           type: "POST",
-           headers: {"Accept": "application/json", "Authorization": keycloak.token},
-           url: "prepareNewWords.py",
-           data: JSON.stringify(d),
-           success: function(response, responseStatus) {
-//               console.log("Next Added table prepared.");
-//               console.log(response);
-           },
-           error: function(jqXHR, textStatus, errorThrown) {
-               appendDebugLog("Error preparing Next Added");
-           }
-       });
-   }
   retryLoad(code, numQ){
     this.hasHTTPError = true;
     appendDebugLog("Load Quiz -> Http Error Code: "+code);
@@ -219,38 +189,31 @@ class Quiz {
         if (self.isCardbox && getBool(localStorage.cardboxSent)) {
           d.cardbox = localStorage.cardboxCurrent;
         }
-      $.ajax({ type: "POST",
-        headers: {"Accept": "application/json", "Authorization": keycloak.token},
-        url: "getQuestions",
-        data: JSON.stringify(d),
-        success: function(response, responseStatus) {
-          self.hasHTTPError = false;
-          if (response.getFromStudyOrder)
-            self.prepareNew(); // this is in basic quiz right now
-            self.eof = response.eof;
-            if (self.eof){
-              overview.fetchData();
-            }
-          let questionArray = response.questions;
-          for (let i=0;i<questionArray.length;i++) {
-            self.createQuestion(questionArray[i]);
-          }
-          if (self.isCardbox && Number(localStorage.cardboxCurrent)!==self.questions[self.questions.length-1].cardbox){
-            localStorage.cardboxSent='false';
-            localStorage.cardboxCurrent=self.questions[self.questions.length-1].cardbox;
-            if ($('#pan_4').length>0){
-              cardboxHighlightAction(self.questions[self.questions.length-1].cardbox, false);
-              showCardboxStats();
-            }
-          }
-          self.initialized = true;
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-          self.questionsLoaded = -1;
-          self.retryLoad(jqXHR.status, numQ);
-
-        }
-      });
+      fetchWithAuth("getQuestions", {method:"POST",body:JSON.stringify(d)})
+        .then(response => {if (!response.ok) {throw new Error(`HTTP ${response.status}`);}
+                return response.json(); })
+        .then(responseData => {
+                this.hasHTTPError = false;
+                if(responseData.getFromStudyOrder) {this.eof = responseData.eof;}
+                if(this.eof){overview.fetchData();}
+                let questionArray = responseData.questions;
+                for (let i=0;i<questionArray.length;i++) {
+                  this.createQuestion(questionArray[i]);
+                }
+                if(this.isCardbox && Number(localStorage.cardboxCurrent)!==this.questions[this.questions.length-1].cardbox) {
+                  localStorage.cardboxSent='false';
+                  localStorage.cardboxCurrent=this.questions[this.questions.length-1].cardbox;
+                  if ($('#pan_4').length>0){
+                    cardboxHighlightAction(this.questions[this.questions.length-1].cardbox, false);
+                    showCardboxStats();
+                  }
+                }
+                this.initialized = true;
+              })
+        .catch(error => { console.error("Error getting question:", error);
+                          this.questionsLoaded = -1;
+                          this.retryLoad(400, numQ);
+                        });
     }
     else {
       //console.log("Quiz not initialized - waiting...");
@@ -477,25 +440,15 @@ class Question {
     };
 
     this.submitted = true;
-
-    try {
-
-    const response = await fetchWithAuth('submitQuestion', {
-      method: 'POST',
-      body: JSON.stringify(d) });
-
-    if (!response.ok) { throw new Error('HTTP ${response.status}'); }
-
-    const result = await response.json()
-
-    // Process success
-    this.hasHTTPError = false;
-    this.processSubmissionResult(result, correct, isCardbox);
-
-    } catch (error) {
-      console.error("Submit question failed: ", error);
-      this.retrySubmit(error.message.includes('HTTP') ? error.message.split(' ')[1] : 0, correct, cardbox, isCardbox);
-      }
+    fetchWithAuth("submitQuestion", {method:"POST",body:JSON.stringify(d)})
+      .then(response => {if(!response.ok) {throw new Error(`HTTP ${response.status}`);}
+              return response.json(); })
+      .then(responseData => { this.hasHTTPError = false;
+              this.processSubmissionResult(responseData, correct, isCardbox);
+            })
+      .catch (error => { console.error("Submit question failed: ", error);
+                this.retrySubmit(error.message.includes('HTTP') ? error.message.split(' ')[1] : 0, correct, cardbox, isCardbox);
+              });
    }
 
 processSubmissionResult(response, correct, isCardbox) {
@@ -561,17 +514,12 @@ retrySubmit(code, correct, cardbox, isCardbox) {
     );
 }
 
-
   addToCardbox() {
     let d = {question: this.alpha };
-    $.ajax({
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "addQuestionToCardbox",
-      type: "POST",
-      data: JSON.stringify(d),
-      success: function(response, responseStatus) { },
-      error: function(jqXHR, textStatus, errorThrown) {
-      }
-    });
+    fetchWithAuth("addQuestionToCardbox", {method:"POST",body:JSON.stringify(d)})
+      .then(response => {if(!response.ok){throw new Error(`HTTP ${response.status}`);}
+              return response.json(); })
+      .then(responseData => { })
+      .catch(error => {console.error("Error adding to Cardbox:", error);});
   }
 } // end class definition
