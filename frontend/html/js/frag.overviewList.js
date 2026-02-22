@@ -106,19 +106,23 @@ OverviewList.prototype = {
 		}
 	},
 //--------------------------------------------------
-	processSelectedRows:function(){
-		var self=this;
-		var x = new Array();
-		Object.entries(this.rows).forEach(function([index,value]){
-			if ($(value.selector).hasClass('overviewListHighlight')) {
-				x.push(Number(value.data.quizid));
-			}
-		});
-		this.action(this.context+'_SELECTION', x);
-		if (x.length===1) {
-			this.action(this.context+'_SET_GO_NAME',this.data[x].quizname);
-		}
-	},
+processSelectedRows: function() {
+    var selectedQuizIds = [];
+    var selectedQuizNames = [];
+
+    Object.entries(this.rows).forEach(function([index, value]) {
+        if ($(value.selector).hasClass('overviewListHighlight')) {
+            selectedQuizIds.push(Number(value.data.quizid));
+            selectedQuizNames.push(value.data.quizname);
+        }
+    });
+
+    this.action(this.context + '_SELECTION', selectedQuizIds);
+
+    if (selectedQuizNames.length === 1) {
+        this.action(this.context + '_SET_GO_NAME', selectedQuizNames[0]);
+    }
+},
 	addSelectionEvent:function(index){
 		var self = this;
 		$(this.rows[index].selector).on('click',function(e){
