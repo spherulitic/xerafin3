@@ -31,8 +31,8 @@ Network=systemd-xerafin
 NetworkAlias=frontend
 
 #Volume=/home/spherulitic/xerafin3/front-end/ssl/dev:/etc/nginx/ssl:ro
-Volume=/etc/letsencrypt/archive/x3.xerafin.net/fullchain1.pem:/etc/nginx/ssl/fullchain.pem:ro
-Volume=/etc/letsencrypt/archive/x3.xerafin.net/privkey1.pem:/etc/nginx/ssl/privkey.pem:ro
+Volume=/etc/letsencrypt/archive/x3.xerafin.net/fullchain2.pem:/etc/nginx/ssl/fullchain.pem:ro
+Volume=/etc/letsencrypt/archive/x3.xerafin.net/privkey2.pem:/etc/nginx/ssl/privkey.pem:ro
 
 
 # Ensure the correct runtime and conmon are used
