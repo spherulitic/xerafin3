@@ -17,8 +17,6 @@ EnvironmentFile=%h/.config/xerafin3/mysql.env
 Network=systemd-xerafin
 NetworkAlias=login
 
-# No volumes needed
-
 # Ensure the correct runtime and conmon are used
 Environment=CONTAINER_CONMON=/usr/local/bin/conmon
 PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
