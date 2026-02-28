@@ -72,14 +72,20 @@ function startChat () {
 }
 
 function getLoggedInUsers() {
-  $.ajax({type: "GET",
-          headers: {"Accept": "application/json", "Authorization": keycloak.token},
-          url: "getLoggedInUsers",
-          success: displayLoggedInUsers,
-          error: function(jqXHR, textStatus, errorThrown) {
-          console.log("Error getting users, status = " + textStatus + " error: " + errorThrown);
-          } } );
- }
+  fetchWithAuth("getLoggedInUsers", { method: "GET" })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(responseData => {
+      displayLoggedInUsers(responseData);
+    })
+    .catch(error => {
+      console.error("Error getting users:", error);
+    });
+}
 
 function getActiveUserDimensions (pRW,pW,uLL,aRows,mRows,mPW){
         var result = {};
@@ -151,33 +157,56 @@ function displayLoggedInUsers(response, responseStatus) {
    displayUserArray(usersArray);
 }
 
-function getInitChats () {
-  var d = { mostRecent: mostRecent } ;
-  $.ajax({type: "POST",
-        headers: {"Accept": "application/json", "Authorization": keycloak.token},
-         url: "getChatsInit",
-        data: JSON.stringify(d),
-     success: displayChats,
-       error: function(jqXHR, textStatus, errorThrown) {
-           console.log("Error: chats could not be updated.");
-           setTimeout(updateChats, 3000);
-       } } );
+function getInitChats() {
+  var d = { mostRecent: mostRecent };
+  fetchWithAuth("getChatsInit", {
+    method: "POST",
+    body: JSON.stringify(d)
+  })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(responseData => {
+      displayChats(responseData);
+    })
+    .catch(error => {
+      console.error("Error: chats could not be updated.", error);
+      setTimeout(updateChats, 3000);
+    });
 }
 
-function updateChats () {
+function updateChats() {
   keycloak.updateToken(30).then(function() {
-    var d = { rownum: lastReadRow } ;
-    getLoggedInUsers();
-    $.ajax({type: "POST",
-         headers: {"Accept": "application/json", "Authorization": keycloak.token},
-             url: "getChats",
-            data: JSON.stringify(d),
-         success: displayChats,
-           error: function(jqXHR, textStatus, errorThrown) {
-           console.log("Error: chats could not be updated.");
-           setTimeout(updateChats, 5000); } } );
+    var d = { rownum: lastReadRow };
 
-  }).catch(function() { console.log('Failed to refresh token'); });
+    // Get logged in users first
+    getLoggedInUsers();
+
+    // Then fetch updated chats
+    fetchWithAuth("getChats", {
+      method: "POST",
+      body: JSON.stringify(d)
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(responseData => {
+        displayChats(responseData);
+      })
+      .catch(error => {
+        console.error("Error: chats could not be updated.", error);
+        setTimeout(updateChats, 5000);
+      });
+
+  }).catch(function() {
+    console.log('Failed to refresh token');
+  });
 }
 
 function createPicCol (data, ident, pare){
@@ -194,7 +223,7 @@ function createPicCol (data, ident, pare){
   pic.className+=' chatPic';
   pic.title = data.name;
   pic.src = data.photo;
-    if (parseInt(data.chatUser)===0) {pic.className+=' chatPicBroadcastX';}
+    if (data.name=='Xerafin') {pic.className+=' chatPicBroadcastX';}
   chatDateUnder.className+=' chatDateUnder';
   chatDateUnder.innerHTML = chatDate.getHours() + ':' + (chatDate.getMinutes() < 10 ? '0' : '') + chatDate.getMinutes();
   chatDateUnder.title = chatDate.getHours() + ':' + (chatDate.getMinutes() < 10 ? '0' : '') + chatDate.getMinutes() + ':' + (chatDate.getSeconds() < 10 ? '0' : '') + chatDate.getSeconds();
@@ -214,7 +243,7 @@ function createChatCol (data, ident, pare){
   theCol.className+=' chatTextColWrapper';
   $('#'+pare).append(theCol);
   chatWrapper.className+=' chatTextWrapper';
-  if (parseInt(data.chatUser)==userid){nameDiv.className+=' chatTextNameMe';chatWrapper.style.cssFloat='left';}
+  if (data.chatUser==keycloak.tokenParsed.sub){nameDiv.className+=' chatTextNameMe';chatWrapper.style.cssFloat='left';}
   else {chatWrapper.style.cssFloat='right';}
   $(theCol).append(chatWrapper);
   nameDiv.innerHTML=data.name;
@@ -243,7 +272,7 @@ function createChatRow (data, ident, pare){
   theRow.className+=' chatRow';
   $('#'+pare).append(theRow);
   createPicCol (data, 'chatImg'+data.chatDate+"_"+getRandomInt(1000000), theRow.id);
-  if (parseInt(data.chatUser) >10) {
+  if (data.name != 'Xerafin') {
     createChatCol(data, "chat"+data.chatDate+"_"+getRandomInt(1000000), ident);
   }
   else {
@@ -294,12 +323,9 @@ chatQueueLoop:
 
 function submitChat(message) {
    d = { chatText: message, chatTime: new Date().getTime() };
-   $.ajax({type: "POST",
-     headers: {"Accept": "application/json", "Authorization": keycloak.token},
-            url: "submitChat",
-           data: JSON.stringify(d),
-        success: function (response, responseStatus) {
-           console.log(JSON.stringify(response)); },
-          error: function(jqXHR, textStatus, errorThrown) {
-           console.log("Error: chat could not be submitted"); } });
+   fetchWithAuth("submitChat", {method:"POST", body:JSON.stringify(d)})
+   .then(response => { if(!response.ok) {throw new Error(`HTTP ${response.status}`);}
+                       return response.json(); })
+   .then(responseData => { })
+   .catch(error => { console.error("Error submitting chat:", error);});
  }
