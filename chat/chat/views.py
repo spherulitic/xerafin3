@@ -206,8 +206,11 @@ def post(userid, message, **kwargs):
 
   if expire:
     # These lines will tell the front end to delete from display
-    queryResult = db.session.scalars(db.select(Chat).where(Chat.milestoneType==kwargs['milestoneType'] and
-      Chat.milestoneOf==kwargs['milestoneOf']))
+    queryResult = db.session.scalars(
+      db.select(Chat)
+       .where(Chat.milestoneType==kwargs['milestoneType'])
+       .where(Chat.milestoneOf==kwargs['milestoneOf'])
+    )
     for row in queryResult:
       msg.append(f'0,{row.timeStamp},\n')
       db.session.delete(row)
