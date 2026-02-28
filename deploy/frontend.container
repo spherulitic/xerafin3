@@ -34,6 +34,8 @@ NetworkAlias=frontend
 Volume=/etc/letsencrypt/archive/x3.xerafin.net/fullchain2.pem:/etc/nginx/ssl/fullchain.pem:ro
 Volume=/etc/letsencrypt/archive/x3.xerafin.net/privkey2.pem:/etc/nginx/ssl/privkey.pem:ro
 
+# Mounted volume to store user photos
+Volume=/var/lib/xerafin/user-photos:/usr/share/nginx/html/images/users:rw,U
 
 # Ensure the correct runtime and conmon are used
 Environment=CONTAINER_CONMON=/usr/local/bin/conmon
