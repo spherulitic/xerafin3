@@ -8,7 +8,7 @@ import sys
 import os
 import json
 import traceback
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from enum import Enum
 from typing import List, Dict, Optional
 from time import sleep
@@ -201,16 +201,17 @@ def post_chat_message(session, headers: Dict, period: Period, stats_data: Dict) 
 
   display_name = get_period_display_name(period).lower()
 
+  yesterday = date.today() - timedelta(days=1)
   # Create appropriate chat message based on period
   if period == Period.DAILY:
     chat_text = f"Good job Xerfers! Yesterday, {stats_data['users']} users solved {stats_data['questions']} alphagrams!"
   elif period == Period.WEEKLY:
     chat_text = f"Great week Xerfers! This past week, {stats_data['users']} users solved {stats_data['questions']} alphagrams!"
   elif period == Period.MONTHLY:
-    month_name = date.today().strftime('%B')
+    month_name = yesterday.strftime('%B')
     chat_text = f"Awesome month Xerfers! In {month_name}, {stats_data['users']} users solved {stats_data['questions']} alphagrams!"
   elif period == Period.YEARLY:
-    year = date.today().year - 1  # Previous year
+    year = yesterday.year # Previous year
     chat_text = f"Fantastic year Xerfers! In {year}, {stats_data['users']} users solved {stats_data['questions']} alphagrams!"
 
   chat_url = 'http://chat:5000/submitChat'
