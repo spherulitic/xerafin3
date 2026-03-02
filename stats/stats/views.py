@@ -65,6 +65,18 @@ def get_user():
     auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
     g.uuid = auth_token["sub"]
     g.name = auth_token.get("name", "Unknown")
+
+    g.photo = 'images/unknown_player.gif'
+    g.countryId = auth_token.get('cardboxPrefs', {}).get('countryId', 0)
+    g.handle = auth_token.get('preferred_username', g.name)
+    # headers to send to other services
+    g.headers = {"Accept": "application/json", "Authorization": raw_token}
+
+    g.mysqlcon = xu.getMysqlCon()
+    g.con = g.mysqlcon.cursor()
+
+    return None
+
   except jwt.ExpiredSignatureError:
     return jsonify({'error': 'Token has expired'}), 401
   except jwt.InvalidTokenError as e:
@@ -76,26 +88,17 @@ def get_user():
   except Exception as e:
     return jsonify({'error': f'Authentication failed: {str(e)}'}), 401
 
-
-  g.photo = 'images/unknown_player.gif'
-  g.countryId = auth_token.get('cardboxPrefs', {}).get('countryId', 0)
-  g.handle = auth_token.get('preferred_username', g.name)
-  # headers to send to other services
-  g.headers = {"Accept": "application/json", "Authorization": raw_token}
-
-  g.mysqlcon = xu.getMysqlCon()
-  g.con = g.mysqlcon.cursor()
-
-  return None
-
-@app.after_request
-def closeMysql(response):
-  ''' Commit and close MySQL connection before we return the response '''
-  g.mysqlcon.commit()
-  g.con.close()
-  g.mysqlcon.close()
-  return response
-
+@app.teardown_request
+def close_mysql(exception=None):
+  '''Safely close MySQL connection if it exists '''
+  mysqlcon = g.pop('mysqlcon', None)
+  if mysqlcon is not None:
+    try:
+      if exception is None:
+        mysqlcon.commit()
+      mysqlcon.close()
+    except Exception as e:
+      app.logger.error(f"Error closing MySQL connection: {str(e)}")
 
 @app.route("/", methods=['GET', 'POST'])
 def default():
@@ -296,19 +299,14 @@ def periodicSummary():
       questions = 0
 
     # Insert summary into lb_summary table
-    # For weekly periods, we need to use YEARWEEK format
-    if period == 'WEEKLY':
-      # Get week number using YEARWEEK mode 5
-      week_number = get_week_number(end_date)
-      period_value = f"WEEK-{week_number}"
-    else:
       # Map period to database format
-      period_db_map = {
-        'DAILY': 'DAY',
-        'MONTHLY': 'MONTH',
-        'YEARLY': 'YEAR'
-      }
-      period_value = period_db_map[period]
+    period_db_map = {
+      'DAILY': 'DAY',
+      'WEEKLY': 'WEEK',
+      'MONTHLY': 'MONTH',
+      'YEARLY': 'YEAR'
+    }
+    period_value = period_db_map[period]
 
     # Check if entry already exists (prevent duplicates)
     check_query = '''SELECT COUNT(*) FROM lb_summary
@@ -1378,6 +1376,7 @@ class Metaranks():
                ORDER BY total DESC, date ASC
                LIMIT {self.offset},{self.pageSize} """
     result = self.runQuery()
+
     user_info_list = getUserData([row[2] for row in result])
     user_info_dict = {user["userid"]: user for user in user_info_list}
     rank = self.offset
@@ -1393,9 +1392,9 @@ class Metaranks():
       rowDict = { "total": row[0],
                   "date": row[1],
                   "userid": row[2],
-                  "name": user_info["name"],
-                  "photo": user_info["photo"],
-                  "countryId": user_info["countryId"]}
+                  "name": user_info.get("name", "Mystery User"),
+                  "photo": user_info.get("photo", "images/unknown_player.gif"),
+                  "countryId": user_info.get("countryId", 0)}
 
       if rowDict["userid"] == g.uuid:
         rowDict["isMe"] = True
