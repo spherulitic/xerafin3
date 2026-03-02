@@ -10,7 +10,7 @@ RUN pip3 install -r requirements.txt
 
 RUN useradd --no-create-home --shell /bin/false appuser
 
-COPY cron.py .
+COPY *.py .
 RUN chown -R appuser:appuser .
 
 USER appuser
