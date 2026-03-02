@@ -1,7 +1,7 @@
 {
   "chat": "1.0.2",
   "keycloak": "1.0.1",
-  "cron": "1.0.3",
+  "cron": "1.0.4",
   "frontend": "1.0.4",
   "lexicon": "1.0.2",
   "lexicon-loader": "1.0.1",
