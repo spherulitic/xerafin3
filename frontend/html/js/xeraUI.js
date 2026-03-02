@@ -584,7 +584,7 @@ XeraOverviewManager.prototype = {
     xerafin.error.log.add("Current Quiz ID: "+this.data.currentQuiz,'comment');
     if (this.data.currentQuiz ==undefined) {this.setCurrentQuizid(-1);}
     if (Number(this.data.currentQuiz)!==-1){
-      if (this.data.currentList.quizList[this.data.currentQuiz].untried === 0){
+      if (this.data.currentList.quizList.untried === 0){
         this.setCurrentQuizid(-1);
         this.setFetchedStatus();
         this.resetWritePoll(function(){
