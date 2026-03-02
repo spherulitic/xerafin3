@@ -650,7 +650,10 @@ def makeWordsAvailable(words_needed) :
   # do not give new words for that time period again
   new_words_at = max(g.cur.fetchone()[0], new_words_nlt)
   seconds_per_backlog = 360 # 10 backlog words per hour working ahead
-  seconds_per_new_word = 3600 / g.newWordsAtOnce # similarly
+  try:
+    seconds_per_new_word = 3600 / g.newWordsAtOnce # similarly
+  except ZeroDivisionError:
+    seconds_per_new_words = 1000000
 
   g.cur.execute("select count(*) from questions where difficulty = 2")
   backlog_size = g.cur.fetchone()[0] or 0
