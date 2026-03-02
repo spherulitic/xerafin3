@@ -54,6 +54,14 @@ def get_user():
     auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
     g.uuid = auth_token["sub"]
     g.name = auth_token.get("name", "Unknown")
+
+    g.mysqlcon = xu.getMysqlCon()
+    g.con = g.mysqlcon.cursor()
+    # headers to send when calling other services
+    g.headers = {"Accept": "application/json", "Authorization": raw_token}
+
+    return None
+
   except jwt.ExpiredSignatureError:
     return jsonify({'error': 'Token has expired'}), 401
   except jwt.InvalidTokenError as e:
@@ -65,19 +73,17 @@ def get_user():
   except Exception as e:
     return jsonify({'error': f'Authentication failed: {str(e)}'}), 401
 
-  g.mysqlcon = xu.getMysqlCon()
-  g.con = g.mysqlcon.cursor()
-  # headers to send when calling other services
-  g.headers = {"Accept": "application/json", "Authorization": raw_token}
-
-  return None
-
-@app.after_request
-def close_mysql(response):
-  g.mysqlcon.commit()
-  g.con.close()
-  g.mysqlcon.close()
-  return response
+@app.teardown_request
+def close_mysql(exception=None):
+  '''Safely close MySQL connection if it exists '''
+  mysqlcon = g.pop('mysqlcon', None)
+  if mysqlcon is not None:
+    try:
+      if exception is None:
+        mysqlcon.commit()
+      mysqlcon.close()
+    except Exception as e:
+      app.logger.error(f"Error closing MySQL connection: {str(e)}")
 
 @app.route("/", methods=['GET', 'POST'])
 def default():
