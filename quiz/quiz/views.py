@@ -336,8 +336,8 @@ def getQuizList():
     quizidList = [x[0] for x in g.con.fetchall()]
 
   elif searchType == "vowel":
-    stmt = f"select quiz_id from quiz_master where quiz_type = {QUIZ_TYPE_VOWEL} and length between {minLength} and {maxLength} order by length"
-    g.con.execute(stmt)
+    stmt = "select quiz_id from quiz_master where quiz_type = %s and length between %s and %s order by length"
+    g.con.execute(stmt, (QUIZ_TYPE_VOWEL, minLength, maxLength))
     quizidList = [x[0] for x in g.con.fetchall()]
 #    result["foundquiz"] = quizidList
 
@@ -465,14 +465,11 @@ def activateQuiz():
 
   return jsonify({'activated': quizidList})
 
-
-
 @app.route("/newQuiz", methods=["GET", "POST"])
 def newQuiz():
+  result = {}
 
-  result = { }
-
-  params = request.get_json(force=True) # returns dict
+  params = request.get_json(force=True)
   isCardbox = params.get("isCardbox", True)
   quizid = params.get("quizid", -1)
 
@@ -481,33 +478,58 @@ def newQuiz():
     url = 'http://cardbox:5000/newQuiz'
     requests.get(url, headers=g.headers)
   else:
-    g.con.execute(f'select quiz_name from quiz_master where quiz_id = {quizid}')
+    # Get quiz name - use parameterized query
+    g.con.execute(
+      "select quiz_name from quiz_master where quiz_id = %s",
+      (quizid,)
+    )
     result["quizName"] = g.con.fetchone()[0]
-    g.con.execute(f"select count(*) from quiz_user_detail where quiz_id = {quizid} and user_id = '{g.uuid}'")
+
+    # Check if user already has this quiz
+    g.con.execute(
+      "select count(*) from quiz_user_detail where quiz_id = %s and user_id = %s",
+      (quizid, g.uuid)
+    )
     c = int(g.con.fetchone()[0])
+
     if c > 0:
-      g.con.execute(f"update quiz_user_detail set locked = 0 where quiz_id = {quizid} and user_id = '{g.uuid}'")
+      # Update existing record
+      g.con.execute(
+        "update quiz_user_detail set locked = 0 where quiz_id = %s and user_id = %s",
+        (quizid, g.uuid)
+      )
     else:
-      # load quiz json
+      # Load quiz json
       filename = os.path.join(QUIZJSON_PATH, f"{quizid}.json")
       with open(filename, 'r') as f:
         data = json.load(f)
-      # insert into quiz user detail
-      for alpha in data["alphagrams"]:
-        g.con.execute(f'''insert into quiz_user_detail (id, quiz_id, user_id, alphagram, locked, completed, correct, incorrect)
-                              values (NULL, {quizid}, "{g.uuid}", "{alpha}", 0, 0, 0, 0)''')
 
-  # send back cardbox info always
+      if data["alphagrams"]:
+        # Create placeholders for each row: (%s, %s, %s, 0, 0, 0, 0)
+        placeholders = ', '.join(['(%s, %s, %s, 0, 0, 0, 0)' for _ in data["alphagrams"]])
+
+        # Flatten the parameters: [quizid, user_id, alpha1, quizid, user_id, alpha2, ...]
+        args = []
+        for alpha in data["alphagrams"]:
+          args.extend([quizid, g.uuid, alpha])
+
+        query = f'''INSERT INTO quiz_user_detail
+                (quiz_id, user_id, alphagram, locked, completed, correct, incorrect)
+                VALUES {placeholders}'''
+
+        g.con.execute(query, args)
+
+  # Get cardbox score
   url = 'http://cardbox:5000/getCardboxScore'
   try:
-
     response = requests.get(url, headers=g.headers)
-    response.raise_for_status() # Raise exception if we get 4xx/5xx response
+    response.raise_for_status()
     cbxResponse = response.json()
     cbxScore = cbxResponse.get("score", 0)
   except (requests.RequestException, ValueError):
-    cbxScore = 0 # if there's an error just return 0; not important
+    cbxScore = 0
 
+  # Get stats
   url = 'http://stats:5000/getUserStatsToday'
   statsResponse = requests.get(url, headers=g.headers).json()
 
@@ -516,7 +538,6 @@ def newQuiz():
   result["score"] = cbxScore
 
   return jsonify(result)
-
 
 
 def submitMilestoneChat(milestone):
@@ -571,26 +592,43 @@ def generatePeriodicQuizzes():
 
 def generateQuiz(**kwargs):
   ''' Accepts args sub_id, descr, where, datemask
-      Creates one quiz from parameters and outputs JSON '''
+    Creates one quiz from parameters and outputs JSON '''
+
+  # Get next quiz_id (this query is safe - no user input)
   g.con.execute("select max(quiz_id) from quiz_master")
   result = g.con.fetchone()
-  if result[0] is None:
-    quizid = 0
-  else:
-    quizid = result[0] + 1
+  quizid = 0 if result[0] is None else result[0] + 1
+
+  # Get alphagrams from lexicon service
   url = 'http://lexicon:5000/getRandomAlphas'
   data = {"quantity": kwargs['quantity'], 'lengths': kwargs['lengths']}
-  quizJSON = {"name": f'{kwargs["descr"]} {datetime.now().strftime(kwargs["datemask"])}'}
-  quizJSON["alphagrams"] = requests.post(url, headers=g.headers, json=data).json()
-  quizJSON["id"] = quizid
-  quizJSON["size"] = kwargs['quantity']
+  quizJSON = {
+    "name": f'{kwargs["descr"]} {datetime.now().strftime(kwargs["datemask"])}',
+    "alphagrams": requests.post(url, headers=g.headers, json=data).json(),
+    "id": quizid,
+    "size": kwargs['quantity']
+  }
 
-  command = f'''INSERT INTO quiz_master (quiz_id, quiz_name, quiz_size, sub_id,
-                 creator, create_date, quiz_type, length, lexicon, version)
-              VALUES ({quizid}, "{quizJSON['name']}", {quizJSON['size']}, {kwargs["sub_id"]},
-                "{g.uuid}", CURDATE(), {kwargs['quiz_type']}, null, 'CSW', 21)'''
-  g.con.execute(command)
+  # CORRECT: Use parameterized query
+  g.con.execute(
+    '''INSERT INTO quiz_master
+       (quiz_id, quiz_name, quiz_size, sub_id, creator, create_date,
+      quiz_type, length, lexicon, version)
+       VALUES (%s, %s, %s, %s, %s, CURDATE(), %s, %s, %s, %s)''',
+    (
+      quizid,
+      quizJSON['name'],
+      quizJSON['size'],
+      kwargs["sub_id"],
+      g.uuid,
+      kwargs['quiz_type'],
+      None,  # for length field
+      'CSW',
+      24
+    )
+  )
 
+  # Save JSON file (this part is fine - file operations, not SQL)
   filename = os.path.join('/app/quizjson', f'{quizid}.json')
   with open(filename, 'w') as f:
     f.write(json.dumps(quizJSON))
@@ -613,7 +651,12 @@ def getNonCardboxQuestions (numNeeded, quizid) : # pylint: disable=unused-argume
   quiz = requests.post(url, headers=g.headers, json=data).json()
   return quiz
 
-def checkOut (alpha, quizid, lock):
-  g.con.execute(f'''update quiz_user_detail set locked = {int(lock)}
-                    where quiz_id = {quizid} and user_id = "{g.uuid}"
-                    and alphagram = "{alpha}"''')
+def checkOut(alpha, quizid, lock):
+  g.con.execute(
+    '''update quiz_user_detail
+       set locked = %s
+       where quiz_id = %s
+       and user_id = %s
+       and alphagram = %s''',
+    (int(lock), quizid, g.uuid, alpha)
+  )
