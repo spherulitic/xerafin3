@@ -195,28 +195,60 @@ def getQuestions():
   # This is only used for non-cardbox quizzes
   result["eof"] = False
 
-  lexService = 'http://lexicon:5000'
+  lex_service = 'http://lexicon:5000'
+  all_words = {word for answers in questions.values() for word in answers}
+  words_batch = {"words": list(all_words)}
+  word_info_batch = { }
+  dots_batch = { }
+
+  try:
+    # batch the calls to lexicon
+    response = requests.post(f'{lex_service}/getWordsInfo',
+                             headers=g.headers,
+                             json=words_batch,
+                             timeout=10)
+    if response.status_code == 200:
+      word_info_batch = response.json()
+    else:
+      app.logger.error(f"Word info batch failed: {response.status_code}")
+      word_info_batch = {word: {} for word in all_words}
+  except Exception as e:
+    app.logger.error(f"Error getting word info: {str(e)}")
+    word_info_batch = {word: {} for word in all_words}
+
+  # TODO: combine these into one call on the lexicon side
+  try:
+    response = requests.post(f'{lex_service}/getDotsBatch',
+                             headers=g.headers,
+                             json=words_batch,
+                             timeout=10)
+    if response.status_code == 200:
+      dots_batch = response.json()
+    else:
+      app.logger.error(f"Dots batch failed: {response.status_code}")
+      dots_batch = {word: {} for word in all_words}
+  except Exception as e:
+    app.logger.error(f"Error getting dots: {str(e)}")
+    dots_batch = {word: {} for word in all_words}
+
   for alpha in questions.keys():
 
-    template = { }
-    template["alpha"] = alpha
-    template["answers"] = questions[alpha]
+    template = { "alpha": alpha, "answers": questions[alpha], "words": {} }
     auxInfo = getAuxInfo(alpha)["aux"]
     template["correct"] = auxInfo.get("correct")
     template["incorrect"] = auxInfo.get("incorrect")
     template["nextScheduled"] = auxInfo.get("nextScheduled")
     template["cardbox"] = auxInfo.get("cardbox")
     template["difficulty"] = auxInfo.get("difficulty")
-    template["words"] = { }
     if lock:
       checkOut(alpha, True)
     for word in template["answers"]:
-      wordJSON = { "word": word }
-      wordInfo = requests.post(f'{lexService}/getWordInfo', headers=g.headers, json=wordJSON).json()
-      innerHooks = requests.post(f'{lexService}/getDots', headers=g.headers, json=wordJSON).json()
-#     [ front hooks, back hooks, definition, [innerHooks], lexicon symbols ]
-      template["words"][word] = [ wordInfo["front_hooks"], wordInfo["back_hooks"],
-                      wordInfo["definition"], innerHooks, wordInfo.get("lexicon_symbols")]
+      word_info = word_info_batch.get(word, {})
+      dots = dots_batch.get(word, [])
+
+#     [ front hooks, back hooks, definition, [dots], lexicon symbols ]
+      template["words"][word] = [ word_info["front_hooks"], word_info["back_hooks"],
+                      word_info["definition"], dots, word_info.get("lexicon_symbols")]
     result["questions"].append(template)
 
   return jsonify(result)

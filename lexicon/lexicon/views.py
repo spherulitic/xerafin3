@@ -10,8 +10,8 @@ import jwt # pylint: disable=E0401
 import itertools
 import dawg
 from pymongo import MongoClient # pylint: disable=E0401
+from pymongo.errors import PyMongoError
 from flask import jsonify, request, g # pylint: disable=E0401
-import xerafinUtil.xerafinUtil as xu
 from lexicon import app
 
 dictConfig({
@@ -56,6 +56,17 @@ def get_user():
     auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
     g.uuid = auth_token["sub"]
     g.name = auth_token.get("name", "Unknown")
+
+    # headers to send to other services
+    g.headers = {"Accept": "application/json", "Authorization": raw_token}
+
+    mongo_db_name = os.environ.get('MONGO_INITDB_DATABASE')
+    g.client = MongoClient(f'mongodb://lexicon-db:27017/')
+    g.words = g.client[mongo_db_name]['words']
+    g.dawg_filename = '/app/data/csw24.dawg'
+
+    return None
+
   except jwt.ExpiredSignatureError:
     return jsonify({'error': 'Token has expired'}), 401
   except jwt.InvalidTokenError as e:
@@ -67,20 +78,14 @@ def get_user():
   except Exception as e:
     return jsonify({'error': f'Authentication failed: {str(e)}'}), 401
 
-  # headers to send to other services
-  g.headers = {"Accept": "application/json", "Authorization": raw_token}
-
-  mongo_db_name = os.environ.get('MONGO_INITDB_DATABASE')
-  g.client = MongoClient(f'mongodb://lexicon-db:27017/')
-  g.words = g.client[mongo_db_name]['words']
-  g.dawg_filename = '/app/data/csw24.dawg'
-
-  return None
-
-@app.after_request
-def closeMongo(response):
-  g.client.close()
-  return response
+@app.teardown_request
+def closeMongo(exception=None):
+  client = g.pop('client', None) # Safely get and remove from g
+  if client is not None:
+    try:
+      client.close()
+    except Exception as e:
+      app.logger.error(f"Error closing MongoDB connection: {str(e)}")
 
 @app.route("/", methods=['GET', 'POST'])
 def default():
@@ -145,6 +150,32 @@ def getWordInfo() :
   del result['_id']
   return jsonify(result)
 
+@app.route("/getWordsInfo", methods=['POST'])
+def getWordsInfo():
+  '''
+  A batch version of getWordInfo.
+  Returns a dict {"word": { word info from DB } }
+  '''
+  params = request.get_json(force=True)
+  words = params.get('words', [ ])
+  if not words:
+    return jsonify({})
+  try:
+    query = {'word': {'$in': words}}
+    # Create dictionary with word as a key
+    # | operator uses second dict if keys overlap
+    result = {word: {} for word in words} | {
+         doc['word']: {k: v for k, v in doc.items() if k != '_id'}
+         for doc in g.words.find(query)
+         }
+    return jsonify(result)
+  except PyMongoError as e:
+    app.logger.error(f"MongoDB error for words {words[:10]}...: {str(e)}")
+    return jsonify({word: {} for word in words})
+  except Exceptions as e:
+    app.logger.error(f"Unexpected error in getWordsInfo for words {words[:10]}...: {str(e)}")
+    return jsonify({word: {} for word in words})
+
 @app.route("/getDots",  methods=['GET', 'POST'])
 def getDots():
   '''
@@ -156,6 +187,36 @@ def getDots():
   numFront = g.words.count_documents({'word': word[1:]})
   numBack = g.words.count_documents({'word': word[:-1]})
   return jsonify([numFront > 0, numBack > 0])
+
+@app.route("/getDotsBatch", methods=['POST'])
+def getDotsBatch():
+  params = request.get_json(force=True)
+  words = params.get('words', [])
+
+  if not words:
+    return jsonify({})
+
+  try:
+    front_variations = [word[1:] for word in words]
+    back_variations = [word[:-1] for word in words]
+    # Get all valid subhooks for all words
+    query = {'word': {'$in': front_variations + back_variations}}
+    cursor = g.words.find(query, {'word': 1})
+    existing_words = {doc['word'] for doc in cursor}
+
+    result = { }
+    for word in words:
+      has_front = word[1:] in existing_words
+      has_back = word[:-1] in existing_words
+      result[word] = [has_front, has_back]
+
+    return jsonify(result)
+  except PyMongoError as e:
+    app.logger.error(f"MongoDB error for words {words[:10]}...: {str(e)}")
+    return jsonify({word: [False, False] for word in words})
+  except Exceptions as e:
+    app.logger.error(f"Unexpected error in getWordsInfo for words {words[:10]}...: {str(e)}")
+    return jsonify({word: [False, False] for word in words})
 
 @app.route('/returnValidAlphas', methods=['POST'])
 def returnValidAlphas():
@@ -247,7 +308,7 @@ def get_sloth_data():
 
   except Exception as e:
     # Log the error
-    xu.debug(f"Error in get_sloth_data: {e}")
+    app.logger.error(f"Error in get_sloth_data: {e}")
     return jsonify({
         "result": [],
         "error": {"status": f"Error: {str(e)}"}
@@ -292,9 +353,9 @@ def getAuxInfoBatch(alphalist):
             data = response.json()
             return data
         else:
-            xu.debug(f"Cardbox service returned error: {response.status_code}")
+            app.logger.error(f"Cardbox service returned error: {response.status_code}")
             return {}
 
     except requests.exceptions.RequestException as e:
-        xu.debug(f"Error calling cardbox service: {e}")
+        app.logger.error(f"Error calling cardbox service: {e}")
         return {}
