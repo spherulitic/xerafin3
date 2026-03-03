@@ -653,7 +653,7 @@ def makeWordsAvailable(words_needed) :
   try:
     seconds_per_new_word = 3600 / g.newWordsAtOnce # similarly
   except ZeroDivisionError:
-    seconds_per_new_words = 1000000
+    seconds_per_new_word = 100000
 
   g.cur.execute("select count(*) from questions where difficulty = 2")
   backlog_size = g.cur.fetchone()[0] or 0
