@@ -598,6 +598,7 @@ def generateQuiz(**kwargs):
   g.con.execute("select max(quiz_id) from quiz_master")
   result = g.con.fetchone()
   quizid = 0 if result[0] is None else result[0] + 1
+  length_value = kwargs["lengths"][0] if len(kwargs["lengths"]) == 1 else None
 
   # Get alphagrams from lexicon service
   url = 'http://lexicon:5000/getRandomAlphas'
@@ -627,7 +628,7 @@ def generateQuiz(**kwargs):
       kwargs["sub_id"],
       g.uuid,
       kwargs['quiz_type'],
-      None,  # for length field
+      length_value,
       'CSW',
       24
     )
