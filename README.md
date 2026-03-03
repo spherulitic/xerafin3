@@ -16,6 +16,14 @@ Like Zyzzyva, Xerafin implements a Leitner spaced-repetition cardbox method to a
 
 XERAFIN 3.0
 
-Xerafin 3.0 is a major rewrite of the Xerafin back end. The goal is to upgrade from Python 2 to Python 3, rearchitect the back end into several containerized microservices, and upgrade the database to MySQL 8.0. It will also integrate Keycloak for user authentication, allowing user self-signup etc.
+Xerafin 3.0 is a major rewrite of the Xerafin back end. The architecture consists of:
+ * A single-page application front end served by nginx. It is written in vanilla HTML and Javascript, with a bit of jQuery
+ * The nginx also serves as reverse proxy
+ * a Keycloak instance for IdP
+ * A MongoDB instance to hold the lexicon. This is populated at startup by a containerized lexicon-loader script
+ * A python container holding the daily cron scripts.
+ * Seven Flask-based microservices (chat, cardbox, lexicon, login, quiz, sloth, stats)
+
+The containers are run as systemd services using Podman quadlets. This Github repo contains CI/CD actions to automatically rebuild and deploy updated containers to prod on each merge to main.
 
 Future feature improvements planned including optimizing the process for adding new words to a user's cardbox, and the addition of a realtime multiplayer anagramming feature via a websocket microservice.
