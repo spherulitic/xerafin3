@@ -182,9 +182,15 @@ def appendChatToResult(line):
 
   url = 'http://login:5000/getUserNamesAndPhotos'
   data = { 'userList': [ userid ] }
-  response = requests.post(url, headers=g.headers, json=data).json()
-  photo = response[0].get('photo', 'images/unknown_player.gif')
-  name = response[0].get('name', 'Unknown Player')
+  response_data = requests.post(url, headers=g.headers, json=data)
+
+  if response_data.status_code == 200:
+    users = response_data.json()
+    photo = users[0].get('photo', 'images/unknown_player.gif')
+    name = users[0].get('name', 'Unknown Player')
+  else:
+    photo = 'images/unknown_player.gif'
+    name = 'Unknown Player'
 
   return {"chatDate": int(timeStamp), "photo": photo, "name": name,
           "chatText": message, "chatUser": userid, "expire": expire}

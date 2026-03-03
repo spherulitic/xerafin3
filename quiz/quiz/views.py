@@ -609,7 +609,12 @@ def generateQuiz(**kwargs):
     "size": kwargs['quantity']
   }
 
-  # CORRECT: Use parameterized query
+  g.con.execute('''UPDATE quiz_master
+                   SET sub_id = NULL
+                   WHERE sub_id IS NOT NULL
+                   AND quiz_type = %s''',
+                    [kwargs['quiz_type']])
+
   g.con.execute(
     '''INSERT INTO quiz_master
        (quiz_id, quiz_name, quiz_size, sub_id, creator, create_date,
