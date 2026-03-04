@@ -612,9 +612,8 @@ def generateQuiz(**kwargs):
 
   g.con.execute('''UPDATE quiz_master
                    SET sub_id = NULL
-                   WHERE sub_id IS NOT NULL
-                   AND quiz_type = %s''',
-                    [kwargs['quiz_type']])
+                   WHERE sub_id = %s''',
+                    [kwargs['sub_id']])
 
   g.con.execute(
     '''INSERT INTO quiz_master
