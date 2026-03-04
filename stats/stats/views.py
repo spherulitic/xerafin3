@@ -1734,9 +1734,9 @@ class Rankings():
                                               "countryId": 0})
       rowDict = { "total": row[0],
                   "userid": row[1],
-                  "name": user_info["name"],
-                  "photo": user_info["photo"],
-                  "countryId": user_info["countryId"]}
+                  "name": user_info.get("name", "Mystery User"),
+                  "photo": user_info.get("photo", "images/unknown_player.gif"),
+                  "countryId": user_info.get("countryId", 0)}
       if rowDict["userid"] == g.uuid:
         rowDict['isMe'] = True
         foundMe = True
