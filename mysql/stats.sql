@@ -56,3 +56,5 @@ CREATE TABLE `leaderboard` (
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
 -- Dump completed on 2023-01-23 20:48:51
+
+CREATE VIEW sloth_completed AS SELECT * FROM sloth.sloth_completed;
