@@ -2,6 +2,7 @@ from math import ceil
 from logging.config import dictConfig
 from datetime import datetime, timedelta
 from functools import lru_cache
+from MySQLdb.cursors import DictCursor
 import json
 import urllib
 import requests
@@ -1482,22 +1483,26 @@ class Awards():
     self.inData = { }
     self.outData = [ ]
     self.type = 0
+    # Ensure the cursor returns dictionaries for easier column access
+    self.cursor = g.mysqlcon.cursor(DictCursor)
+
+    # Parse input parameters (same as before)
     if "year" in data:
       try:
         self.year = int(data["year"])
       except ValueError:
         self.year = 0
-      if (datetime.now().month == 1 and datetime.now().day == 1) or self.year < 2018:
-        self.year = 0
     else:
       self.year = 0
+
     if "type" in data:
       if data["type"] == "most":
         self.type = 1
-      else: # type is "top" or default
+      else:  # type is "top" or default
         self.type = 0
     else:
       self.type = 0
+
     if "pageSize" in data:
       try:
         self.pageSize = int(data["pageSize"])
@@ -1507,6 +1512,7 @@ class Awards():
         self.pageSize = 10
     else:
       self.pageSize = 10
+
     if "pageNumber" in data:
       try:
         self.pageNumber = max(int(data["pageNumber"]), 1)
@@ -1514,6 +1520,7 @@ class Awards():
         self.pageNumber = 1
     else:
       self.pageNumber = 1
+
     if "displayType" in data:
       try:
         self.displayType = int(data["displayType"])
@@ -1522,24 +1529,128 @@ class Awards():
     else:
       self.displayType = 0
 
-    self.readSource()
+    # Query the database directly instead of reading from file
+    self.queryDatabase()
     self.findUserRank()
     self.getUserAmount()
     self.getRankingBounds()
     self.extractData()
 
-  def readSource(self):
-    if self.type == 1:
-      file = "awardsMost"
-    if self.type == 0:
-      file = "awardsTop"
-    if self.year == 0:
-      file = f'{file}.JSON'
-    else:
-      file = f'{file}_{self.year}.JSON'
-    fname = f'{AWARDS_DIR}/{file}'
-    with open(fname) as f:
-      self.inData = json.load(f)
+  def queryDatabase(self):
+    """Query the database directly based on type and year parameters"""
+    try:
+
+      # Determine ordering based on type
+      if self.type == 1:  # "most" type - order by total first
+        ordering = 'total DESC, emerald DESC, ruby DESC, sapphire DESC, gold DESC, silver DESC, bronze DESC,'
+      else:  # "top" type - order by coin values first
+        ordering = 'emerald DESC, ruby DESC, sapphire DESC, gold DESC, silver DESC, bronze DESC,'
+
+      # Build and execute the appropriate query
+      if self.year == 0:
+        # Query for all-time totals from user_coin_total table
+        sql = '''
+          SELECT userid, emerald + ruby + sapphire + gold + silver + bronze AS total,
+               emerald, ruby, sapphire, gold, silver, bronze, dateStamp
+          FROM user_coin_total
+          ORDER BY {ordering} dateStamp ASC
+        '''.format(ordering=ordering)
+        self.cursor.execute(sql)
+
+      elif self.year > 2017:
+        # Query for specific year from user_coin_log table with aggregation
+        coins = ['emerald', 'ruby', 'sapphire', 'gold', 'silver', 'bronze']
+
+        # Build the SUM clauses for each coin type
+        sum_clauses = []
+        for idx, coin in enumerate(coins):
+          sum_clauses.append(f'SUM(amount * (coinType = {idx})) AS {coin}')
+
+        sql = '''
+          SELECT userid,
+               {sum_clauses},
+               MIN(dateStamp) AS earliest,
+               SUM(amount) AS total
+          FROM user_coin_log
+          WHERE YEAR(dateStamp) = %s
+          GROUP BY userid
+          ORDER BY {ordering} earliest ASC
+        '''.format(
+          sum_clauses=', '.join(sum_clauses),
+          ordering=ordering
+        )
+        self.cursor.execute(sql, (self.year,))
+      else:
+        # No data for years <= 2017 (except 0 which is handled above)
+        self.rankings = []
+        self.lastUpdate = int(time.time())
+        return
+
+      # Get the raw query results
+      query_results = self.cursor.fetchall()
+
+      if not query_results:
+        self.rankings = []
+        self.lastUpdate = int(time.time())
+        return
+
+      # Extract userids to fetch user data
+      userids = [row['userid'] for row in query_results]
+
+      # Get user data from the helper function
+      user_data_list = getUserData(userids)
+
+      # Create a lookup dictionary for quick access
+      user_data = {user['userid']: user for user in user_data_list}
+
+      # Combine query results with user data
+      rankings = []
+      pos = 0
+
+      for row in query_results:
+        pos += 1
+        userid = row['userid']
+
+        # Get user data for this userid, use defaults if missing
+        user_info = user_data.get(userid, {})
+
+        if user_info:
+          # User found - use actual data
+          name = user_info.get('name', 'Unknown User')
+          countryId = user_info.get('countryId', 0)
+          photo = user_info.get('photo', 'images/unknown_player.gif')
+        else:
+          # User missing - use defaults and log warning
+          app.logger.warning(f"Missing user data for userid: {userid}, using defaults")
+          name = "Unknown User"
+          countryId = 0
+          photo = "images/unknown_player.gif"
+
+        ranking_entry = {
+          'rank': pos,
+          'name': name,
+          'id': userid,
+          'countryId': countryId,
+          'photo': photo,
+          'values': {
+            'emerald': row['emerald'],
+            'ruby': row['ruby'],
+            'sapphire': row['sapphire'],
+            'gold': row['gold'],
+            'silver': row['silver'],
+            'bronze': row['bronze'],
+            'total': row['total']
+          }
+        }
+        rankings.append(ranking_entry)
+
+      self.rankings = rankings
+      self.lastUpdate = int(time.time())
+
+    except Exception as e:
+      app.logger.error(f"Database error in Awards.queryDatabase: {str(e)}")
+      self.rankings = []
+      self.lastUpdate = int(time.time())
 
   def getRankingBounds(self):
     ''' This was Rick's code. I have no idea what it does. '''
@@ -1557,47 +1668,240 @@ class Awards():
       self.pagetotal = 1
       self.page = 1
     else:
-      self.pageTotal = ceil(self.userCount/self.pageSize)
+      self.pageTotal = ceil(self.userCount / self.pageSize) if self.userCount > 0 else 1
       if self.pageTotal == 0:
         self.pageTotal = 1
-      self.page = min(self.pageNumber-1,self.pageTotal)
+      self.page = min(self.pageNumber - 1, self.pageTotal - 1)  # Fixed: pageTotal-1 for zero-based
       self.offset = self.pageSize * self.page
 
   def findUserRank(self):
     try:
-      self.userRank = [a["rank"] for a in self.inData["rankings"] if a["id"] == g.uuid][0]
-    except IndexError:
+      self.userRank = [a["rank"] for a in self.rankings if a["id"] == g.uuid][0]
+    except (IndexError, KeyError, AttributeError):
       self.userRank = -1
 
   def getRankings(self):
     return self.outData
 
   def parseOutputParams(self, p_row):
-    outp = {'rank':p_row['rank'], 'photo':p_row['photo'], 'name':p_row['name'],
-            'countryId':p_row['countryId'], 'values':p_row['values']}
+    outp = {
+      'rank': p_row['rank'],
+      'photo': p_row['photo'],
+      'name': p_row['name'],
+      'countryId': p_row['countryId'],
+      'values': p_row['values']
+    }
     if 'isMe' in p_row:
       outp['isMe'] = 1
     return outp
 
   def extractData(self):
+    if not self.rankings:
+      self.outData = {
+        "rankings": [],
+        "users": 0,
+        "lastUpdate": self.lastUpdate,
+        "page": 1
+      }
+      return
+
     userFound = 0
-    result = [ ]
-    for index, row in enumerate(self.inData["rankings"][self.offset:min(self.offset+self.pageSize, self.userCount)]):
-      if self.offset + index == self.userRank - 1:
+    result = []
+
+    # Ensure offset is within bounds
+    start_idx = min(self.offset, len(self.rankings))
+    end_idx = min(self.offset + self.pageSize, len(self.rankings))
+
+    for index, row in enumerate(self.rankings[start_idx:end_idx]):
+      actual_index = self.offset + index
+      if actual_index == self.userRank - 1:
         row["isMe"] = 1
         userFound = 1
-      result.append(self.parseOutputParams(row))
-    if userFound == 0:
-      if self.userRank != -1:
-        self.inData["rankings"][self.userRank-1]["isMe"] = 1
-        if self.userRank < self.offset:
-          result.insert(0, self.parseOutputParams(self.inData["rankings"][self.userRank-1]))
-        else:
-          result.append(self.parseOutputParams(self.inData["rankings"][self.userRank-1]))
-    self.outData = {"rankings": result, "users": self.userCount, "lateUpdate": self.inData["lastUpdate"], "page": self.page+1}
+
+      # Transform the row to match frontend expectations
+      transformed_row = {
+        'rank': row['rank'],
+        'name': row['name'],
+        'id': row['id'],
+        'countryId': row['countryId'],
+        'photo': row['photo'],
+        'values': row['values'],
+        'users': [  # Add users array as expected by frontend
+          {
+            'name': row['name'],
+            'photo': row['photo']
+            # Add any other user-specific fields here if needed
+          }
+        ]
+      }
+      if 'isMe' in row:
+        transformed_row['isMe'] = row['isMe']
+
+      result.append(transformed_row)
+
+    if userFound == 0 and self.userRank != -1:
+      # Add the user's entry if not in current page
+      user_row = self.rankings[self.userRank - 1].copy()
+      user_row["isMe"] = 1
+
+      # Transform the user row
+      transformed_user = {
+        'rank': user_row['rank'],
+        'name': user_row['name'],
+        'id': user_row['id'],
+        'countryId': user_row['countryId'],
+        'photo': user_row['photo'],
+        'values': user_row['values'],
+        'users': [
+          {
+            'name': user_row['name'],
+            'photo': user_row['photo']
+          }
+        ],
+        'isMe': 1
+      }
+
+      if self.userRank < self.offset + 1:
+        result.insert(0, transformed_user)
+      else:
+        result.append(transformed_user)
+
+    # The top-level structure should have 'rankings' as the key
+    self.outData = {
+      "rankings": result,
+      "users": self.userCount,
+      "lastUpdate": self.lastUpdate,
+      "page": self.page + 1
+    }
 
   def getUserAmount(self):
-    self.userCount = len(self.inData["rankings"])
+    self.userCount = len(self.rankings)
+
+#class Awards():
+#  def __init__(self, data):
+#    self.displayType = 0
+#    self.offset = 0
+#    self.userCount = 0
+#    self.userRank = -1
+#    self.inData = { }
+#    self.outData = [ ]
+#    self.type = 0
+#    if "year" in data:
+#      try:
+#        self.year = int(data["year"])
+#      except ValueError:
+#        self.year = 0
+#      if (datetime.now().month == 1 and datetime.now().day == 1) or self.year < 2018:
+#        self.year = 0
+#    else:
+#      self.year = 0
+#    if "type" in data:
+#      if data["type"] == "most":
+#        self.type = 1
+#      else: # type is "top" or default
+#        self.type = 0
+#    else:
+#      self.type = 0
+#    if "pageSize" in data:
+#      try:
+#        self.pageSize = int(data["pageSize"])
+#      except ValueError:
+#        self.pageSize = 10
+#      if self.pageSize < 1 or self.pageSize > 50:
+#        self.pageSize = 10
+#    else:
+#      self.pageSize = 10
+#    if "pageNumber" in data:
+#      try:
+#        self.pageNumber = max(int(data["pageNumber"]), 1)
+#      except ValueError:
+#        self.pageNumber = 1
+#    else:
+#      self.pageNumber = 1
+#    if "displayType" in data:
+#      try:
+#        self.displayType = int(data["displayType"])
+#      except ValueError:
+#        self.displayType = 0
+#    else:
+#      self.displayType = 0
+#
+#    self.readSource()
+#    self.findUserRank()
+#    self.getUserAmount()
+#    self.getRankingBounds()
+#    self.extractData()
+#
+#  def readSource(self):
+#    if self.type == 1:
+#      file = "awardsMost"
+#    if self.type == 0:
+#      file = "awardsTop"
+#    if self.year == 0:
+#      file = f'{file}.JSON'
+#    else:
+#      file = f'{file}_{self.year}.JSON'
+#    fname = f'{AWARDS_DIR}/{file}'
+#    with open(fname) as f:
+#      self.inData = json.load(f)
+#
+#  def getRankingBounds(self):
+#    ''' This was Rick's code. I have no idea what it does. '''
+#    if self.displayType == 1:
+#      bound = self.pageSize
+#      if bound % 2 == 0:
+#        self.pageSize += 1
+#      else:
+#        bound = bound - 1
+#      bounds = int(bound / 2)
+#      if self.userRank + bounds > self.userCount:
+#        self.offset = max(self.userCount - self.pageSize, 0)
+#      else:
+#        self.offset = max(self.userRank - bounds - 1, 0)
+#      self.pagetotal = 1
+#      self.page = 1
+#    else:
+#      self.pageTotal = ceil(self.userCount/self.pageSize)
+#      if self.pageTotal == 0:
+#        self.pageTotal = 1
+#      self.page = min(self.pageNumber-1,self.pageTotal)
+#      self.offset = self.pageSize * self.page
+#
+#  def findUserRank(self):
+#    try:
+#      self.userRank = [a["rank"] for a in self.inData["rankings"] if a["id"] == g.uuid][0]
+#    except IndexError:
+#      self.userRank = -1
+#
+#  def getRankings(self):
+#    return self.outData
+#
+#  def parseOutputParams(self, p_row):
+#    outp = {'rank':p_row['rank'], 'photo':p_row['photo'], 'name':p_row['name'],
+#            'countryId':p_row['countryId'], 'values':p_row['values']}
+#    if 'isMe' in p_row:
+#      outp['isMe'] = 1
+#    return outp
+#
+#  def extractData(self):
+#    userFound = 0
+#    result = [ ]
+#    for index, row in enumerate(self.inData["rankings"][self.offset:min(self.offset+self.pageSize, self.userCount)]):
+#      if self.offset + index == self.userRank - 1:
+#        row["isMe"] = 1
+#        userFound = 1
+#      result.append(self.parseOutputParams(row))
+#    if userFound == 0:
+#      if self.userRank != -1:
+#        self.inData["rankings"][self.userRank-1]["isMe"] = 1
+#        if self.userRank < self.offset:
+#          result.insert(0, self.parseOutputParams(self.inData["rankings"][self.userRank-1]))
+#        else:
+#          result.append(self.parseOutputParams(self.inData["rankings"][self.userRank-1]))
+#    self.outData = {"rankings": result, "users": self.userCount, "lateUpdate": self.inData["lastUpdate"], "page": self.page+1}
+#
+#  def getUserAmount(self):
+#    self.userCount = len(self.inData["rankings"])
 
 class Rankings():
   def __init__(self, data):

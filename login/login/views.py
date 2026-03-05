@@ -215,7 +215,7 @@ def getUserNamesAndPhotos():
 
       try:
         userInfo = keycloak_admin.get_user(uuid)
-        userDict["name"] = f'{userInfo["firstName"]} {userInfo["lastName"]}'
+        userDict["name"] = f'{userInfo.get("firstName", "")} {userInfo.get("lastName", "")}'
         userDict["photo"] = userInfo.get('attributes', {}).get('photo', 'images/unknown_player.gif')
         userDict["countryId"] = userInfo.get('attributes', {}).get('countryId', 0)
         result.append(userDict)
