@@ -59,6 +59,24 @@ def get_user():
     auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
     g.uuid = auth_token["sub"]
     g.name = auth_token.get("name", "Unknown")
+
+    cardboxPrefs = auth_token.get('cardboxPrefs', { })
+    g.closet = cardboxPrefs.get('closet', 10)
+    g.reschedHrs = cardboxPrefs.get('reschedHrs', 24)
+    g.cb0max = cardboxPrefs.get('cb0max', 500)
+    g.newWordsAtOnce = cardboxPrefs.get('newWordsAtOnce', 10)
+    g.schedVersion = cardboxPrefs.get('schedVersion', 0)
+
+    # headers to send to other services
+    g.headers = {"Accept": "application/json", "Authorization": raw_token}
+
+    g.con = lite.connect(getDBFile())
+    g.cur = g.con.cursor()
+    # Debug for slow queries
+    g.start_time = time.time()
+
+    return None
+
   except jwt.ExpiredSignatureError:
     return jsonify({'error': 'Token has expired'}), 401
   except jwt.InvalidTokenError as e:
@@ -70,29 +88,27 @@ def get_user():
   except Exception as e:
     return jsonify({'error': f'Authentication failed: {str(e)}'}), 401
 
-  cardboxPrefs = auth_token.get('cardboxPrefs', { })
-  g.closet = cardboxPrefs.get('closet', 10)
-  g.reschedHrs = cardboxPrefs.get('reschedHrs', 24)
-  g.cb0max = cardboxPrefs.get('cb0max', 500)
-  g.newWordsAtOnce = cardboxPrefs.get('newWordsAtOnce', 10)
-  g.schedVersion = cardboxPrefs.get('schedVersion', 0)
-
-  # headers to send to other services
-  g.headers = {"Accept": "application/json", "Authorization": raw_token}
-
-  g.con = lite.connect(getDBFile())
-  g.cur = g.con.cursor()
-
-  return None
-
-@app.after_request
-def close_sqlite(response):
+@app.teardown_request
+def close_sqlite(exception=None):
   '''Close the cursor to the cardbox database'''
   # In a crash, g.con might not have been set up correctly
   if hasattr(g, 'con') and g.con:
-    g.con.commit()
+    if exception is None:
+      g.con.commit()
+    else:
+      g.con.rollback()
     g.con.close()
-  return response
+
+  if hasattr(g, 'start_time'):
+    duration = time.time() - g.start_time
+
+    if duration > 1.0:
+      app.logger.warning(
+            f"⚠️ SLOW REQUEST: {request.method} {request.path} | "
+            f"JSON: {request.get_json(silent=True)} | "
+            f"duration: {duration:.3f}s | "
+            f"user: {g.get('uuid', 'unknown')}"
+      )
 
 @app.route("/", methods=['GET', 'POST'])
 def default():
@@ -561,6 +577,7 @@ def futureSweep():
   # Anything in cardbox N; 1 <= N <= 9; we can see N days ahead of schedule
   g.cur.execute("update questions set difficulty = 4 where cardbox < 10 " +
     "and next_scheduled > ?+(cardbox*3600*24) and difficulty in (0, -1)", (now,))
+  g.con.commit()
 
 def dbClean():
   ''' Make sure the database is in a good state.

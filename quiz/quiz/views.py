@@ -1,4 +1,4 @@
-import os
+import os, time
 from logging.config import dictConfig
 import urllib
 import json
@@ -59,6 +59,7 @@ def get_user():
     g.con = g.mysqlcon.cursor()
     # headers to send when calling other services
     g.headers = {"Accept": "application/json", "Authorization": raw_token}
+    g.start_time = time.time()
 
     return None
 
@@ -84,6 +85,17 @@ def close_mysql(exception=None):
       mysqlcon.close()
     except Exception as e:
       app.logger.error(f"Error closing MySQL connection: {str(e)}")
+
+  if hasattr(g, 'start_time'):
+    duration = time.time() - g.start_time
+
+    if duration > 1.0:
+      app.logger.warning(
+            f"⚠️ SLOW REQUEST: {request.method} {request.path} | "
+            f"JSON: {request.get_json(silent=True)} | "
+            f"duration: {duration:.3f}s | "
+            f"user: {g.get('uuid', 'unknown')}"
+      )
 
 @app.route("/", methods=['GET', 'POST'])
 def default():
