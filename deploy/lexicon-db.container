@@ -29,9 +29,9 @@ Restart=always
 RestartSec=10
 
 # Hard memory limits
-MemoryHigh=220M
-MemoryMax=200M
-MemorySwapMax=20M
+MemoryHigh=768M
+MemoryMax=1G
+MemorySwapMax=512M
 
 LimitNPROC=64000
 LimitNOFILE=64000
