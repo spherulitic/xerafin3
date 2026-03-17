@@ -5,7 +5,7 @@ After=xerafin-network.service
 Requires=xerafin-network.service
 After=lexicon-db.service
 Requires=lexicon-db.service
-PartOf=xerafin.target
+PartOf=lexicon-db.service
 
 [Container]
 ContainerName=lexicon-loader
@@ -31,4 +31,4 @@ Restart=on-failure
 RemainAfterExit=yes
 
 [Install]
-WantedBy=xerafin.target
+WantedBy=lexicon-db.service
