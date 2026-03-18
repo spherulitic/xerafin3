@@ -147,7 +147,19 @@ def getWordInfo() :
   word = params.get('word')
   query = {'word': word}
   result = g.words.find_one(query)
+  if result is None:
+    # Word not found - return a structured response
+    return jsonify({
+      'word': word,
+      'definition': None,
+      'front_hooks': '',
+      'back_hooks': '',
+      'found': False,
+      'message': f"Word '{word}' not found in dictionary"
+    })
+
   del result['_id']
+  result['found'] = True
   return jsonify(result)
 
 @app.route("/getWordsInfo", methods=['POST'])

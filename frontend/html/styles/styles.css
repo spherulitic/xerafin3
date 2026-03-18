@@ -1259,3 +1259,121 @@ body::-webkit-scrollbar-thumb {
 	box-shadow: 0px 0px -2px rgba(140,176,48,0.95);
 	background-size: auto;
 }
+
+/* CSS for Word Info widget */
+
+.wordInfoContainer {
+  padding: 10px;
+  color: #fff; /* Light text for black background */
+}
+
+.wordInfoInputRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.wordInfoLabel {
+  font-weight: bold;
+  min-width: 50px;
+  color: #fff; /* Light text for black background */
+}
+
+.wordInfoInput {
+  flex: 1;
+  padding: 5px 8px;
+  border: 1px solid #666;
+  border-radius: 4px;
+  background-color: #333;
+  color: #fff;
+}
+
+.wordInfoInput:focus {
+  outline: none;
+  border-color: #8ab030;
+}
+
+.wordInfoButton {
+  padding: 5px 15px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: #fff;
+  font-weight: bold;
+
+  /* Match the highlightRow gradient */
+  background-image: -moz-linear-gradient(top, rgba(128,164,48,0.95) 0%, rgba(140,176,48,0.95) 50%, rgba(128,164,48,0.95) 100%) !important;
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(128,164,48,0.95)), color-stop(50%,rgba(140,176,48,0.95)), color-stop(100%,rgba(128,164,48,0.95))) !important;
+  background-image: -webkit-linear-gradient(top, rgba(128,164,48,0.95) 0%, rgba(140,176,48,0.95) 50%, rgba(128,164,48,0.95) 100%) !important;
+  background-image: -o-linear-gradient(top, rgba(128,164,48,0.95) 0%, rgba(140,176,48,0.95) 50%, rgba(128,164,48,0.95) 100%) !important;
+  background-image: -ms-linear-gradient(top, rgba(128,164,48,0.95) 0%, rgba(140,176,48,0.95) 50%, rgba(128,164,48,0.95) 100%) !important;
+  background-image: linear-gradient(to bottom, rgba(128,164,48,0.95) 0%, rgba(140,176,48,0.95) 50%, rgba(128,164,48,0.95) 100%) !important;
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr='rgba(128,164,48,0.95)', endColorstr='rgba(128,164,48,0.95)', GradientType=0) !important;
+}
+
+.wordInfoButton:hover {
+  /* Slightly darker version for hover effect */
+  background-image: -moz-linear-gradient(top, rgba(118,154,38,0.95) 0%, rgba(130,166,38,0.95) 50%, rgba(118,154,38,0.95) 100%) !important;
+  background-image: -webkit-gradient(linear, left top, left bottom, color-stop(0%,rgba(118,154,38,0.95)), color-stop(50%,rgba(130,166,38,0.95)), color-stop(100%,rgba(118,154,38,0.95))) !important;
+  background-image: -webkit-linear-gradient(top, rgba(118,154,38,0.95) 0%, rgba(130,166,38,0.95) 50%, rgba(118,154,38,0.95) 100%) !important;
+  background-image: -o-linear-gradient(top, rgba(118,154,38,0.95) 0%, rgba(130,166,38,0.95) 50%, rgba(118,154,38,0.95) 100%) !important;
+  background-image: -ms-linear-gradient(top, rgba(118,154,38,0.95) 0%, rgba(130,166,38,0.95) 50%, rgba(118,154,38,0.95) 100%) !important;
+  background-image: linear-gradient(to bottom, rgba(118,154,38,0.95) 0%, rgba(130,166,38,0.95) 50%, rgba(118,154,38,0.95) 100%) !important;
+}
+
+.wordInfoWordDisplay {
+  text-align: center;
+  margin: 15px 0 10px 0;
+  padding: 5px;
+}
+
+.wordInfoDisplayWord {
+  display: inline-block;
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #8ab030; /* Matching green */
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding-bottom: 5px;
+}
+
+.wordInfoDefinition {
+  padding: 15px;
+  background-color: #222;
+  border-radius: 4px;
+  min-height: 80px;
+  border: 1px solid #444;
+  color: #fff;
+}
+
+.wordInfoDefinitionText {
+  font-size: 1.1em;
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+.wordInfoHooks {
+  margin-top: 8px;
+  color: #ddd;
+  font-size: 0.9em;
+}
+
+.wordInfoHookLabel {
+  font-weight: bold;
+  color: #8ab030; /* Matching green from the button */
+}
+
+.wordInfoError {
+  color: #ff6b6b; /* Softer red for dark background */
+  font-style: italic;
+}
+
+.wordInfoPlaceholder {
+  color: #aaa;
+  font-style: italic;
+}
+.wordInfoDisplayWord.wordNotFound {
+  color: #ff6b6b; /* Red color for not found */
+  border-bottom-color: #ff6b6b;
+}

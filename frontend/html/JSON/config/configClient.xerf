@@ -79,6 +79,7 @@
             "group": "Widgets",
             "files": [
                 {"title": "alphaStats","level": 1},
+                {"title": "wordInfo","level": 1},
                 {"title": "cardboxStats","level": 1},
         {"title": "chat","level": 1},
         {"title": "gameStats","level": 1},
