@@ -283,10 +283,10 @@ function createChatRow (data, ident, pare){
 function displayChats (response, responseStatus) {
   var newChats = response[0];
   var expiredChats = [ ];
-  var serverTime = new Date (response[2]*1000);
+  var serverTime = new Date (response[2]);
   var timeOutput;
-  try {timeOutput=serverTime.toLocaleTimeString('en-GB', {hour: "numeric", minute: "numeric", timeZone: "America/New_York"});}
-  catch (e){timeOutput = "GMT-6";}
+  try {timeOutput=serverTime.toLocaleTimeString('en-GB', {hour: "numeric", minute: "numeric", timeZone: "UTC"});}
+  catch (e){timeOutput = "UTC";}
   $('#chatServerTime').html("Server Time:"+ timeOutput);
   lastReadRow = response[1];
 
