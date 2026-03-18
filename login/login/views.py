@@ -281,6 +281,7 @@ def getNavbar():
 #    {'title': 'Cardbox & Chill', 'onClick': 'initTogether()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': True},
     {'title': 'Cardbox', 'onClick': 'showCardboxStats()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
     {'title': 'Alphagram Info', 'onClick': 'showAlphaStats(toAlpha($.trim(prompt("Enter a word or alphagram to display"))))', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
+    {'title': 'Definitions', 'onClick': 'createWordInfoPanel()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
     {'title': 'Rankings', 'onClick': 'initLeaderboard()', 'hasChildren': False, 'privLevel': 1, 'lastChild': False, 'new': False},
     {'title': 'Debug', 'onClick': 'initDebug()', 'hasChildren': False, 'privLevel': 42, 'lastChild': False, 'new': True},
     {'title': 'Game Stats', 'onClick': 'showGameStats()', 'hasChildren': False, 'privLevel': 1, 'lastChild': True, 'new': False},

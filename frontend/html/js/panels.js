@@ -84,6 +84,7 @@ function panelFunctionLookup(panel){
     case '5': showAlphaStats(""); break;
     case '6': showGameStats(); break;
   case '7': showProfile(); break;
+  case '8': createWordInfoPanel(); break;
   case '20': initBQ(); break;
     case '100': initTournamentStandings(); break;
     case '500': initOldManageUsers(); break;
