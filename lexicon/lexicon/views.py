@@ -245,6 +245,41 @@ def returnValidAlphas():
 
   return jsonify(result)
 
+@app.route("/wordJudge", methods=['POST'])
+def wordJudge():
+  '''
+  Checks if all words in the provided list exist in the MongoDB database.
+  Returns {"result": True} if all words exist, {"result": False} otherwise.
+  '''
+  params = request.get_json(force=True)
+  words = params.get('words', [])
+
+  # Handle empty list case
+  if not words:
+    return jsonify({"result": False})
+
+  try:
+    # Remove duplicates for efficiency (optional)
+    unique_words = list(set(words))
+
+    # Query to find all existing words
+    query = {'word': {'$in': unique_words}}
+
+    # Get count of matching documents
+    existing_count = g.words.count_documents(query)
+
+    # Check if all unique words exist
+    all_exist = (existing_count == len(unique_words))
+
+    return jsonify({"result": all_exist})
+
+  except PyMongoError as e:
+    app.logger.error(f"MongoDB error in wordJudge for words {words[:10]}...: {str(e)}")
+    return jsonify({"error": "Service temporarily unavailable"}), 503
+  except Exception as e:
+    app.logger.error(f"Unexpected error in wordJudge for words {words[:10]}...: {str(e)}")
+    return jsonify({"error": "Internal server error"}), 500
+
 @app.route('/getRandomAlphas', methods=['GET', 'POST'])
 def getRandomAlphas():
   ''' Take in a list of lengths and a quantity. Return a list of alphagrams '''
