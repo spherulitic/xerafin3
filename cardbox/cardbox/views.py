@@ -177,22 +177,26 @@ def wrong(alpha):
   ''' Takes in an alphagram marked wrong and moves it based on scheduling.
       Returns aux info and new cardbox score '''
   result = { }
-  if g.schedVersion in (1, 2, 3):
-    g.cur.execute(f"select cardbox from questions where question='{alpha}'")
-    currentCardbox = g.cur.fetchone()[0]
-  else:
-    currentCardbox = -1
-  stmt = ("update questions set cardbox = ?, next_scheduled = ?, " +
-        "incorrect = incorrect+1, streak=0, difficulty=4 where question = ?")
-  if currentCardbox < 8:
-    g.cur.execute(stmt, (0, getNext(0), alpha))
-  else:
-    g.cur.execute(stmt, (2, getNext(2), alpha))
+  try:
+    if g.schedVersion in (1, 2, 3):
+      g.cur.execute(f"select cardbox from questions where question='{alpha}'")
+      currentCardbox = g.cur.fetchone()[0] or -1
+    else:
+      currentCardbox = -1
+    stmt = ("update questions set cardbox = ?, next_scheduled = ?, " +
+          "incorrect = incorrect+1, streak=0, difficulty=4 where question = ?")
+    if currentCardbox < 8:
+      g.cur.execute(stmt, (0, getNext(0), alpha))
+    else:
+      g.cur.execute(stmt, (2, getNext(2), alpha))
+
+  except Exception as e:
+    app.logger.error(f'Failed marking question wrong for {alpha}: {str(e)}')
+    raise
 
   result["auxInfo"] = getAuxInfo(alpha)
   result["score"] = getCardboxScore()
   return result
-
 
 @app.route("/getQuestions", methods=['GET', 'POST'])
 def getQuestions():
