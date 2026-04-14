@@ -114,6 +114,29 @@ function displayAlphaStats (response, responseStatus) {
         textbox.className = "quizAnswerBox";
         textbox.id = "currentAlpha";
         textbox.value = alpha;
+        textbox.onkeydown = function(event) {
+            if (event.key === "Enter" || event.key === "Tab") {
+                var inputValue = document.getElementById("currentAlpha").value;
+                if(inputValue) {
+                    // Store the current input element reference
+                    var currentInput = this;
+                    showAlphaStats(toAlpha(inputValue.toUpperCase())).then(function() {
+                        // After the stats are displayed, refocus on the input
+                        setTimeout(function() {
+                            var newInput = document.getElementById("currentAlpha");
+                            if (newInput) {
+                                newInput.focus();
+                                // Place cursor at end of text instead of selecting all
+                                newInput.setSelectionRange(newInput.value.length, newInput.value.length);
+                            }
+                        }, 50);
+                    });
+                }
+                // Prevent default form submission behavior
+                event.preventDefault();
+                return false;
+            }
+        };
         col2.onchange = function() {
                     var inputValue = document.getElementById("currentAlpha").value;
                     if(inputValue) {
