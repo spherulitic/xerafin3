@@ -1,0 +1,256 @@
+openapi: 3.0.3
+info:
+  title: Xerafin Chat Service
+  description: Endpoints relating to the chat widget, including database access and long-poll spool files.
+  version: 1.0.0
+servers:
+  - url: http://chat:5000
+    description: Internal service endpoint
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    ChatMessage:
+      type: object
+      properties:
+        chatDate:
+          type: integer
+          description: Unix timestamp in milliseconds
+          example: 1712345678000
+        photo:
+          type: string
+          nullable: true
+          description: URL to user photo
+          example: images/avatar.gif
+        name:
+          type: string
+          nullable: true
+          description: Display name of the user
+          example: Jane Smith
+        chatText:
+          type: string
+          description: The chat message body
+          example: Hello everyone!
+        chatUser:
+          type: string
+          description: UUID of the user who sent the message
+          example: 550e8400-e29b-41d4-a716-446655440000
+        expire:
+          type: boolean
+          description: Whether this message is an expiry/deletion signal
+          example: false
+    StatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Authorization header missing
+    GetChatsInitRequest:
+      type: object
+      properties:
+        mostRecent:
+          type: integer
+          description: Unix timestamp in milliseconds. Only chats after this time are returned. Defaults to now.
+          example: 1712345678000
+    GetChatsRequest:
+      type: object
+      required:
+        - rownum
+      properties:
+        rownum:
+          type: integer
+          description: The last spool file row number the client has read up to
+          example: 4
+    GetChatsInitResponse:
+      type: array
+      items: {}
+      description: Array of [messages[], rownum, serverTimestamp, statusObject]
+      example:
+        - - chatDate: 1712345678000
+            photo: images/avatar.gif
+            name: Jane Smith
+            chatText: Hello!
+            chatUser: 550e8400-e29b-41d4-a716-446655440000
+            expire: false
+        - 0
+        - 1712345999000
+        - status: success
+    SubmitChatRequest:
+      type: object
+      properties:
+        userid:
+          type: string
+          description: Override userid. Defaults to the authenticated user's UUID.
+          example: 550e8400-e29b-41d4-a716-446655440000
+        chatText:
+          type: string
+          description: The message body
+          example: Hello everyone!
+        chatTime:
+          type: integer
+          description: Unix timestamp in milliseconds
+          example: 1712345678000
+        expire:
+          type: boolean
+          description: If true, signals deletion of milestone chats
+          example: false
+        milestoneType:
+          type: string
+          nullable: true
+          description: Type of milestone this chat is associated with
+          example: user questions
+        milestoneOf:
+          type: string
+          nullable: true
+          description: Identifier of the milestone target
+          example: 550e8400-e29b-41d4-a716-446655440000
+security:
+  - bearerAuth: []
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: Public endpoint. No authentication required.
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+  /getChatsInit:
+    post:
+      summary: Initialise chat session and retrieve recent messages
+      description: |
+        Creates or resets the user's chat spool file, then returns all chat
+        messages newer than the provided mostRecent timestamp. Also fetches
+        user names and photos from the login service.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetChatsInitRequest'
+      responses:
+        '200':
+          description: Chat initialisation successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetChatsInitResponse'
+        '400':
+          description: Invalid JSON
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorised
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /getChats:
+    post:
+      summary: Long-poll for new chat messages
+      description: |
+        Blocks for up to 45 seconds waiting for new lines in the user's chat
+        spool file. Returns immediately when new messages are available.
+        The client should pass the last rownum it received to resume reading.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GetChatsRequest'
+      responses:
+        '200':
+          description: New messages or timeout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetChatsInitResponse'
+        '400':
+          description: Invalid JSON
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorised
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /submitChat:
+    post:
+      summary: Submit a new chat message
+      description: |
+        Writes a chat message to the database and appends it to all active
+        users' spool files. If expire is true, milestone-related chats are
+        deleted from the database and expiry signals are spooled.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitChatRequest'
+      responses:
+        '200':
+          description: Chat submitted successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/StatusResponse'
+                  - type: object
+                    properties:
+                      msg:
+                        type: array
+                        items:
+                          type: string
+                        description: Spool lines written to chat files
+        '400':
+          description: Invalid JSON
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Unauthorised
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
