@@ -32,9 +32,9 @@ type ChatMessage struct {
 
 // UserInfo is the response shape from the login service
 type UserInfo struct {
-	UserID string  `json:"userid"`
-	Photo  *string `json:"photo"`
-	Name   *string `json:"name"`
+	UserID string      `json:"userid"`
+	Photo  interface{} `json:"photo"` // Can be string or []string (array from Keycloak)
+	Name   *string     `json:"name"`
 }
 
 // NewMux constructs the HTTP mux with all routes registered
@@ -120,11 +120,35 @@ func (h *Handler) getChatsInit(w http.ResponseWriter, r *http.Request) {
 			Expire:   false,
 		}
 		if info != nil {
-			msg.Photo = info.Photo
+			// Handle photo which can be string or []string from Keycloak
+			if info.Photo != nil {
+				var photoStr string
+				switch v := info.Photo.(type) {
+				case string:
+					photoStr = v
+				case []interface{}:
+					if len(v) > 0 {
+						if s, ok := v[0].(string); ok {
+							photoStr = s
+						}
+					}
+				case []string:
+					if len(v) > 0 {
+						photoStr = v[0]
+					}
+				}
+				if photoStr != "" {
+					msg.Photo = &photoStr
+				}
+			}
 			msg.Name = info.Name
 		}
 		result = append(result, msg)
 	}
+
+	// TODO: When issue #417 is implemented, login service will return map[userid]{name,photo}
+	// instead of array[{userid,name,photo}]. Update fetchUserInfo to handle new format.
+	// Current format requires O(n) lookup; new format will be O(1) direct access.
 
 	// Response envelope matches the original Python format:
 	// [messages, rownum, serverTimestampMs, statusObject]
@@ -309,7 +333,27 @@ func parseSpoolLine(line string, headers map[string]string) (ChatMessage, error)
 
 	if err == nil {
 		if info, ok := infoMap[userID]; ok {
-			msg.Photo = info.Photo
+			// Handle photo which can be string or []string from Keycloak
+			if info.Photo != nil {
+				var photoStr string
+				switch v := info.Photo.(type) {
+				case string:
+					photoStr = v
+				case []interface{}:
+					if len(v) > 0 {
+						if s, ok := v[0].(string); ok {
+							photoStr = s
+						}
+					}
+				case []string:
+					if len(v) > 0 {
+						photoStr = v[0]
+					}
+				}
+				if photoStr != "" {
+					msg.Photo = &photoStr
+				}
+			}
 			msg.Name = info.Name
 		}
 	}
