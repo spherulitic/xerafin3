@@ -554,7 +554,7 @@ def newQuiz():
 
 def submitMilestoneChat(milestone):
   url = 'http://chat:5000/submitChat'
-  data = {'userid': 0,
+  data = {'userid': "0",
           'milestoneType': 'user questions',
           'milestoneOf': g.uuid,
           'chatText': f'{g.name} has completed {milestone} questions today.',
