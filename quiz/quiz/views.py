@@ -372,49 +372,74 @@ def getQuizList():
 
   quizidList = quizidList[:50] # hard limit of 50 results
 
+  # Batch fetch all data to avoid N+1 queries
+  quiz_metadata = {}
+  user_progress = {}
+  bookmarked_set = set()
+
+  # Filter out cardbox (-1) from batch queries
+  regular_quizids = [qid for qid in quizidList if qid != -1]
+
+  if regular_quizids:
+    # Batch fetch quiz metadata
+    placeholders = ','.join(['%s'] * len(regular_quizids))
+    command = f"select quiz_id, quiz_name, quiz_size from quiz_master where quiz_id in ({placeholders})"
+    g.con.execute(command, regular_quizids)
+    quiz_metadata = {row[0]: {'quiz_name': row[1], 'quiz_size': row[2]} for row in g.con.fetchall()}
+
+    # Batch fetch user progress
+    command = f'''select quiz_id, count(*), sum(completed), sum(sign(correct)), max(last_answered)
+                  from quiz_user_detail
+                  where user_id = %s and quiz_id in ({placeholders})
+                  group by quiz_id'''
+    g.con.execute(command, [g.uuid] + regular_quizids)
+    user_progress = {row[0]: row[1:] for row in g.con.fetchall()}  # Store as tuple (count, sum_completed, sum_correct, max_last_answered)
+
+    # Batch fetch bookmarks
+    command = f"select quiz_id from user_quiz_bookmark where user_id = %s and quiz_id in ({placeholders})"
+    g.con.execute(command, [g.uuid] + regular_quizids)
+    bookmarked_set = {row[0] for row in g.con.fetchall()}
+
   for index, qid in enumerate(quizidList):
 
     if qid == -1:
       result[-1] = {"quizid": qid, "quizname": "Cardbox", "quizsize": -1, "untried": -1, "unsolved": -1, "status": "Active"}
     else:
-      command = "select quiz_name, quiz_size from quiz_master where quiz_id = %s"
-      g.con.execute(command, [qid])
-      row = g.con.fetchone()
       template = {}
       template["quizid"] = qid
-      template["quizname"] = row[0]
-      template["quizsize"] = int(row[1])
 
-      command = "select count(*), sum(completed), sum(sign(correct)), max(last_answered) from quiz_user_detail where user_id = %s and quiz_id = %s"
-      g.con.execute(command, [g.uuid, qid])
-      row = g.con.fetchone()
+      # Get metadata from batch
+      meta = quiz_metadata.get(qid, {})
+      template["quizname"] = meta.get('quiz_name', 'Unknown')
+      template["quizsize"] = int(meta.get('quiz_size', 0))
 
-      if int(row[0]) == 0:
+      # Get user progress from batch
+      progress = user_progress.get(qid)
+
+      if not progress or int(progress[0]) == 0:
         template["status"] = "Inactive"
         template["untried"] = template["quizsize"]
         template["unsolved"] = template["quizsize"]
         template["correct"] = 0
         template["incorrect"] = 0
-
       else:
-        template["untried"] = template["quizsize"] - int(row[1])
+        count, sum_completed, sum_correct, max_last_answered = progress
+        template["untried"] = template["quizsize"] - int(sum_completed)
         if template["untried"] == 0:
           template["status"] = "Completed"
-          if row[3]:
-            lastCorrect = row[3] # it comes out of mysql as a datetime!
+          if max_last_answered:
+            lastCorrect = max_last_answered
             # if it's completed more than four days ago, drop it off the list entirely
             if (datetime.today() - lastCorrect).days > QUIZ_INACTIVE_TIMER:
               continue
         else:
           template["status"] = "Active"
 
-        template["unsolved"] = template["quizsize"] - int(row[2])
-        template["correct"] = int(row[2])
-        template["incorrect"] = int(row[1]) - int(row[2])
+        template["unsolved"] = template["quizsize"] - int(sum_correct)
+        template["correct"] = int(sum_correct)
+        template["incorrect"] = int(sum_completed) - int(sum_correct)
 
-      stmt = "select count(*) from user_quiz_bookmark where user_id = %s and quiz_id = %s"
-      g.con.execute(stmt, [g.uuid, qid])
-      template["bookmarked"] = (g.con.fetchone()[0] == 1)
+      template["bookmarked"] = qid in bookmarked_set
       template["sub"] = (searchType == "myQuizzes" and qid != -1 and not template["bookmarked"] )
 
       result[index] = template
@@ -554,7 +579,7 @@ def newQuiz():
 
 def submitMilestoneChat(milestone):
   url = 'http://chat:5000/submitChat'
-  data = {'userid': 0,
+  data = {'userid': "0",
           'milestoneType': 'user questions',
           'milestoneOf': g.uuid,
           'chatText': f'{g.name} has completed {milestone} questions today.',

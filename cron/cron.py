@@ -215,7 +215,7 @@ def post_chat_message(session, headers: Dict, period: Period, stats_data: Dict) 
     chat_text = f"Fantastic year Xerfers! In {year}, {stats_data['users']} users solved {stats_data['questions']} alphagrams!"
 
   chat_url = 'http://chat:5000/submitChat'
-  chat_message = {"chatText": chat_text}
+  chat_message = {"userid": "0", "chatText": chat_text}
 
   try:
     make_request(

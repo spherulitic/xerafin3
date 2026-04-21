@@ -1407,9 +1407,9 @@ class Metaranks():
       rowDict["rank"] = rank
       self.rankData.append(rowDict)
     if not foundMe and self.userRank != -1:
-      self.query = f"""{queryStart} WHERE userid={g.uuid}
+      self.query = f"""{queryStart} WHERE userid='{g.uuid}'
                  {self.checkAnd()}{self.setDay()}{self.setMonth()}
-              GROUP BY userid, name{self.getTimeConditionsQuery()}
+              GROUP BY userid{self.getTimeConditionsQuery()}
               ORDER BY total DESC, date ASC
               LIMIT 1"""
       result = self.runQuery()
@@ -1429,9 +1429,9 @@ class Metaranks():
           else:
             self.rankData.append(rowDict)
     if not foundCurrent and self.currentRank != -1 and self.userRank != -1:
-      self.query = f"""{queryStart} WHERE userid={g.uuid}{self.checkAnd()}
+      self.query = f"""{queryStart} WHERE userid='{g.uuid}'{self.checkAnd()}
                        {self.setDay()}{self.setMonth()} AND {self.getDateFormatForQuery()}
-                GROUP BY userid, name{self.getTimeConditionsQuery()}
+                GROUP BY userid{self.getTimeConditionsQuery()}
                 ORDER BY total DESC, date ASC
                 LIMIT 1 """
       result = self.runQuery()
