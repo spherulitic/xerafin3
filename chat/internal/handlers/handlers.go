@@ -198,7 +198,12 @@ func (h *Handler) getChats(w http.ResponseWriter, r *http.Request) {
 		msg, err := parseSpoolLine(line, headers)
 		if err != nil {
 			slog.Error("failed to parse spool line", "line", line, "err", err)
-                        writeJSON(w, http.StatusInternalServerError, map[string]string{"error":err.Error()})
+                        // Check if error is due to token expiration
+                        if strings.Contains(err.Error(), "unauthorized") || strings.Contains(err.Error(), "401") {
+                            writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "token may have expired"})
+                        } else {
+                            writeJSON(w, http.StatusInternalServerError, map[string]string{"error":err.Error()})
+                        }
                         return
 		}
 		result = append(result, msg)
@@ -396,6 +401,10 @@ func fetchUserInfo(url string, userIDs []string, headers map[string]string) (map
     slog.Debug("fetchUserInfo response", "status", resp.StatusCode, "url", url)
 
     if resp.StatusCode != http.StatusOK {
+        if resp.StatusCode == http.StatusUnauthorized {
+            slog.Warn("fetchUserInfo: login service returned 401 (token likely expired)", "url", url)
+            return nil, fmt.Errorf("unauthorized: token may have expired")
+        }
         slog.Error("fetchUserInfo: non-200 response", "status", resp.StatusCode, "url", url)
         return nil, fmt.Errorf("login service returned %d", resp.StatusCode)
     }
