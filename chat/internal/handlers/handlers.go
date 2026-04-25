@@ -105,7 +105,7 @@ func (h *Handler) getChatsInit(w http.ResponseWriter, r *http.Request) {
 
 	userInfoMap, err := fetchUserInfo("http://login:5000/getUserNamesAndPhotos", userIDs, headers)
 	if err != nil {
-		slog.Warn("failed to fetch user info", "err", err)
+		slog.Info("failed to fetch user info", "err", err)
 		// Non-fatal — we continue with nil photo/name
 	}
 
@@ -324,7 +324,7 @@ func parseSpoolLine(line string, headers map[string]string) (ChatMessage, error)
     // Fetch user info for this single user
     infoMap, err := fetchUserInfo("http://login:5000/getUserNamesAndPhotos", []string{userID}, headers)
     if err != nil {
-        slog.Error("parseSpoolLine: failed to fetch user info", "userID", userID, "err", err)
+        slog.Info("parseSpoolLine: failed to fetch user info (token may be expired)", "userID", userID, "err", err)
         // Return the error so getChats knows something went wrong
         return ChatMessage{}, fmt.Errorf("failed to fetch user info for %s: %w", userID, err)
     }
@@ -402,7 +402,7 @@ func fetchUserInfo(url string, userIDs []string, headers map[string]string) (map
 
     if resp.StatusCode != http.StatusOK {
         if resp.StatusCode == http.StatusUnauthorized {
-            slog.Warn("fetchUserInfo: login service returned 401 (token likely expired)", "url", url)
+            slog.Info("fetchUserInfo: login service returned 401 (token likely expired)", "url", url)
             return nil, fmt.Errorf("unauthorized: token may have expired")
         }
         slog.Error("fetchUserInfo: non-200 response", "status", resp.StatusCode, "url", url)
