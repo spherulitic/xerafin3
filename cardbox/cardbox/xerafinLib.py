@@ -25,6 +25,7 @@ from xerafinUtil import xerafinUtil as xs
 # 2 : In the backlog
 # 3 : Locked
 # 4 : In the future, not eligible to be completed now
+# 5 : Rescheduled (always eligible, never overwritten by closetSweep/futureSweep)
 
 CARDBOX_DB_PATH = "cardbox-data"
 
