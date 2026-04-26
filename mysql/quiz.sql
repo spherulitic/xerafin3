@@ -91,7 +91,7 @@ CREATE TABLE `quiz_user_detail` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 CREATE INDEX idx_user_quiz_completed
-ON quiz_user_detail(user_id, quiz_id, completed);
+ON quiz_user_detail(user_id, quiz_id, completed, last_answered);
 
 --
 -- Dumping data for table `quiz_user_detail`
