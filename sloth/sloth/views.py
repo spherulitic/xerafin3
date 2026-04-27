@@ -281,7 +281,7 @@ def complete_game():
           'http://chat:5000/submitChat',
           headers=g.headers,
           json={
-              'userid': '0',  # System user or bot ID
+              'userid': '1',  # Subword Sloth system user
               'chatText': message
           },
           timeout=5
