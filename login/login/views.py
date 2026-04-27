@@ -206,9 +206,16 @@ def getUserNamesAndPhotos():
     for uuid in uuidList:
       userDict = {'userid': uuid}
 
-      if uuid in ['0', '1']:  # System user -- not in keycloak
+      if uuid == '0':  # System user -- not in keycloak
         userDict["name"] = 'Xerafin'
         userDict['photo'] = 'images/xerafin2.png'
+        userDict['countryId'] = 0
+        result.append(userDict)
+        continue
+
+      if uuid == '1': # Subword Sloth System User
+        userDict["name"] = 'Subword Sloth'
+        userDict['photo'] = 'images/sloth.png'
         userDict['countryId'] = 0
         result.append(userDict)
         continue
