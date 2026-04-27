@@ -645,11 +645,10 @@ def futureSweep():
   max_cb = g.cur.fetchone()[0]
   for cb in range(0, max_cb + 1):
     lookahead = getLookaheadDays(cb, g.schedVersion)
-    if lookahead > 0:
-      g.cur.execute(
-        "update questions set difficulty = 4 where cardbox = ? "
-        "and next_scheduled > ?+(3600*24*?) and difficulty in (0, -1)",
-        (cb, now, lookahead))
+    g.cur.execute(
+      "update questions set difficulty = 4 where cardbox = ? "
+      "and next_scheduled > ?+(3600*24*?) and difficulty in (0, -1)",
+      (cb, now, lookahead))
   g.con.commit()
   duration = time.time() - t_start
   if duration > 1.0:
