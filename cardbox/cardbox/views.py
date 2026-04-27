@@ -52,6 +52,34 @@ def get_public_key():
 {public_key}
 -----END PUBLIC KEY-----'''
 
+# Schedule data: cardbox x is rescheduled for a time [min_days, max_days]
+# between min_days and min_days+max_days days in the future
+# Version 2 uses the same schedule as version 0 (difference is in wrong() behavior)
+SCHEDULES = {
+    0: [ [.5,.8], [3,2], [5,4], [11,6], [16,10], [27,14], [50,20], [80,30],
+         [130,40], [300,60], [430,100], [430,100], [430,100] ],
+    1: [ [.2,.3], [1,1], [3,3], [7,7], [14,14], [30,30], [60,45],
+         [120,90], [240,120], [430,100], [430,100], [430,100], [430,100] ],
+    3: [ [0.5,1], [1,2], [2,6], [6,8], [12,10], [19,12], [27,18],
+         [40,28], [62,32], [86,48], [120,70], [170,80], [215,150] ],
+}
+
+def getSchedule(version):
+  '''Return the schedule list for the given version.
+     Version 2 uses the same schedule as version 0.'''
+  if version == 2:
+    return SCHEDULES[0]
+  return SCHEDULES.get(version, SCHEDULES[0])
+
+def getLookaheadDays(cardbox, version):
+  '''How many days ahead of schedule a word in this cardbox can be quizzed.
+     Returns max(cardbox, 20% of the minimum interval) days.
+     Cardboxes above 12 use the same schedule as cardbox 12.'''
+  sched = getSchedule(version)
+  cb = min(cardbox, len(sched) - 1)
+  min_days = sched[cb][0]
+  return max(cardbox, int(min_days * 0.2))
+
 @app.before_request
 def get_user():
   # Skip verification for public routes
@@ -153,14 +181,20 @@ def getAuxInfoBatch():
   return jsonify(result)
 
 @app.route('/correct', methods=['POST'])
-def correct():
+def correctView():
+  ''' Takes in an alphagram and schedules in the given cardbox.
+      If no cardbox is given it will schedule in current cardbox + 1
+      Returns aux info and new cardbox score '''
+  params = request.get_json(force=True) # returns dict
+  alpha = params.get("alpha")
+  cardbox = params.get("cardbox")
+  return jsonify(correct(alpha, cardbox))
+
+def correct(alpha, cardbox=None):
   ''' Takes in an alphagram and schedules in the given cardbox.
       If no cardbox is given it will schedule in current cardbox + 1
       Returns aux info and new cardbox score '''
   result = {"status": "success"}
-  params = request.get_json(force=True) # returns dict
-  alpha = params.get("alpha")
-  cardbox = params.get("cardbox")
   if alpha is None:
     result["status"] = "Missing alphagram"
   else:
@@ -175,7 +209,7 @@ def correct():
       "where question = ?", (cardbox, getNext(cardbox), now, alpha))
   result["auxInfo"] = getAuxInfo(alpha)
   result["score"] = getCardboxScore()
-  return jsonify(result)
+  return result
 
 @app.route('/wrong', methods=['POST'])
 def wrongView():
@@ -432,6 +466,29 @@ def shameList():
 #  return jsonify(getCardboxStats())
   return jsonify({"status": "success"})
 
+@app.route('/triumphList', methods=['POST'])
+def triumphList():
+  ''' The List of Triumph: Takes in a list of alphagrams.
+        Any alphagrams in cardbox with difficulty != 4 are marked correct.
+        Any alphagrams not in cardbox are ignored. '''
+  params = request.get_json(force=True) # returns dict
+  questions = params.get('questions', [ ])
+  url = 'http://lexicon:5000/returnValidAlphas'
+  resp = requests.post(url, headers=g.headers, json={'alphas': questions})
+  validAlphas = resp.json()
+
+  for alpha in validAlphas:
+    if not isInCardbox(alpha):
+      continue
+    # Check if eligible (difficulty != 4)
+    g.cur.execute("select difficulty from questions where question=?", (alpha,))
+    row = g.cur.fetchone()
+    if row is None or row[0] == 4:
+      continue
+    correct(alpha)
+
+  return jsonify({"status": "success"})
+
 @app.route('/addQuestionToCardbox', methods=['POST'])
 def addQuestionToCardbox():
   ''' Add one alphagram to cardbox zero, if it's valid '''
@@ -581,15 +638,24 @@ def futureSweep():
   Only moves difficulty 0 and -1 -> 4
   Note difficulty 2 and 4 are exclusive
   """
+  t_start = time.time()
   now = int(time.time())
   g.cur.execute("update questions set difficulty = 0 where difficulty in (4, 50)")
-  # Anything in cardbox 10 or higher we can see 30 days ahead of schedule
-  g.cur.execute("update questions set difficulty = 4 where cardbox >= 10 " +
-    "and next_scheduled > ?+(3600*24*30) and difficulty in (0, -1)", (now,))
-  # Anything in cardbox N; 1 <= N <= 9; we can see N days ahead of schedule
-  g.cur.execute("update questions set difficulty = 4 where cardbox < 10 " +
-    "and next_scheduled > ?+(cardbox*3600*24) and difficulty in (0, -1)", (now,))
+  g.cur.execute("select coalesce(max(cardbox), 0) from questions")
+  max_cb = g.cur.fetchone()[0]
+  for cb in range(0, max_cb + 1):
+    lookahead = getLookaheadDays(cb, g.schedVersion)
+    if lookahead > 0:
+      g.cur.execute(
+        "update questions set difficulty = 4 where cardbox = ? "
+        "and next_scheduled > ?+(3600*24*?) and difficulty in (0, -1)",
+        (cb, now, lookahead))
   g.con.commit()
+  duration = time.time() - t_start
+  if duration > 1.0:
+    app.logger.warning(
+      f"⚠️ SLOW futureSweep: {duration:.3f}s | max cardbox={max_cb} | "
+      f"user: {g.get('uuid', 'unknown')}")
 
 def dbClean():
   ''' Make sure the database is in a good state.
@@ -890,19 +956,7 @@ def getNext (newCardbox = 0) :
   random.seed()
   offset=random.randrange(day)
 
-# List of lists
-# cardbox x is rescheduled for a time [x,y]
-# between x and x+y days in the future
-  if g.schedVersion == 1:
-    sched = [ [.2, .3], [1, 1], [3, 3], [7, 7], [14, 14], [30,30], [60,45],
-              [120, 90], [240, 120], [430, 100], [430,100], [430,100], [430,100] ]
-
-  elif g.schedVersion == 3:
-    sched = [ [0.5,1] , [1,2] , [2,6] , [6,8] , [12,10] , [19,12] , [27,18] ,
-              [40,28] , [62,32] , [86,48] , [120,70] , [170,80] , [215,150] ]
-  else:
-    sched = [ [.5,.8], [3,2], [5,4], [11,6], [16,10], [27,14], [50,20], [80,30],
-              [130,40], [300,60], [430,100], [430,100],[430,100] ]
+  sched = getSchedule(g.schedVersion)
 
   return int( now + (sched[newCardbox][0]*day) + (sched[newCardbox][1]*offset))
 
