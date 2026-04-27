@@ -99,7 +99,8 @@
         {"title": "app.sloth","level": 1},
         {"title": "basicQuiz","level": 1},
         {"title": "invaders","level": 1},
-        {"title": "wordwall","level": 1}
+        {"title": "wordwall","level": 1},
+        {"title": "wordsiege","level": 1}
       ]
     }
     ],
@@ -139,6 +140,15 @@
                     "icon": "images\/invaders.png",
                     "title": "Wall of Words",
                     "onClick": "initWordwall()",
+                    "hasChildren": false,
+                    "privLevel": "1",
+                    "lastChild": true,
+                    "new": true
+                },
+        {
+                    "icon": "images\/invaders.png",
+                    "title": "Word Siege",
+                    "onClick": "initWordSiege()",
                     "hasChildren": false,
                     "privLevel": "1",
                     "lastChild": true,
