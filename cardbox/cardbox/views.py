@@ -1,4 +1,14 @@
-'''Xerafin cardbox module'''
+'''Xerafin cardbox module
+
+# DIFFICULTY column in QUESTIONS table being used for status
+# -1 : Immediately available to be sent by getQuestions()
+# 0 : Unlocked
+# 1 : Locked by Karatasi
+# 2 : In the backlog
+# 3 : Locked
+# 4 : In the future, not eligible to be completed now
+# 5 : Rescheduled (always eligible, never overwritten by closetSweep/futureSweep)
+'''
 
 import json
 from logging.config import dictConfig
@@ -156,13 +166,13 @@ def correct():
   else:
     now = int(time.time())
     if cardbox is None:
-      g.cur.execute(f"select cardbox from questions where question='{alpha}'")
+      g.cur.execute("select cardbox from questions where question=?", (alpha,))
       currentCardbox = g.cur.fetchone()[0]
       cardbox = currentCardbox + 1
-    g.cur.execute(f"update questions set cardbox = {cardbox}, " +
-      f"next_scheduled = {getNext(cardbox)}, " +
-      f"correct=correct+1, streak=streak+1, last_correct = {now}, difficulty=4 " +
-      f"where question = '{alpha}'")
+    g.cur.execute("update questions set cardbox = ?, " +
+      "next_scheduled = ?, " +
+      "correct=correct+1, streak=streak+1, last_correct = ?, difficulty=4 " +
+      "where question = ?", (cardbox, getNext(cardbox), now, alpha))
   result["auxInfo"] = getAuxInfo(alpha)
   result["score"] = getCardboxScore()
   return jsonify(result)
@@ -179,7 +189,7 @@ def wrong(alpha):
   result = { }
   try:
     if g.schedVersion in (1, 2, 3):
-      g.cur.execute(f"select cardbox from questions where question='{alpha}'")
+      g.cur.execute("select cardbox from questions where question=?", (alpha,))
       currentCardbox = g.cur.fetchone()[0] or -1
     else:
       currentCardbox = -1
@@ -287,8 +297,7 @@ def newQuiz():
   futureSweep()
   g.cur.execute("select * from cleared_until")
   clearedUntil = g.cur.fetchone()[0]
-  command = f"update questions set difficulty = -1 where difficulty = 0 and next_scheduled < {max(now, clearedUntil)}"
-  g.cur.execute(command)
+  g.cur.execute("update questions set difficulty = -1 where difficulty = 0 and next_scheduled < ?", (max(now, clearedUntil),))
   return jsonify(result)
 
 
@@ -500,14 +509,14 @@ def getCurrentDue (summarize=False):
   g.cur.execute("select * from cleared_until")
   clearedUntil = max(g.cur.fetchone()[0], now)
   if summarize:
-    g.cur.execute(f"""SELECT COUNT(*) FROM questions
-                      WHERE next_scheduled < {clearedUntil}
-                      AND cardbox is not null AND difficulty != 4""")
+    g.cur.execute("""SELECT COUNT(*) FROM questions
+                      WHERE next_scheduled < ?
+                      AND cardbox is not null AND difficulty != 4""", (clearedUntil,))
     result["total"] = g.cur.fetchone()[0]
   else:
-    g.cur.execute(f"""select cardbox, count(*) from questions
-                      where next_scheduled < {clearedUntil} and cardbox is not null
-                      and difficulty != 4 group by cardbox""")
+    g.cur.execute("""select cardbox, count(*) from questions
+                      where next_scheduled < ? and cardbox is not null
+                      and difficulty != 4 group by cardbox""", (clearedUntil,))
     for row in g.cur.fetchall():
       result[row[0]] = row[1]
   return result
@@ -518,10 +527,9 @@ def getDueInRange(start, end):
   start and end are integers - unix epoch time
   '''
   result = { }
-  statement = f"""select cardbox, count(*) from questions
-                 where next_scheduled between {start} and {end} and cardbox is not null
-                 group by cardbox"""
-  g.cur.execute(statement)
+  g.cur.execute("""select cardbox, count(*) from questions
+                 where next_scheduled between ? and ? and cardbox is not null
+                 group by cardbox""", (start, end))
   for row in g.cur.fetchall():
     result[row[0]] = row[1]
   return result
@@ -601,9 +609,9 @@ def closetSweep():
 
   now = int(time.time())
   g.cur.execute("update questions set difficulty = 0 where " +
-    f"cardbox < {g.closet} and difficulty != 1")
+    "cardbox < ? and difficulty not in (1, 5)", (g.closet,))
   g.cur.execute("update questions set difficulty = 2 " +
-    f"where cardbox >= {g.closet} and difficulty != 1 and next_scheduled < {now}")
+    "where cardbox >= ? and difficulty not in (1, 5) and next_scheduled < ?", (g.closet, now))
 
 
 #def getLexicon(userid):
@@ -628,11 +636,11 @@ def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None) : # pylint
   # Cardbox doesn't filter, it only prioritizes one cardbox over others
   # If you specifically ask for a cardbox in the backlog, ignore backlogging
   if cardbox >= g.closet:
-    diffToGet = (-1,2)
-    dFormat = "?,?"
+    diffToGet = (-1, 2, 5)
+    dFormat = "?,?,?"
   else:
-    diffToGet = (-1,)
-    dFormat = "?"
+    diffToGet = (-1, 5)
+    dFormat = "?,?"
 
   getCardsQry = ("select question from questions " +
     f"where difficulty in ({dFormat}) and next_scheduled is not null " +
@@ -721,8 +729,8 @@ def makeWordsAvailable(words_needed) :
         addWords(1)
         cb0_available = cb0_available - 1
         new_words_at = new_words_at + seconds_per_new_word
-  g.cur.execute(f'UPDATE cleared_until SET timeStamp = {cleared_until}')
-  g.cur.execute(f'UPDATE new_words_at SET timeStamp = {new_words_at}')
+  g.cur.execute("UPDATE cleared_until SET timeStamp = ?", (cleared_until,))
+  g.cur.execute("UPDATE new_words_at SET timeStamp = ?", (new_words_at,))
 
 def _add_word (alpha) :
 
@@ -796,9 +804,9 @@ def getAuxInfo (alpha):
                 }
   '''
   auxInfo = {"alpha": alpha}
-  g.cur.execute('select cardbox, next_scheduled, correct, incorrect, difficulty ' +
-              f'from questions where question = "{alpha}" ' +
-              'and next_scheduled is not null')
+  g.cur.execute('select cardbox, next_scheduled, correct, incorrect, difficulty '
+              'from questions where question = ? '
+              'and next_scheduled is not null', (alpha,))
   result = g.cur.fetchone()
   if result:
     auxInfo["aux"] = {"cardbox": result[0], "nextScheduled": result[1],
@@ -818,7 +826,7 @@ def checkOut (alpha, lock) :
   else:
     difficulty = 0
 
-  g.cur.execute(f"update questions set difficulty = {difficulty} where question = '{alpha}'")
+  g.cur.execute("update questions set difficulty = ? where question = ?", (difficulty, alpha))
 
 def _get_bingo_from_cardbox(cardbox=0):
     """
@@ -834,7 +842,7 @@ def _get_bingo_from_cardbox(cardbox=0):
             SELECT question FROM questions
             WHERE cardbox IS NOT NULL
             AND length(question) >= 7
-            AND difficulty IN (-1, 0, 2)
+            AND difficulty IN (-1, 0, 2, 5)
             ORDER BY CASE cardbox WHEN ? THEN -2
                      ELSE difficulty END,
                      cardbox, next_scheduled
@@ -899,7 +907,7 @@ def getNext (newCardbox = 0) :
   return int( now + (sched[newCardbox][0]*day) + (sched[newCardbox][1]*offset))
 
 def isInCardbox(alpha):
-  g.cur.execute(f'SELECT count(*) FROM questions WHERE question = "{alpha}"')
+  g.cur.execute('SELECT count(*) FROM questions WHERE question = ?', (alpha,))
   return g.cur.fetchone()[0] > 0
 
 def insertIntoNextAdded(alphagrams):
