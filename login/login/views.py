@@ -187,7 +187,7 @@ def getUserNamesAndPhotos():
     [ {"userid": uuid, "name": name, "photo": photo}, { .... } ]
   '''
   result = []
-  not_found_users = []  # Track users not found in Keycloak
+  not_found_users = set()  # Track users not found in Keycloak
 
   try:
     params = request.get_json(force=True, silent=True)
@@ -195,7 +195,7 @@ def getUserNamesAndPhotos():
       app.logger.error("Invalid JSON received in getUserNamesAndPhotos")
       return jsonify({"error": "Invalid JSON payload"}), 400
 
-    uuidList = params.get('userList', [])
+    uuidList = set(params.get('userList', []))
 
     if not uuidList:
       app.logger.warning("Empty userList received")
@@ -231,8 +231,7 @@ def getUserNamesAndPhotos():
         # Check if it's a "user not found" error
         error_msg = str(user_error).lower()
         if 'not found' in error_msg or '404' in error_msg:
-          not_found_users.append(uuid)
-          app.logger.warning(f"User not found in Keycloak: {uuid}")
+          not_found_users.add(uuid)
 
           # Return default values for missing users
           userDict["name"] = 'Unknown User'
@@ -245,7 +244,7 @@ def getUserNamesAndPhotos():
 
     # Log summary if any users weren't found
     if not_found_users:
-      app.logger.info(f"Users not found in Keycloak: {', '.join(not_found_users)}")
+      app.logger.info(f"Users not found in Keycloak: {', '.join(sorted(not_found_users))}")
 
     return jsonify(result)
 
