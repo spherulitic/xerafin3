@@ -105,7 +105,8 @@ Config.prototype = {
     this.activeApps = [
       ['Basic Quiz', 'initBQ','images/icons/question-png-icon-1.png'],
       //['Cardbox Invaders','initInvaders','images/cardboxInvaders2.png'],
-      ['Wall of Words','initWordWall','images/icons/xeraWall.png']
+      ['Wall of Words','initWordWall','images/icons/xeraWall.png'],
+      ['Word Siege','initWordSiege','images/icons/xeraWall.png']
     ];
     this.colorAnswers = [
       'black','#dddddd','hsl(0,75%,50%)','hsl(25,75%,50%)','hsl(50,75%,50%)','hsl(75,75%,50%)','hsl(100,75%,50%)','hsl(150,75%,50%)',
