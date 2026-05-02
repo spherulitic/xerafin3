@@ -336,11 +336,12 @@ function manageCardboxExchange(value){
     case 2:manageDatabaseFile();break;
     case 3:manageUploadList();break;
     case 4:manageListOfShame();break;
+    case 5:manageListOfTriumph();break;
     default:break;
   }
 }
 function manageCardbox(){
-  var opt=[['Settings',1],['Database File',2],['Add Custom Word List',3],['List of Shame',4]];
+  var opt=[['Settings',1],['Database File',2],['Add Custom Word List',3],['List of Shame',4],['List of Triumph',5]];
   $('#manageContent').html("");
   gCreateElemArray([
       ['a0','div','manageCardboxDrop steelRowed','manageDropdown','manageContent',''],
@@ -435,6 +436,43 @@ function submitShameList(text) {
      success: callbackEnd,
      error: function(jqXHR, textStatus, errorThrown) { console.log("Error: " + textStatus); }
         });
+}
+
+function manageListOfTriumph(){
+  gCreateElemArray([
+      ['a0','div','prefContent','triumphDiv','manageParams',''],
+      ['a1','div','shameDesc highlightRow','triumphDesc','a0','Enter a list of alphagrams or words.<br>Each of these that is in your cardbox and eligible for quizzing will be marked correct.'],
+      ['a2','div','shameWrap','triumphWrap','a0',''],
+      ['a2a','textArea','shameList','triumphList','a2',''],
+      ['a3','div','','prefBtnShameWrap','a0',''],
+      ['a3a','button','btn btn-default btnPrefs shameButton','triumphButton','a3','Submit']
+    ]);
+    $('#prefBtnShameWrap').css({'padding':'5px','border-bottom-left-radius':'5px','border-bottom-right-radius':'5px'});
+    $('#prefBtnShameWrap').addClass('metalBThree');
+    $('#triumphList').prop('cols',40);
+    $('#triumphList').prop('rows',10);
+    $('#triumphList').css('textTransform','uppercase');
+    $('#triumphButton').click(function() { submitTriumphList($("#triumphList").val()); });
+}
+
+function submitTriumphList(text) {
+  var triumphArr = text.replace(/[\r\n]+/g, " ").split(" ").filter((val) => val);
+  var newArr = triumphArr.map(function(x, i, arr) { return toAlpha(x.toUpperCase().replace(/[^A-Z]/g, ""));});
+  triumphArr = Array.from( new Set (newArr)); // remove duplicates
+  fetchWithAuth("triumphList", {
+     method: "POST",
+     body: JSON.stringify({questions: triumphArr})
+  }).then(function(response) {
+     if (response.ok) {
+       alert("Updating words complete.");
+     } else {
+       console.log("Error updating words: " + response.status);
+       alert("Error updating words.");
+     }
+  }).catch(function(error) {
+     console.log("Error: " + error);
+     alert("Error updating words.");
+  });
 }
 
 function writeSchedInfo(schedInfo){

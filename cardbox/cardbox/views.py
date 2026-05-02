@@ -27,6 +27,41 @@ import xerafinUtil.xerafinUtil as xu
 from studyOrder import studyOrder
 from cardbox import app
 
+# Debug timing helpers for slow queries
+_QUERY_TIMING_LOG = []
+_MAX_TIMING_ENTRIES = 100
+
+def _log_query(query_name, duration, query_info=""):
+    """Log a query timing entry. Only logs queries taking > 0.1s."""
+    if duration < 0.1:
+        return
+    entry = {
+        "query": query_name,
+        "duration_ms": round(duration * 1000, 1),
+        "info": query_info,
+        "user": g.get('uuid', 'unknown')[:8],
+        "time": time.strftime('%H:%M:%S')
+    }
+    _QUERY_TIMING_LOG.append(entry)
+    if len(_QUERY_TIMING_LOG) > _MAX_TIMING_ENTRIES:
+        _QUERY_TIMING_LOG.pop(0)
+    if duration > 0.5:
+        app.logger.warning(
+            f"⏱ SLOW QUERY: {query_name} | {entry['duration_ms']}ms | "
+            f"{query_info} | user: {entry['user']}"
+        )
+
+def _time_query(query_name, query_info=""):
+    """Context manager to time a block of code. Usage: with _time_query('name'): ..."""
+    class _QueryTimer:
+        def __enter__(self2):
+            self2.start = time.time()
+            return self2
+        def __exit__(self2, *args):
+            duration = time.time() - self2.start
+            _log_query(query_name, duration, query_info)
+    return _QueryTimer()
+
 dictConfig({
     'version': 1,
     'formatters': {'default': {
@@ -51,6 +86,34 @@ def get_public_key():
         return f'''-----BEGIN PUBLIC KEY-----
 {public_key}
 -----END PUBLIC KEY-----'''
+
+# Schedule data: cardbox x is rescheduled for a time [min_days, max_days]
+# between min_days and min_days+max_days days in the future
+# Version 2 uses the same schedule as version 0 (difference is in wrong() behavior)
+SCHEDULES = {
+    0: [ [.5,.8], [3,2], [5,4], [11,6], [16,10], [27,14], [50,20], [80,30],
+         [130,40], [300,60], [430,100], [430,100], [430,100] ],
+    1: [ [.2,.3], [1,1], [3,3], [7,7], [14,14], [30,30], [60,45],
+         [120,90], [240,120], [430,100], [430,100], [430,100], [430,100] ],
+    3: [ [0.5,1], [1,2], [2,6], [6,8], [12,10], [19,12], [27,18],
+         [40,28], [62,32], [86,48], [120,70], [170,80], [215,150] ],
+}
+
+def getSchedule(version):
+  '''Return the schedule list for the given version.
+     Version 2 uses the same schedule as version 0.'''
+  if version == 2:
+    return SCHEDULES[0]
+  return SCHEDULES.get(version, SCHEDULES[0])
+
+def getLookaheadDays(cardbox, version):
+  '''How many days ahead of schedule a word in this cardbox can be quizzed.
+     Returns max(cardbox, 20% of the minimum interval) days.
+     Cardboxes above 12 use the same schedule as cardbox 12.'''
+  sched = getSchedule(version)
+  cb = min(cardbox, len(sched) - 1)
+  min_days = sched[cb][0]
+  return max(cardbox, int(min_days * 0.2))
 
 @app.before_request
 def get_user():
@@ -153,14 +216,20 @@ def getAuxInfoBatch():
   return jsonify(result)
 
 @app.route('/correct', methods=['POST'])
-def correct():
+def correctView():
+  ''' Takes in an alphagram and schedules in the given cardbox.
+      If no cardbox is given it will schedule in current cardbox + 1
+      Returns aux info and new cardbox score '''
+  params = request.get_json(force=True) # returns dict
+  alpha = params.get("alpha")
+  cardbox = params.get("cardbox")
+  return jsonify(correct(alpha, cardbox))
+
+def correct(alpha, cardbox=None):
   ''' Takes in an alphagram and schedules in the given cardbox.
       If no cardbox is given it will schedule in current cardbox + 1
       Returns aux info and new cardbox score '''
   result = {"status": "success"}
-  params = request.get_json(force=True) # returns dict
-  alpha = params.get("alpha")
-  cardbox = params.get("cardbox")
   if alpha is None:
     result["status"] = "Missing alphagram"
   else:
@@ -175,7 +244,7 @@ def correct():
       "where question = ?", (cardbox, getNext(cardbox), now, alpha))
   result["auxInfo"] = getAuxInfo(alpha)
   result["score"] = getCardboxScore()
-  return jsonify(result)
+  return result
 
 @app.route('/wrong', methods=['POST'])
 def wrongView():
@@ -233,10 +302,11 @@ def getQuestions():
 
   try:
     # batch the calls to lexicon
-    response = requests.post(f'{lex_service}/getWordsInfo',
-                             headers=g.headers,
-                             json=words_batch,
-                             timeout=10)
+    with _time_query('getQuestions.lexicon.getWordsInfo', f'num_words={len(all_words)}'):
+      response = requests.post(f'{lex_service}/getWordsInfo',
+                               headers=g.headers,
+                               json=words_batch,
+                               timeout=10)
     if response.status_code == 200:
       word_info_batch = response.json()
     else:
@@ -248,10 +318,11 @@ def getQuestions():
 
   # TODO: combine these into one call on the lexicon side
   try:
-    response = requests.post(f'{lex_service}/getDotsBatch',
-                             headers=g.headers,
-                             json=words_batch,
-                             timeout=10)
+    with _time_query('getQuestions.lexicon.getDotsBatch', f'num_words={len(all_words)}'):
+      response = requests.post(f'{lex_service}/getDotsBatch',
+                               headers=g.headers,
+                               json=words_batch,
+                               timeout=10)
     if response.status_code == 200:
       dots_batch = response.json()
     else:
@@ -432,6 +503,29 @@ def shameList():
 #  return jsonify(getCardboxStats())
   return jsonify({"status": "success"})
 
+@app.route('/triumphList', methods=['POST'])
+def triumphList():
+  ''' The List of Triumph: Takes in a list of alphagrams.
+        Any alphagrams in cardbox with difficulty != 4 are marked correct.
+        Any alphagrams not in cardbox are ignored. '''
+  params = request.get_json(force=True) # returns dict
+  questions = params.get('questions', [ ])
+  url = 'http://lexicon:5000/returnValidAlphas'
+  resp = requests.post(url, headers=g.headers, json={'alphas': questions})
+  validAlphas = resp.json()
+
+  for alpha in validAlphas:
+    if not isInCardbox(alpha):
+      continue
+    # Check if eligible (difficulty != 4)
+    g.cur.execute("select difficulty from questions where question=?", (alpha,))
+    row = g.cur.fetchone()
+    if row is None or row[0] == 4:
+      continue
+    correct(alpha)
+
+  return jsonify({"status": "success"})
+
 @app.route('/addQuestionToCardbox', methods=['POST'])
 def addQuestionToCardbox():
   ''' Add one alphagram to cardbox zero, if it's valid '''
@@ -581,15 +675,23 @@ def futureSweep():
   Only moves difficulty 0 and -1 -> 4
   Note difficulty 2 and 4 are exclusive
   """
+  t_start = time.time()
   now = int(time.time())
   g.cur.execute("update questions set difficulty = 0 where difficulty in (4, 50)")
-  # Anything in cardbox 10 or higher we can see 30 days ahead of schedule
-  g.cur.execute("update questions set difficulty = 4 where cardbox >= 10 " +
-    "and next_scheduled > ?+(3600*24*30) and difficulty in (0, -1)", (now,))
-  # Anything in cardbox N; 1 <= N <= 9; we can see N days ahead of schedule
-  g.cur.execute("update questions set difficulty = 4 where cardbox < 10 " +
-    "and next_scheduled > ?+(cardbox*3600*24) and difficulty in (0, -1)", (now,))
+  g.cur.execute("select coalesce(max(cardbox), 0) from questions")
+  max_cb = g.cur.fetchone()[0]
+  for cb in range(0, max_cb + 1):
+    lookahead = getLookaheadDays(cb, g.schedVersion)
+    g.cur.execute(
+      "update questions set difficulty = 4 where cardbox = ? "
+      "and next_scheduled > ?+(3600*24*?) and difficulty in (0, -1)",
+      (cb, now, lookahead))
   g.con.commit()
+  duration = time.time() - t_start
+  if duration > 1.0:
+    app.logger.warning(
+      f"⚠️ SLOW futureSweep: {duration:.3f}s | max cardbox={max_cb} | "
+      f"user: {g.get('uuid', 'unknown')}")
 
 def dbClean():
   ''' Make sure the database is in a good state.
@@ -642,15 +744,16 @@ def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None) : # pylint
     diffToGet = (-1, 5)
     dFormat = "?,?"
 
-  getCardsQry = ("select question from questions " +
-    f"where difficulty in ({dFormat}) and next_scheduled is not null " +
-     "order by case cardbox when ? then -1 else cardbox end, next_scheduled limit ?")
-  g.cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
-  result = g.cur.fetchall()
-  if len(result) < numNeeded:
-    makeWordsAvailable(numNeeded-len(result))
+  with _time_query('getQuestionsFromCardbox.query', f'cardbox={cardbox}, numNeeded={numNeeded}'):
+    getCardsQry = ("select question from questions " +
+      f"where difficulty in ({dFormat}) and next_scheduled is not null " +
+       "order by case cardbox when ? then -1 else cardbox end, next_scheduled limit ?")
     g.cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
     result = g.cur.fetchall()
+    if len(result) < numNeeded:
+      makeWordsAvailable(numNeeded-len(result))
+      g.cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
+      result = g.cur.fetchall()
   allQuestions = [x[0] for x in result]
   for alpha in allQuestions:
     quiz[alpha] = getAnagrams(alpha)
@@ -662,9 +765,11 @@ def makeWordsAvailable(words_needed) :
   Used by getQuestionsFromCardbox
   """
   now = int(time.time())
-  futureSweep()
+  with _time_query('makeWordsAvailable.futureSweep'):
+    futureSweep()
 
-  g.cur.execute("select max(cardbox) from questions")
+  with _time_query('makeWordsAvailable.max_cardbox'):
+    g.cur.execute("select max(cardbox) from questions")
   max_cardbox = g.cur.fetchone()[0] or 0
   if max_cardbox >= 10:
     max_cardbox = 30
@@ -672,9 +777,11 @@ def makeWordsAvailable(words_needed) :
   # only give new words when we clear reschedHrs in the future
   new_words_nlt = now + (3600*g.reschedHrs)
   max_work_ahead = max(now + (max_cardbox*3600*24), new_words_nlt+60)
-  g.cur.execute("select * from cleared_until")
+  with _time_query('makeWordsAvailable.cleared_until'):
+    g.cur.execute("select * from cleared_until")
   cleared_until = max(g.cur.fetchone()[0], now)
-  g.cur.execute("select * from new_words_at")
+  with _time_query('makeWordsAvailable.new_words_at'):
+    g.cur.execute("select * from new_words_at")
   # if we previously gave new words for a certain (absolute) time period
   # do not give new words for that time period again
   new_words_at = max(g.cur.fetchone()[0], new_words_nlt)
@@ -684,14 +791,17 @@ def makeWordsAvailable(words_needed) :
   except ZeroDivisionError:
     seconds_per_new_word = 100000
 
-  g.cur.execute("select count(*) from questions where difficulty = 2")
+  with _time_query('makeWordsAvailable.backlog_size'):
+    g.cur.execute("select count(*) from questions where difficulty = 2")
   backlog_size = g.cur.fetchone()[0] or 0
-  g.cur.execute("select count(*) from questions where cardbox = 0")
+  with _time_query('makeWordsAvailable.cb0_count'):
+    g.cur.execute("select count(*) from questions where cardbox = 0")
   cb0_available = g.cb0max - (g.cur.fetchone()[0] or 0)
 
-  g.cur.execute('''SELECT question, cardbox, next_scheduled, difficulty
-                   FROM questions WHERE next_scheduled > ?
-                   ORDER BY next_scheduled ASC limit 1''',(cleared_until,))
+  with _time_query('makeWordsAvailable.next_row'):
+    g.cur.execute('''SELECT question, cardbox, next_scheduled, difficulty
+                     FROM questions WHERE next_scheduled > ?
+                     ORDER BY next_scheduled ASC limit 1''',(cleared_until,))
   row = g.cur.fetchone()
 
   for i in range(0,words_needed):
@@ -804,10 +914,11 @@ def getAuxInfo (alpha):
                 }
   '''
   auxInfo = {"alpha": alpha}
-  g.cur.execute('select cardbox, next_scheduled, correct, incorrect, difficulty '
-              'from questions where question = ? '
-              'and next_scheduled is not null', (alpha,))
-  result = g.cur.fetchone()
+  with _time_query('getAuxInfo', f'alpha={alpha}'):
+    g.cur.execute('select cardbox, next_scheduled, correct, incorrect, difficulty '
+                'from questions where question = ? '
+                'and next_scheduled is not null', (alpha,))
+    result = g.cur.fetchone()
   if result:
     auxInfo["aux"] = {"cardbox": result[0], "nextScheduled": result[1],
       "correct": result[2], "incorrect": result[3], "difficulty": result[4] }
@@ -838,38 +949,41 @@ def _get_bingo_from_cardbox(cardbox=0):
         cur = g.cur
 
         # First query: get due questions from cardbox
-        cur.execute("""
-            SELECT question FROM questions
-            WHERE cardbox IS NOT NULL
-            AND length(question) >= 7
-            AND difficulty IN (-1, 0, 2, 5)
-            ORDER BY CASE cardbox WHEN ? THEN -2
-                     ELSE difficulty END,
-                     cardbox, next_scheduled
-            LIMIT 1
-        """, (cardbox,))
+        with _time_query('get_bingo.cardbox', f'cardbox={cardbox}'):
+            cur.execute("""
+                SELECT question FROM questions
+                WHERE cardbox IS NOT NULL
+                AND length(question) >= 7
+                AND difficulty IN (-1, 0, 2, 5)
+                ORDER BY CASE cardbox WHEN ? THEN -2
+                         ELSE difficulty END,
+                         cardbox, next_scheduled
+                LIMIT 1
+            """, (cardbox,))
 
-        result = cur.fetchone()
-        if result is not None:
-            return result[0]
+            result = cur.fetchone()
+            if result is not None:
+                return result[0]
 
         # Second query: get from next_added
-        cur.execute("""
-            SELECT question FROM next_added
-            WHERE length(question) >= 7
-            ORDER BY timeStamp
-            LIMIT 1
-        """)
+        with _time_query('get_bingo.next_added'):
+            cur.execute("""
+                SELECT question FROM next_added
+                WHERE length(question) >= 7
+                ORDER BY timeStamp
+                LIMIT 1
+            """)
 
-        result = cur.fetchone()
-        if result is not None:
-            _add_word(result[0])
-            return result[0]
+            result = cur.fetchone()
+            if result is not None:
+                _add_word(result[0])
+                return result[0]
 
         # Third fallback: get from study order
-        result = _get_from_study_order(1, True)
-        _add_word(result[0])
-        return result[0]
+        with _time_query('get_bingo.study_order'):
+            result = _get_from_study_order(1, True)
+            _add_word(result[0])
+            return result[0]
 
     except Exception as e:
         # Log error and re-raise or handle appropriately
@@ -890,19 +1004,7 @@ def getNext (newCardbox = 0) :
   random.seed()
   offset=random.randrange(day)
 
-# List of lists
-# cardbox x is rescheduled for a time [x,y]
-# between x and x+y days in the future
-  if g.schedVersion == 1:
-    sched = [ [.2, .3], [1, 1], [3, 3], [7, 7], [14, 14], [30,30], [60,45],
-              [120, 90], [240, 120], [430, 100], [430,100], [430,100], [430,100] ]
-
-  elif g.schedVersion == 3:
-    sched = [ [0.5,1] , [1,2] , [2,6] , [6,8] , [12,10] , [19,12] , [27,18] ,
-              [40,28] , [62,32] , [86,48] , [120,70] , [170,80] , [215,150] ]
-  else:
-    sched = [ [.5,.8], [3,2], [5,4], [11,6], [16,10], [27,14], [50,20], [80,30],
-              [130,40], [300,60], [430,100], [430,100],[430,100] ]
+  sched = getSchedule(g.schedVersion)
 
   return int( now + (sched[newCardbox][0]*day) + (sched[newCardbox][1]*offset))
 
