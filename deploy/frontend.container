@@ -30,9 +30,9 @@ PublishPort=7443:443
 Network=systemd-xerafin
 NetworkAlias=frontend
 
-#Volume=/home/spherulitic/xerafin3/front-end/ssl/dev:/etc/nginx/ssl:ro
-Volume=/etc/letsencrypt/archive/x3.xerafin.net/fullchain2.pem:/etc/nginx/ssl/fullchain.pem:ro
-Volume=/etc/letsencrypt/archive/x3.xerafin.net/privkey2.pem:/etc/nginx/ssl/privkey.pem:ro
+#Volume=/home/spherulitic/xerafin3/frontend/ssl/dev:/etc/nginx/ssl:ro
+Volume=/etc/letsencrypt/live/x3.xerafin.net/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro
+Volume=/etc/letsencrypt/live/x3.xerafin.net/privkey.pem:/etc/nginx/ssl/privkey.pem:ro
 
 # Mounted volume to store user photos
 Volume=/var/lib/xerafin/user-photos:/usr/share/nginx/html/images/users:rw,U
