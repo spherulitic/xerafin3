@@ -206,7 +206,7 @@ XeraOverview.prototype = {
     $(goButton).addClass('btn btn-default');
     $(goButton).css({'margin':'0 5px 0 0','width':'20%','height':'24px','padding':'0px','vertical-align':'middle'});
     this.highlightQuizRow();
-    this.actionValues = [['Basic Quiz', startQuiz],['Cardbox Invaders',initInvaders], ['Wall of Words',initWordWall]];
+    this.actionValues = [['Basic Quiz', startQuiz],['Cardbox Invaders',initInvaders], ['Wall of Words',initWordWall], ['Word Siege',initWordSiege]];
     var list = new Array();
     this.actionValues.forEach(function(row,index){
       list.push([row[0],index]);
