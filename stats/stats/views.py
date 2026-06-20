@@ -68,6 +68,7 @@ def get_user():
     g.name = auth_token.get("name", "Unknown")
 
     g.photo = auth_token.get('cardboxPrefs', {}).get('photo', 'images/unknown_player.gif')
+
     g.countryId = auth_token.get('cardboxPrefs', {}).get('countryId', 0)
     g.handle = auth_token.get('preferred_username', g.name)
     # headers to send to other services
@@ -88,3 +89,2074 @@ def get_user():
     return jsonify({'error': f'Cannot reach authentication service: {str(e)}'}), 503
   except Exception as e:
     return jsonify({'error': f'Authentication failed: {str(e)}'}), 401
+
+@app.teardown_request
+def close_mysql(exception=None):
+  '''Safely close MySQL connection if it exists '''
+  mysqlcon = g.pop('mysqlcon', None)
+  if mysqlcon is not None:
+    try:
+      if exception is None:
+        mysqlcon.commit()
+      mysqlcon.close()
+    except Exception as e:
+      app.logger.error(f"Error closing MySQL connection: {str(e)}")
+
+@app.route("/", methods=['GET', 'POST'])
+def default():
+  return "Xerafin Stats Service"
+
+@app.route("/getRankings", methods=['GET', 'POST'])
+def getRankings():
+  ''' Endpoint to return any sort of rankings data to the client '''
+  data = request.get_json(force=True)
+
+  # data should contain such items as:
+  #   displayType
+  #   pageSize  - int
+  #   pageNumber - int
+  #   timeframe {today, yesterday, thisWeek, lastWeek, thisMonth,
+  #              lastMonth, thisYear, lastYear, eternity}
+  #   type
+  #   year
+  #   view {QA, AW, SL}
+
+  if data.get("view", "QA") == "QA":
+    if data.get("displayType", 0) in (2, 3):
+      rank = Metaranks(data)
+    else:
+      rank = Rankings(data)
+  elif data.get("view", "QA") == "AW":
+    rank = Awards(data)
+  elif data.get("view", "QA") == "SL":
+    rank = SlothRankings(data)
+  else:
+    rank = Rankings(data)
+
+  return jsonify(rank.getRankings())
+
+@app.route("/getAllTimeStats", methods=['GET', 'POST'])
+def getAllTimeStats():
+  ''' Endpoint to send sitewide all-time stats to the client '''
+
+  result = { }
+
+  command = """select ifnull(sum(questionsAnswered), 0), ifnull(count(distinct userid), 0)
+             from leaderboard"""
+  g.con.execute(command)
+  row = g.con.fetchone()
+  if row:
+    result["questions"] = int(row[0])
+    result["users"] = int(row[1])
+  else:
+    result["questions"] = 0
+    result["users"] = 0
+
+  response = jsonify(result)
+  return response
+
+@app.route("/increment", methods=['GET', 'POST'])
+def increment():
+  ''' Increments the total questions solved today for the requesting user
+       in the daily leaderboard
+      Returns [qAnswered, startScore]
+  '''
+  g.con.execute(f'''update leaderboard set questionsAnswered = questionsAnswered + 1
+                    where userid = '{g.uuid}' and dateStamp = curdate()''')
+  if g.con.rowcount == 0:
+    url = 'http://cardbox:5000/getCardboxScore'
+    resp = requests.get(url, headers=g.headers).json()
+    startScore = resp["score"]
+    questionsAnswered = 1
+    g.con.execute(f'''insert into leaderboard (userid, dateStamp, questionsAnswered, startScore)
+                      values ('{g.uuid}', curdate(), {questionsAnswered}, {startScore})''')
+    return jsonify({'questionsAnswered': questionsAnswered, 'startScore': startScore})
+
+  return (getUserStatsToday())
+
+@app.route("/resetStartScore", methods=['GET', 'POST'])
+def reset_start_score():
+  ''' When a user uploads a cardbox file, reset the start score for the day
+  '''
+  try:
+    data = request.get_json(force=True)
+    new_start_score = data.get("score", 0)
+    query = ''' UPDATE leaderboard SET startScore = %s
+                WHERE userid = %s AND dateStamp = CURDATE() '''
+    g.con.execute(query, (new_start_score, g.uuid))
+    rows_affected = g.con.rowcount
+    return jsonify({
+             "success": True,
+             "message": "Start score updated successfully" if rows_affected > 0 else "No matching record found for today",
+             "error": None }), 200
+
+  except AttributeError as e:
+    app.logger.error(f'Database connection issue: {str(e)}')
+    return jsonify({"success": False,
+                    "message": "Database connection error",
+                    "error": "DB_CONNECTION_ERROR" }), 503
+  except Exception as e:
+    app.logger.error(f'Unexpected error in reset_start_score: {str(e)}', exc_info=True)
+    return jsonify({ "success": False,
+                     "message": "Internal server error",
+                     "error": "INTERNAL_SERVER_ERROR"}), 500
+
+@app.route("/getUserStatsToday", methods=['GET', 'POST'])
+def getUserStatsTodayView():
+  ''' Returns questionsAnswered and startScore for the requesting user '''
+  return jsonify(getUserStatsToday())
+
+from datetime import datetime, timedelta
+import math
+from flask import request, jsonify, g
+import requests
+
+# Add this helper function at the top of your module
+def get_period_date_range(period: str):
+    """
+    Returns the start and end dates for the given period.
+    All periods end at 'yesterday' since we run after midnight.
+    """
+    today = datetime.now().date()
+    yesterday = today - timedelta(days=1)
+
+    if period.upper() == 'DAILY':
+        # Yesterday's date
+        start_date = yesterday
+        end_date = yesterday
+
+    elif period.upper() == 'WEEKLY':
+        # Week ending yesterday (Monday to Sunday)
+        # Find the most recent Monday
+        days_since_monday = yesterday.weekday()  # Monday=0, Sunday=6
+        start_date = yesterday - timedelta(days=days_since_monday)
+        end_date = yesterday
+
+    elif period.upper() == 'MONTHLY':
+        # Month ending yesterday
+        start_date = yesterday.replace(day=1)  # First day of month
+        end_date = yesterday
+
+    elif period.upper() == 'YEARLY':
+        # Year ending yesterday
+        start_date = yesterday.replace(month=1, day=1)  # Jan 1 of this year
+        end_date = yesterday
+
+    else:
+        raise ValueError(f"Invalid period: {period}")
+
+    return start_date, end_date
+
+def get_week_number(date_obj):
+    """Get week number using YEARWEEK mode 5 for consistency with legacy system"""
+    query = "SELECT YEARWEEK(%s, 5)"
+    g.con.execute(query, (date_obj,))
+    result = g.con.fetchone()
+    return result[0] if result else None
+
+@app.route("/periodicSummary", methods=['POST'])
+def periodicSummary():
+  """
+  Executes end-of-period routine for daily, weekly, monthly, or yearly.
+  Inserts summary data into lb_summary, calculates awards, returns stats.
+
+  Request body: {"period": "daily"} (or "weekly", "monthly", "yearly")
+  Returns: {"users": X, "questions": Y}
+  """
+  try:
+    # Get period from request body
+    data = request.get_json()
+    if not data or 'period' not in data:
+      return jsonify({"error": "Missing 'period' in request body"}), 400
+
+    period = data['period'].upper()
+    valid_periods = ['DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY']
+    if period not in valid_periods:
+      return jsonify({"error": f"Invalid period. Must be one of: {valid_periods}"}), 400
+
+    # Get date range for this period
+    start_date, end_date = get_period_date_range(period)
+
+    # Calculate summary statistics for the period
+    if period == 'DAILY':
+      # Simple daily query
+      query = '''SELECT COUNT(DISTINCT userid), SUM(questionsAnswered)
+             FROM leaderboard
+             WHERE dateStamp = %s'''
+      g.con.execute(query, (end_date,))
+
+    else:
+      # Weekly, monthly, yearly - need to aggregate
+      query = '''SELECT COUNT(DISTINCT userid), SUM(questionsAnswered)
+             FROM leaderboard
+             WHERE dateStamp BETWEEN %s AND %s'''
+      g.con.execute(query, (start_date, end_date))
+
+    row = g.con.fetchone()
+    if row:
+      users = row[0] or 0
+      questions = row[1] or 0
+    else:
+      users = 0
+      questions = 0
+
+    # Insert summary into lb_summary table
+      # Map period to database format
+    period_db_map = {
+      'DAILY': 'DAY',
+      'WEEKLY': 'WEEK',
+      'MONTHLY': 'MONTH',
+      'YEARLY': 'YEAR'
+    }
+    period_value = period_db_map[period]
+
+    # Check if entry already exists (prevent duplicates)
+    check_query = '''SELECT COUNT(*) FROM lb_summary
+             WHERE period = %s AND dateStamp = %s'''
+    g.con.execute(check_query, (period_value, end_date))
+    if g.con.fetchone()[0] == 0:
+      query = '''INSERT INTO lb_summary (period, dateStamp, questionsAnswered, numUsers)
+             VALUES (%s, %s, %s, %s)'''
+      g.con.execute(query, (period_value, end_date, questions, users))
+
+    # Calculate awards if there were users
+    if users > 0:
+      # Get top users for this period
+      if period == 'DAILY':
+        award_query = '''SELECT userid, questionsAnswered
+                 FROM leaderboard
+                 WHERE dateStamp = %s
+                 ORDER BY questionsAnswered DESC'''
+        g.con.execute(award_query, (end_date,))
+      else:
+        award_query = '''SELECT userid, SUM(questionsAnswered) as total_questions
+                 FROM leaderboard
+                 WHERE dateStamp BETWEEN %s AND %s
+                 GROUP BY userid
+                 ORDER BY total_questions DESC'''
+        g.con.execute(award_query, (start_date, end_date))
+
+      results = g.con.fetchall()
+
+      # Award configuration - matching your schema order
+      # user_coin_total columns: bronze, silver, gold, platinum, emerald, sapphire, ruby, diamond
+      # platinum and diamond currently unused
+      award_columns = ["emerald", "ruby", "sapphire", "gold", "silver", "bronze"]
+
+      # Using original award thresholds but extended for 8 tiers instead of 6
+      # Adjust thresholds as needed for your game balance
+      award_thresholds = [users, 1000, 100, 20, 8, 4]  # Added more tiers
+      award_ranks = [math.ceil(float(users) / x) for x in award_thresholds]
+
+      # Coin amounts per period (adjust as needed)
+      coin_amounts = {
+        'DAILY': 1,
+        'WEEKLY': 3,
+        'MONTHLY': 6,
+        'YEARLY': 30
+      }
+      coin_amount = coin_amounts[period]
+
+      # Map period for database (matching your varchar field)
+      period_db_value = {
+        'DAILY': 'DAY',
+        'WEEKLY': 'WEEK',
+        'MONTHLY': 'MONTH',
+        'YEARLY': 'YEAR'
+      }[period]
+
+      # Process awards
+      award_idx = 0
+      max_awards = min(len(results), award_ranks[-1])
+
+      for rank, row in enumerate(results[:max_awards]):
+        # Move to next award tier if we've exceeded current tier's rank limit
+        while award_idx < len(award_ranks) - 1 and rank >= award_ranks[award_idx]:
+          award_idx += 1
+
+        user_id = row[0]
+        user_questions = row[1]
+
+        # Insert into user_coin_log
+        coin_log_query = '''INSERT INTO user_coin_log
+                  (userid, dateStamp, amount, period, reason, coinType, data)
+                  VALUES (%s, %s, %s, %s, %s, %s, %s)'''
+
+        g.con.execute(coin_log_query, (
+          user_id,
+          end_date,
+          coin_amount,
+          period_db_value,
+          'QA',  # Questions Answered
+          award_idx,  # 0=bronze, 1=silver, etc.
+          f'{user_questions}-{rank + 1}'  # Rank is 1-indexed for display
+        ))
+
+        # Ensure user exists in user_coin_total
+        check_query = 'SELECT COUNT(*) FROM user_coin_total WHERE userid = %s'
+        g.con.execute(check_query, (user_id,))
+        if g.con.fetchone()[0] == 0:
+          # Insert with all coin types set to 0
+          init_query = '''INSERT INTO user_coin_total
+                  (userid, bronze, silver, gold, platinum, emerald, sapphire, ruby, diamond, dateStamp)
+                  VALUES (%s, 0, 0, 0, 0, 0, 0, 0, 0, %s)'''
+          g.con.execute(init_query, (user_id, end_date))
+
+        # Update user's award count
+        award_column = award_columns[award_idx]
+        update_query = f'''UPDATE user_coin_total
+                   SET {award_column} = {award_column} + {coin_amount},
+                     dateStamp = %s
+                   WHERE userid = %s'''
+        g.con.execute(update_query, (end_date, user_id))
+
+    # Return statistics for chat message
+    return jsonify({
+      "users": users,
+      "questions": questions,
+      "period": period.lower(),
+      "date": end_date.isoformat()
+    })
+
+  except Exception as e:
+    print(f"Error in periodicSummary: {e}")
+    import traceback
+    traceback.print_exc()
+    return jsonify({"error": str(e)}), 500
+
+def getUserStatsToday():
+  ''' Fetches questionsAnswered and startScore for the requesting user '''
+  g.con.execute(f'''select questionsAnswered, startScore from leaderboard
+                  where userid = '{g.uuid}' and datestamp = curdate()''')
+  row = g.con.fetchone()
+  if row:
+    questionsAnswered = row[0]
+    startScore = row[1]
+  else:
+    questionsAnswered = 0
+    url = 'http://cardbox:5000/getCardboxScore'
+    resp = requests.get(url, headers=g.headers).json()
+    startScore = resp["score"]
+
+  return {'questionsAnswered': questionsAnswered, 'startScore': startScore}
+
+def getUserData(uuidList):
+  ''' Takes in a list of uuids
+     Returns a list of dicts
+     [ {"userid": uuid, "name": name, "photo": photo}, { .... } ]
+   '''
+
+  url = 'http://login:5000/getUserNamesAndPhotos'
+  resp = requests.get(url, headers=g.headers, json={"userList": uuidList}).json()
+  return resp
+
+def get_users_by_period(period: str, con) -> int:
+  """
+  Helper function to get user counts for different periods.
+  This replaces the getUsersByPeriod function from the legacy code.
+  """
+  today = datetime.now().date()
+
+  if period == "thisWeek":
+    # Start of week (Monday)
+    start_of_week = today - timedelta(days=today.weekday())
+    query = """
+      SELECT COUNT(DISTINCT userid)
+      FROM leaderboard
+      WHERE dateStamp >= %s AND dateStamp <= %s
+    """
+    con.execute(query, (start_of_week, today))
+
+  elif period == "thisMonth":
+    start_of_month = today.replace(day=1)
+    query = """
+      SELECT COUNT(DISTINCT userid)
+      FROM leaderboard
+      WHERE dateStamp >= %s AND dateStamp <= %s
+    """
+    con.execute(query, (start_of_month, today))
+
+  elif period == "thisYear":
+    start_of_year = today.replace(month=1, day=1)
+    query = """
+      SELECT COUNT(DISTINCT userid)
+      FROM leaderboard
+      WHERE dateStamp >= %s AND dateStamp <= %s
+    """
+    con.execute(query, (start_of_year, today))
+
+  elif period == "eternity":
+    query = "SELECT COUNT(DISTINCT userid) FROM leaderboard"
+    con.execute(query)
+
+  else:
+    return 0
+
+  row = con.fetchone()
+  return int(row[0]) if row else 0
+
+
+def get_global_stats(con) -> Dict[str, Any]:
+  """Get global statistics about questions answered and users."""
+  globe = {"questions": {}, "users": {}}
+
+  # Today's sitewide totals
+  today = datetime.now().date()
+  query = """
+    SELECT
+      IFNULL(SUM(questionsAnswered), 0),
+      IFNULL(COUNT(DISTINCT userid), 0)
+    FROM leaderboard
+    WHERE dateStamp = CURDATE()
+  """
+  con.execute(query)
+  row = con.fetchone()
+  today_questions = int(row[0]) if row else 0
+  today_users = int(row[1]) if row else 0
+
+  globe["questions"]["today"] = today_questions
+  globe["users"]["today"] = today_users
+
+  # Yesterday's sitewide totals
+  query = """
+    SELECT
+      IFNULL(SUM(questionsAnswered), 0),
+      IFNULL(COUNT(DISTINCT userid), 0)
+    FROM leaderboard
+    WHERE dateStamp = CURDATE() - INTERVAL 1 DAY
+  """
+  con.execute(query)
+  row = con.fetchone()
+  yesterday_questions = int(row[0]) if row else 0
+  yesterday_users = int(row[1]) if row else 0
+
+  globe["questions"]["yesterday"] = yesterday_questions
+  globe["users"]["yesterday"] = yesterday_users
+
+  # Weekly totals
+  weekday = datetime.now().strftime("%A")
+  if weekday == "Monday":
+    this_week_questions = today_questions
+  elif weekday == "Tuesday":
+    this_week_questions = today_questions + yesterday_questions
+  else:
+    query = """
+      SELECT IFNULL(SUM(questionsAnswered), 0)
+      FROM lb_summary
+      WHERE period = 'DAY'
+      AND dateStamp < CURDATE() - INTERVAL 1 DAY
+      AND YEARWEEK(dateStamp, 5) = YEARWEEK(CURDATE(), 5)
+    """
+    con.execute(query)
+    row = con.fetchone()
+    if row and row[0]:
+      this_week_questions = int(row[0]) + yesterday_questions + today_questions
+    else:
+      this_week_questions = yesterday_questions + today_questions
+
+  globe["questions"]["thisWeek"] = this_week_questions
+  globe["users"]["thisWeek"] = get_users_by_period("thisWeek", con)
+
+  # Monthly totals
+  day_of_month = datetime.now().strftime("%d")
+  if day_of_month == "01":
+    this_month_questions = today_questions
+  elif day_of_month == "02":
+    this_month_questions = today_questions + yesterday_questions
+  else:
+    query = """
+      SELECT IFNULL(SUM(questionsAnswered), 0)
+      FROM lb_summary
+      WHERE period = 'DAY'
+      AND dateStamp < CURDATE() - INTERVAL 1 DAY
+      AND DATE_FORMAT(dateStamp, '%Y%m') = DATE_FORMAT(CURDATE(), '%Y%m')
+    """
+    con.execute(query)
+    row = con.fetchone()
+    if row and row[0]:
+      this_month_questions = int(row[0]) + yesterday_questions + today_questions
+    else:
+      this_month_questions = yesterday_questions + today_questions
+
+  globe["questions"]["thisMonth"] = this_month_questions
+  globe["users"]["thisMonth"] = get_users_by_period("thisMonth", con)
+
+  # Annual totals
+  month = datetime.now().strftime("%m")
+  if month == "01":
+    this_year_questions = this_month_questions
+  else:
+    query = """
+      SELECT IFNULL(SUM(questionsAnswered), 0)
+      FROM lb_summary
+      WHERE period = 'MONTH'
+      AND DATE_FORMAT(dateStamp, '%Y') = DATE_FORMAT(CURDATE(), '%Y')
+    """
+    con.execute(query)
+    row = con.fetchone()
+    if row and row[0]:
+      this_year_questions = int(row[0]) + this_month_questions
+    else:
+      this_year_questions = this_month_questions
+
+  globe["questions"]["thisYear"] = this_year_questions
+  globe["users"]["thisYear"] = get_users_by_period("thisYear", con)
+
+  # Eternity totals
+  query = "SELECT IFNULL(SUM(questionsAnswered), 0) FROM lb_summary WHERE period = 'YEAR'"
+  con.execute(query)
+  row = con.fetchone()
+  if row and row[0]:
+    eternity_questions = int(row[0]) + this_year_questions
+  else:
+    eternity_questions = this_year_questions
+
+  globe["questions"]["eternity"] = eternity_questions
+  globe["users"]["eternity"] = get_users_by_period("eternity", con)
+
+  return globe
+
+
+def get_site_records(con) -> Dict[str, Any]:
+  """Get site records for maximum questions and users."""
+  siterecords = {"maxUsers": {}, "maxQuestions": {}}
+
+  # Get records for each period
+  for period in ['DAY', 'WEEK', 'MONTH', 'YEAR']:
+    # Max questions
+    query = """
+      SELECT dateStamp, questionsAnswered
+      FROM lb_summary
+      WHERE period = %s
+      ORDER BY questionsAnswered DESC, dateStamp DESC
+      LIMIT 1
+    """
+    con.execute(query, (period,))
+    row = con.fetchone()
+    period_key = period.lower()
+
+    if row and row[0] and row[1]:
+      siterecords["maxQuestions"][period_key] = {
+        "date": str(row[0]),
+        "questions": int(row[1])
+      }
+    else:
+      siterecords["maxQuestions"][period_key] = {
+        "date": "1969-12-31",
+        "questions": 0
+      }
+
+    # Max users
+    query = """
+      SELECT dateStamp, numUsers
+      FROM lb_summary
+      WHERE period = %s
+      ORDER BY numUsers DESC, dateStamp DESC
+      LIMIT 1
+    """
+    con.execute(query, (period,))
+    row = con.fetchone()
+
+    if row and row[0] and row[1]:
+      siterecords["maxUsers"][period_key] = {
+        "date": str(row[0]),
+        "users": int(row[1])
+      }
+    else:
+      siterecords["maxUsers"][period_key] = {
+        "date": "1969-12-31",
+        "users": 0
+      }
+
+  # Weekday records
+  query = """
+    SELECT dateStamp, questionsAnswered
+    FROM lb_summary
+    WHERE DATE_FORMAT(dateStamp, '%a') = DATE_FORMAT(CURDATE(), '%a')
+    AND period = 'DAY'
+    ORDER BY questionsAnswered DESC, dateStamp DESC
+    LIMIT 1
+  """
+  con.execute(query)
+  row = con.fetchone()
+
+  if row and row[0] and row[1]:
+    siterecords["maxQuestions"]["weekday"] = {
+      "date": str(row[0]),
+      "questions": int(row[1])
+    }
+  else:
+    siterecords["maxQuestions"]["weekday"] = {
+      "date": "1969-12-31",
+      "questions": 0
+    }
+
+  query = """
+    SELECT dateStamp, numUsers
+    FROM lb_summary
+    WHERE DATE_FORMAT(dateStamp, '%a') = DATE_FORMAT(CURDATE(), '%a')
+    AND period = 'DAY'
+    ORDER BY numUsers DESC, dateStamp DESC
+    LIMIT 1
+  """
+  con.execute(query)
+  row = con.fetchone()
+
+  if row and row[0] and row[1]:
+    siterecords["maxUsers"]["weekday"] = {
+      "date": str(row[0]),
+      "users": int(row[1])
+    }
+  else:
+    siterecords["maxUsers"]["weekday"] = {
+      "date": "1969-12-31",
+      "users": 0
+    }
+
+  # Format dates
+  date_formats = {
+    "year": "%Y",
+    "month": "%b %Y",
+    "week": "%d %b %Y",
+    "day": "%d %b %Y",
+    "weekday": "%d %b %Y"
+  }
+
+  for record_type in ["maxQuestions", "maxUsers"]:
+    for period_key, date_format in date_formats.items():
+      if period_key in siterecords[record_type]:
+        try:
+          dt = datetime.strptime(siterecords[record_type][period_key]["date"], "%Y-%m-%d")
+          siterecords[record_type][period_key]["date"] = dt.strftime(date_format)
+
+          if period_key == "week":
+            week_end = dt + timedelta(days=6)
+            siterecords[record_type][period_key]["dateEnd"] = week_end.strftime(date_format)
+
+          if period_key == "weekday":
+            siterecords[record_type][period_key]["weekday"] = dt.strftime("%A")
+        except (ValueError, KeyError):
+          # Handle date parsing errors gracefully
+          pass
+
+  return siterecords
+
+
+@app.route('/get_site_records', methods=['GET'])
+def get_site_records_view():
+  """
+  Endpoint to get global statistics and site records.
+  Returns the same structure as the legacy endpoint.
+  """
+  result = {}
+  error = {"status": None}
+
+  try:
+    # Use the connection from Flask's g context
+    con = g.con
+
+    # Get global stats
+    globe = get_global_stats(con)
+    result["globe"] = globe
+
+    # Get site records
+    siterecords = get_site_records(con)
+    result["siterecords"] = siterecords
+
+    # Add empty object at the end to match legacy output
+    response_data = [result, {}]
+
+    return jsonify(response_data)
+
+  except Exception as ex:
+    error["status"] = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args}"
+    return jsonify({"error": error}), 500
+
+def get_user_info_from_keycloak(user_ids):
+  """
+  Get user information from Keycloak for the given list of user IDs.
+  Returns a dictionary mapping user_id -> {"name": ..., "photo": ...}
+  """
+  if not user_ids:
+    return {}
+
+  try:
+    users_data = getUserData(user_ids)  # This returns the list of dicts
+
+    # Convert list of dicts to a dictionary for easy lookup
+    user_info_map = {}
+    for user_data in users_data:
+      user_id = user_data.get("userid")
+      if user_id:
+        user_info_map[user_id] = {
+          "name": user_data.get("name", ""),
+          "photo": user_data.get("photo", "images/unknown_player.gif")
+        }
+
+    return user_info_map
+
+  except Exception as e:
+    print(f"Error getting user data from Keycloak: {e}")
+    return {}
+
+def get_individual_records_data(con) -> Dict[str, Any]:
+  """
+  Get individual records for best performers in different time periods.
+  Now uses Keycloak instead of the login table.
+  """
+  indivrecords = {}
+  user_ids_to_fetch = {}
+
+  # Collect user IDs from both queries
+  queries = []
+
+  # Queries for day and weekday periods
+  queries.append(("day", """
+    SELECT userid, questionsAnswered, dateStamp
+    FROM leaderboard
+    ORDER BY questionsAnswered DESC
+    LIMIT 1
+  """))
+
+  queries.append(("weekday", """
+    SELECT userid, questionsAnswered, dateStamp
+    FROM leaderboard
+    WHERE DATE_FORMAT(dateStamp, '%a') = DATE_FORMAT(CURDATE(), '%a')
+    ORDER BY questionsAnswered DESC
+    LIMIT 1
+  """))
+
+  # Queries for week, month, year, and eternity periods
+  period_queries = [
+    ("week", "%Y%u", """
+      SELECT userid, SUM(questionsAnswered) as total, MIN(dateStamp) as period_start
+      FROM leaderboard
+      GROUP BY userid, DATE_FORMAT(dateStamp, %s)
+      ORDER BY total DESC
+      LIMIT 1
+    """),
+    ("month", "%Y%m", """
+      SELECT userid, SUM(questionsAnswered) as total, MIN(dateStamp) as period_start
+      FROM leaderboard
+      GROUP BY userid, DATE_FORMAT(dateStamp, %s)
+      ORDER BY total DESC
+      LIMIT 1
+    """),
+    ("year", "%Y", """
+      SELECT userid, SUM(questionsAnswered) as total, MIN(dateStamp) as period_start
+      FROM leaderboard
+      GROUP BY userid, DATE_FORMAT(dateStamp, %s)
+      ORDER BY total DESC
+      LIMIT 1
+    """),
+    ("eternity", None, """
+      SELECT userid, SUM(questionsAnswered) as total, NULL as period_start
+      FROM leaderboard
+      GROUP BY userid
+      ORDER BY total DESC
+      LIMIT 1
+    """)
+  ]
+
+  # First pass: execute all queries and collect user IDs
+  period_results = {}
+
+  for period, query in queries:
+    con.execute(query)
+    row = con.fetchone()
+    if row and row[0] and row[1]:  # userid and questionsAnswered
+      user_id = str(row[0])
+      period_results[period] = {
+        "user_id": user_id,
+        "answered": int(row[1]),
+        "date": str(row[2]) if row[2] else "None"
+      }
+      user_ids_to_fetch[user_id] = True
+
+  for period, date_mask, query_template in period_queries:
+    if period == "eternity":
+      con.execute(query_template)
+    else:
+      con.execute(query_template, (date_mask,))
+
+    row = con.fetchone()
+    if row and row[0] and row[1]:  # userid and total
+      user_id = str(row[0])
+      period_results[period] = {
+        "user_id": user_id,
+        "answered": int(row[1]),
+        "date": str(row[2]) if row[2] and row[2] != "None" else "None"
+      }
+      user_ids_to_fetch[user_id] = True
+
+  # Get all user info from Keycloak in one batch
+  user_info_map = get_user_info_from_keycloak(list(user_ids_to_fetch.keys()))
+
+  # Build the response structure with user info
+  for period, data in period_results.items():
+    user_id = data["user_id"]
+    user_info = user_info_map.get(user_id, {})
+
+    indivrecords[period] = {
+      "name": user_info.get("name", "Unknown Player"),
+      "photo": user_info.get("photo", "images/unknown_player.gif"),
+      "answered": data["answered"],
+      "date": data["date"]
+    }
+
+  # Ensure all periods exist in the response (even if empty)
+  for period in ["day", "weekday", "week", "month", "year", "eternity"]:
+    if period not in indivrecords:
+      indivrecords[period] = {}
+
+  # Format dates according to the specified format
+  date_formats = {
+    "year": "%Y",
+    "month": "%b %Y",
+    "week": "%d %b %Y",
+    "day": "%d %b %Y",
+    "weekday": "%d %b %Y"
+  }
+
+  for period, date_format in date_formats.items():
+    if (period in indivrecords and indivrecords[period] and
+      "date" in indivrecords[period] and indivrecords[period]["date"] != "None"):
+      try:
+        dt = datetime.strptime(indivrecords[period]["date"], "%Y-%m-%d")
+        indivrecords[period]["date"] = dt.strftime(date_format)
+
+        # Add week end date for weekly records
+        if period == "week":
+          week_end = dt + timedelta(days=6)
+          indivrecords[period]["dateEnd"] = week_end.strftime(date_format)
+
+        # Add weekday name for weekday records
+        if period == "weekday":
+          indivrecords[period]["weekday"] = dt.strftime("%A")
+
+      except (ValueError, KeyError) as e:
+        # Log error but don't crash
+        app.logger.error(f"Error formatting date for {period}: {e}")
+        # Keep original date format
+        pass
+
+  return indivrecords
+
+@app.route('/get_individual_records', methods=['GET'])
+def get_individual_records():
+  try:
+    indivrecords = get_individual_records_data(g.con)
+    response_data = [{"indivrecords": indivrecords}, {}]
+    return jsonify(response_data)
+  except Exception as ex:
+    app.logger.error(f'Error in get_individual_records endpoint: {ex}')
+    app.logger.error(traceback.format_exc())
+    return jsonify({"error": str(ex)}), 500
+
+@app.route('/get_my_records', methods=['GET'])
+def get_my_records():
+  """
+  Endpoint for user's personal records and totals.
+  Returns both userrecords and usertotals.
+  """
+  result = {}
+
+  try:
+
+    user_id = g.uuid
+    con = g.con
+
+    # ===== USER TOTALS =====
+    usertotals = {"questions": {}}
+
+    # Today
+    query = """
+      SELECT questionsAnswered
+      FROM leaderboard
+      WHERE dateStamp = CURDATE() AND userid = %s
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    today_questions = int(row[0]) if row and row[0] is not None else 0
+
+    # Yesterday
+    query = """
+      SELECT questionsAnswered
+      FROM leaderboard
+      WHERE dateStamp = CURDATE() - INTERVAL 1 DAY AND userid = %s
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    yesterday_questions = int(row[0]) if row and row[0] is not None else 0
+
+    # This week
+    weekday = time.strftime("%A")
+    if weekday == "Monday":
+      this_week_questions = today_questions
+    elif weekday == "Tuesday":
+      this_week_questions = today_questions + yesterday_questions
+    else:
+      query = """
+        SELECT SUM(questionsAnswered)
+        FROM leaderboard
+        WHERE YEARWEEK(dateStamp, 5) = YEARWEEK(CURDATE(), 5) AND userid = %s
+      """
+      con.execute(query, (user_id,))
+      row = con.fetchone()
+      this_week_questions = int(row[0]) if row and row[0] is not None else 0
+
+    # This month
+    day_of_month = time.strftime("%d")
+    if day_of_month == "01":
+      this_month_questions = today_questions
+    elif day_of_month == "02":
+      this_month_questions = today_questions + yesterday_questions
+    else:
+      query = """
+        SELECT SUM(questionsAnswered)
+        FROM leaderboard
+        WHERE DATE_FORMAT(dateStamp, '%%Y%%m') = DATE_FORMAT(CURDATE(), '%%Y%%m')
+        AND userid = %s
+      """
+      con.execute(query, (user_id,))
+      row = con.fetchone()
+      this_month_questions = int(row[0]) if row and row[0] is not None else 0
+
+    # This year
+    month = time.strftime("%m")
+    if month == "01":
+      this_year_questions = this_month_questions
+    else:
+      query = """
+        SELECT SUM(questionsAnswered)
+        FROM leaderboard
+        WHERE DATE_FORMAT(dateStamp, '%%Y') = DATE_FORMAT(CURDATE(), '%%Y')
+        AND userid = %s
+      """
+      con.execute(query, (user_id,))
+      row = con.fetchone()
+      this_year_questions = int(row[0]) if row and row[0] is not None else 0
+
+    # Eternity (all time)
+    query = """
+      SELECT SUM(questionsAnswered)
+      FROM leaderboard
+      WHERE userid = %s
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    eternity_questions = int(row[0]) if row and row[0] is not None else 0
+
+    # Build usertotals dictionary
+    usertotals["questions"] = {
+      "today": today_questions,
+      "yesterday": yesterday_questions,
+      "thisWeek": this_week_questions,
+      "thisMonth": this_month_questions,
+      "thisYear": this_year_questions,
+      "eternity": eternity_questions
+    }
+
+    result["usertotals"] = usertotals
+
+    # ===== USER RECORDS =====
+    userrecords = {}
+
+    # Weekday record (best for current weekday)
+    query = """
+      SELECT dateStamp, questionsAnswered
+      FROM leaderboard
+      WHERE DATE_FORMAT(dateStamp, '%%a') = DATE_FORMAT(CURDATE(), '%%a')
+      AND userid = %s
+      ORDER BY questionsAnswered DESC, dateStamp DESC
+      LIMIT 1
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    if row and row[0] and row[1] is not None:
+      userrecords["weekday"] = {
+        "date": str(row[0]),
+        "questions": int(row[1])
+      }
+
+    # Day record (best single day)
+    query = """
+      SELECT dateStamp, questionsAnswered
+      FROM leaderboard
+      WHERE userid = %s
+      ORDER BY questionsAnswered DESC, dateStamp DESC
+      LIMIT 1
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    if row and row[0] and row[1] is not None:
+      userrecords["day"] = {
+        "date": str(row[0]),
+        "questions": int(row[1])
+      }
+
+    # Week record (best week)
+    query = """
+      SELECT MIN(dateStamp), SUM(questionsAnswered)
+      FROM leaderboard
+      WHERE userid = %s
+      GROUP BY YEARWEEK(dateStamp, 5)
+      ORDER BY SUM(questionsAnswered) DESC, MIN(dateStamp) DESC
+      LIMIT 1
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    if row and row[0] and row[1] is not None:
+      userrecords["week"] = {
+        "date": str(row[0]),
+        "questions": int(row[1])
+      }
+
+    # Month record (best month)
+    query = """
+      SELECT MIN(dateStamp), SUM(questionsAnswered)
+      FROM leaderboard
+      WHERE userid = %s
+      GROUP BY DATE_FORMAT(dateStamp, '%%Y%%m')
+      ORDER BY SUM(questionsAnswered) DESC, MIN(dateStamp) DESC
+      LIMIT 1
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    if row and row[0] and row[1] is not None:
+      userrecords["month"] = {
+        "date": str(row[0]),
+        "questions": int(row[1])
+      }
+
+    # Year record (best year)
+    query = """
+      SELECT MIN(dateStamp), SUM(questionsAnswered)
+      FROM leaderboard
+      WHERE userid = %s
+      GROUP BY DATE_FORMAT(dateStamp, '%%Y')
+      ORDER BY SUM(questionsAnswered) DESC, MIN(dateStamp) DESC
+      LIMIT 1
+    """
+    con.execute(query, (user_id,))
+    row = con.fetchone()
+    if row and row[0] and row[1] is not None:
+      userrecords["year"] = {
+        "date": str(row[0]),
+        "questions": int(row[1])
+      }
+
+    # Format dates
+    date_formats = {
+      "year": "%Y",
+      "month": "%b %Y",
+      "week": "%d %b %Y",
+      "day": "%d %b %Y",
+      "weekday": "%d %b %Y"
+    }
+
+    for period, date_format in date_formats.items():
+      if period in userrecords and userrecords[period]:
+        try:
+          dt = datetime.strptime(userrecords[period]["date"], "%Y-%m-%d")
+          userrecords[period]["date"] = dt.strftime(date_format)
+
+          if period == "week":
+            week_end = dt + timedelta(days=6)
+            userrecords[period]["dateEnd"] = week_end.strftime(date_format)
+
+          if period == "weekday":
+            userrecords[period]["weekday"] = dt.strftime("%A")
+        except (ValueError, KeyError) as e:
+          app.logger.error(f"Error formatting date for {period}: {e}")
+          # Keep original date format
+
+    result["userrecords"] = userrecords
+
+    # Return in legacy format: list with data dict and empty dict
+    response_data = [result, {}]
+    return jsonify(response_data)
+
+  except Exception as ex:
+    app.logger.error(f"Error in get_my_records: {ex}")
+    app.logger.error(traceback.format_exc())
+    error_msg = f"An exception of type {type(ex).__name__} occurred. Arguments: {ex.args}"
+    return jsonify({"error": error_msg}), 500
+
+class Metaranks():
+  def __init__(self, data):
+    # default to the MySQL function curdate()
+    self.curdate = data.get("curDate", "curdate()")
+    self.displayType = int(data.get("displayType", 2))
+    self.pageSize = max(min(int(data.get("pageSize", 10)),50),2)
+    self.pageNumber = max(int(data.get("pageNumber", 1)),1)
+    self.period = data.get("timeframe", "daily")
+    if self.period not in PERIODS:
+      self.period = "daily"
+    self.currentRank = -1
+    self.countUsers()
+    self.findUser()
+    self.getRankingBounds()
+    self.getRankingsData()
+
+  def countUsers(self):
+    self.query = f"""SELECT COUNT(userid) FROM (
+                     SELECT userid{self.setDateType()}
+      FROM leaderboard{self.checkWhere()}{self.setDay()}{self.setMonth()}
+      GROUP BY userid{self.getTimeConditionsQuery()}) AS TMP"""
+
+    # note -- the PHP was returning an assoc array with column names mapped to values
+    # to do this in Python you need to use cursor.description
+    # result is returning cursor.fetchall() which only contains the values
+    result = self.runQuery()
+    for row in result:
+      self.userCount = row[0]
+
+  def getDateFormatForQuery(self):
+    dateFormat = "1"
+    if self.period == "weekly":
+      dateFormat = f"{self.getTimeConditionsQuery()[1:]}=DATE_FORMAT(NOW(),'%Y%u')"
+    elif self.period == MONTHS + ["monthly"]:
+      dateFormat = f"{self.getTimeConditionsQuery()[1:]}=DATE_FORMAT(NOW(),'%Y%m')"
+    elif self.period == "yearly":
+      dateFormat = f"{self.getTimeConditionsQuery()[1:]}=DATE_FORMAT(NOW(), '%Y')"
+    elif self.period in DAYS + ["daily"]:
+      dateFormat = "dateStamp=CURDATE()"
+    return dateFormat
+
+  def getTimeConditionsQuery(self):
+    fragment = "DATE_FORMAT(dateStamp,"
+    if self.period in ["daily"] + DAYS:
+      result = ", dateStamp"
+    elif self.period == "weekly":
+      result = f", {fragment}'%Y%u')"
+    elif self.period == "monthly":
+      result = f", {fragment}'%Y%m')"
+    elif self.period == "yearly":
+      result = f", {fragment}'%Y')"
+    elif self.period in MONTHS:
+      result = f", {fragment}'%Y%m')"
+    else:
+      result = ""
+
+    return result
+
+  def setDateType(self):
+    if self.period in ["daily","monday","tuesday","wednesday","thursday",
+                       "friday","saturday","sunday"]:
+      result = ", dateStamp AS date"
+    elif self.period in ["weekly"]:
+      result = ", MIN(dateStamp) AS date"
+    elif self.period in ["monthly","yearly","january","february","march","april",
+                         "may","june","july","august","september","october",
+                         "november","december"]:
+      result = ", MIN(dateStamp) AS date"
+    else:
+      result = ""
+    return result
+
+
+  def setDay(self):
+    try:
+      dayOfWeek = DAYS.index(self.period)
+    except ValueError:
+      return ""
+    return f"WEEKDAY(dateStamp)={dayOfWeek}"
+
+  def setMonth(self):
+    try:
+      month = MONTHS.index(self.period)+1
+    except ValueError:
+      return ""
+    return f"MONTH(dateStamp)={month}"
+
+  def runQuery(self):
+    ''' Runs the query text in self.query and returns the results '''
+    g.con.execute(self.query)
+    return g.con.fetchall()
+
+  def findUser(self, findCurrent=True):
+    self.query = f""" SELECT userid, SUM(questionsAnswered) AS total {self.setDateType()}
+                       FROM leaderboard
+                       {self.checkWhere()}{self.setDay()}{self.setMonth()}
+                       GROUP BY userid{self.getTimeConditionsQuery()}
+                       ORDER BY total DESC, date ASC """
+    # columns in result set: [userid, questionsAnswered, date]
+    result = self.runQuery()
+    myResult = [(i,j[2]) for (i,j) in enumerate(result) if j[0] == g.uuid]
+    # if my uuid is in the result set, myResult is now [(<index>, <date>)]
+    # if not, myResult is an empty list, which is falsy
+    if bool(myResult):
+      myRank = myResult[0][0]+1
+      myDate = myResult[0][1]
+      self.userRank = myRank
+      if findCurrent and self.compareDateWithCurrent(myDate):
+        self.currentRank = myRank
+    else:
+      self.userRank = -1
+
+  def checkWhere(self):
+    if self.period not in ["daily","weekly","monthly","yearly"]:
+      return " WHERE "
+    return ""
+
+  def checkAnd(self):
+    if self.period not in ["daily","weekly","monthly","yearly"]:
+      return " AND "
+    return ""
+
+  def compareDateWithCurrent(self, dateIn):
+    now = datetime.now()
+    if self.period in DAYS:
+      # if the date isn't a Monday, grab the previous Monday at 12 pm
+      delta = relativedelta(weekday=MO(-1), hour=12, minute=0, second=0, microsecond=0)
+      if dateIn.weekday() != 1:
+        x = dateIn + delta
+      else:
+        x = dateIn
+      if now.weekday() != 1:
+        lastMonday = now + delta
+      else:
+        lastMonday = now
+      return (datetime.date(x) == datetime.date(lastMonday)) and (dateIn.weekday() == now.weekday())
+    if self.period in MONTHS + ["monthly"]:
+      return now.month == dateIn.month and now.year == dateIn.year
+    if self.period == "daily":
+      return datetime.date(now) == dateIn
+    if self.period == "weekly":
+      return now.isocalendar().week == dateIn.isocalendar().week and now.year == dateIn.year
+    if self.period == "yearly":
+      return now.year == dateIn.year
+    return False
+
+  def formatDate(self, dateIn):
+    if self.period in ["daily"] + DAYS:
+      formattedDate = dateIn.strftime("%d %b %Y")
+    elif self.period in ["yearly"] + MONTHS:
+      formattedDate = dateIn.strftime("%Y")
+    elif self.period == "monthly":
+      formattedDate = dateIn.strftime("%b %Y")
+    elif self.period == "weekly":
+      if dateIn.weekday() == 0:
+        dateIn = dateIn + timedelta(weeks=1)
+      formattedDate = dateIn.strftime("%d %b %Y")
+    else:
+      formattedDate = p_date
+    return formattedDate
+
+  def getRankingBounds(self):
+    ''' This was Rick's code. I have no idea what it does. '''
+    if self.displayType == 3:
+      bound = self.pageSize
+      if bound % 2 == 0:
+        self.pageSize += 1
+      else:
+        bound = bound - 1
+      bounds = int(bound / 2)
+      if self.currentRank != -1:
+        index = self.currentRank
+      else:
+        index = self.userRank
+      if index + bounds > self.userCount:
+        self.offset = max(self.userCount - self.pageSize, 0)
+      else:
+        self.offset = max(index - bounds - 1, 0)
+      self.pageTotal = 1
+      self.page = 1
+    else:
+      self.pageTotal = ceil(self.userCount / self.pageSize)
+      if self.pageTotal == 0:
+        self.pageTotal = 1
+      self.page = min(self.pageNumber-1,self.pageTotal)
+      self.offset = self.pageSize * self.page
+
+  def getRankingsData(self):
+    queryStart = f"""SELECT SUM(questionsAnswered) AS total{self.setDateType()}, userid
+               FROM leaderboard"""
+    self.query = f"""{queryStart}{self.checkWhere()}{self.setDay()}{self.setMonth()}
+               GROUP BY userid {self.getTimeConditionsQuery()}
+               ORDER BY total DESC, date ASC
+               LIMIT {self.offset},{self.pageSize} """
+    result = self.runQuery()
+
+    user_info_list = getUserData([row[2] for row in result])
+    user_info_dict = {user["userid"]: user for user in user_info_list}
+    rank = self.offset
+    self.rankData = [ ]
+    foundMe = False
+    foundCurrent = False
+    for row in result:
+      rank += 1
+      userid = row[2]
+      user_info = user_info_dict.get(userid, {"name": "Mystery User",
+                                              "photo": "images/unknown_player.gif",
+                                              "countryId": 0})
+      rowDict = { "total": row[0],
+                  "date": row[1],
+                  "userid": row[2],
+                  "name": user_info.get("name", "Mystery User"),
+                  "photo": user_info.get("photo", "images/unknown_player.gif"),
+                  "countryId": user_info.get("countryId", 0)}
+
+      if rowDict["userid"] == g.uuid:
+        rowDict["isMe"] = True
+        if rank == self.userRank:
+          foundMe = True
+        if rank == self.currentRank and self.currentRank != -1:
+          foundCurrent = True
+          rowDict["isCurrent"] = True
+      rowDict["rank"] = rank
+      self.rankData.append(rowDict)
+    if not foundMe and self.userRank != -1:
+      self.query = f"""{queryStart} WHERE userid='{g.uuid}'
+                 {self.checkAnd()}{self.setDay()}{self.setMonth()}
+              GROUP BY userid{self.getTimeConditionsQuery()}
+              ORDER BY total DESC, date ASC
+              LIMIT 1"""
+      result = self.runQuery()
+      for row in result:
+        rowDict = {"total": row[0], "date": row[1], "userid": row[2]}
+        if rowDict["userid"] == g.uuid:
+          rowDict["isMe"] = True
+          if self.userRank == self.currentRank and self.currentRank != -1:
+            foundCurrent = True
+            rowDict["isCurrent"] = True
+          if self.userRank != -1:
+            rowDict["rank"] = self.userRank
+          if rowDict["rank"] < self.rankData[0]["rank"]:
+            self.rankData.insert(0, rowDict)
+          elif foundCurrent and rowDict["rank"] < self.rankData[1]["rank"]:
+            self.rankData.insert(1, rowDict)
+          else:
+            self.rankData.append(rowDict)
+    if not foundCurrent and self.currentRank != -1 and self.userRank != -1:
+      self.query = f"""{queryStart} WHERE userid='{g.uuid}'{self.checkAnd()}
+                       {self.setDay()}{self.setMonth()} AND {self.getDateFormatForQuery()}
+                GROUP BY userid{self.getTimeConditionsQuery()}
+                ORDER BY total DESC, date ASC
+                LIMIT 1 """
+      result = self.runQuery()
+      for row in result:
+        rowDict = {"total": row[0], "date": row[1], "userid": row[2]}
+        if rowDict["userid"] == g.uuid:
+          rowDict["isMe"] = True
+          rowDict["isCurrent"] = True
+          rowDict["rank"] = self.currentRank
+          if rowDict["rank"] < self.rankData[0]["rank"]:
+            self.rankData.insert(0, rowDict)
+          elif rowDict["rank"] < self.rankData[1]["rank"] and not foundCurrent:
+            self.rankData.insert(1, rowDict)
+          else:
+            self.rankData.append(rowDict)
+
+  def getRankings(self):
+    rankingsList = [ ]
+    for row in self.rankData:
+      userData = { }
+      subData = {'answered': row['total']}
+      if 'isMe' in row:
+        subData["photo"] = g.photo
+        subData["name"] = g.name
+        userData['countryId'] = g.countryId
+        userData["isMe"] = row["isMe"]
+      else:
+        subData['photo'] = row['photo']
+        subData['name'] = row['name']
+        userData['countryId'] = row.get('countryId', '0')
+
+      userData['rank'] = row['rank']
+      userData['date'] = self.formatDate(row['date'])
+      userData['users'] = [ subData ]
+      if 'isCurrent' in row:
+        userData['isCurrent'] = row['isCurrent']
+
+      rankingsList.append(userData)
+    result = { "rankings": rankingsList, "myRank": self.userRank, "myCurrent": self.currentRank,
+               "period": self.period, "users": self.userCount, "page": self.page+1}
+    return result
+
+class Awards():
+  def __init__(self, data):
+    self.displayType = 0
+    self.offset = 0
+    self.userCount = 0
+    self.userRank = -1
+    self.inData = { }
+    self.outData = [ ]
+    self.type = 0
+    # Ensure the cursor returns dictionaries for easier column access
+    self.cursor = g.mysqlcon.cursor(DictCursor)
+
+    # Parse input parameters (same as before)
+    if "year" in data:
+      try:
+        self.year = int(data["year"])
+      except ValueError:
+        self.year = 0
+    else:
+      self.year = 0
+
+    if "type" in data:
+      if data["type"] == "most":
+        self.type = 1
+      else:  # type is "top" or default
+        self.type = 0
+    else:
+      self.type = 0
+
+    if "pageSize" in data:
+      try:
+        self.pageSize = int(data["pageSize"])
+      except ValueError:
+        self.pageSize = 10
+      if self.pageSize < 1 or self.pageSize > 50:
+        self.pageSize = 10
+    else:
+      self.pageSize = 10
+
+    if "pageNumber" in data:
+      try:
+        self.pageNumber = max(int(data["pageNumber"]), 1)
+      except ValueError:
+        self.pageNumber = 1
+    else:
+      self.pageNumber = 1
+
+    if "displayType" in data:
+      try:
+        self.displayType = int(data["displayType"])
+      except ValueError:
+        self.displayType = 0
+    else:
+      self.displayType = 0
+
+    # Query the database directly instead of reading from file
+    self.queryDatabase()
+    self.findUserRank()
+    self.getUserAmount()
+    self.getRankingBounds()
+    self.extractData()
+
+  def queryDatabase(self):
+    """Query the database directly based on type and year parameters"""
+    try:
+
+      # Determine ordering based on type
+      if self.type == 1:  # "most" type - order by total first
+        ordering = 'total DESC, emerald DESC, ruby DESC, sapphire DESC, gold DESC, silver DESC, bronze DESC,'
+      else:  # "top" type - order by coin values first
+        ordering = 'emerald DESC, ruby DESC, sapphire DESC, gold DESC, silver DESC, bronze DESC,'
+
+      # Build and execute the appropriate query
+      if self.year == 0:
+        # Query for all-time totals from user_coin_total table
+        sql = '''
+          SELECT userid, emerald + ruby + sapphire + gold + silver + bronze AS total,
+               emerald, ruby, sapphire, gold, silver, bronze, dateStamp
+          FROM user_coin_total
+          ORDER BY {ordering} dateStamp ASC
+        '''.format(ordering=ordering)
+        self.cursor.execute(sql)
+
+      elif self.year > 2017:
+        # Query for specific year from user_coin_log table with aggregation
+        coins = ['emerald', 'ruby', 'sapphire', 'gold', 'silver', 'bronze']
+
+        # Build the SUM clauses for each coin type
+        sum_clauses = []
+        for idx, coin in enumerate(coins):
+          sum_clauses.append(f'SUM(amount * (coinType = {idx})) AS {coin}')
+
+        sql = '''
+          SELECT userid,
+               {sum_clauses},
+               MIN(dateStamp) AS earliest,
+               SUM(amount) AS total
+          FROM user_coin_log
+          WHERE YEAR(dateStamp) = %s
+          GROUP BY userid
+          ORDER BY {ordering} earliest ASC
+        '''.format(
+          sum_clauses=', '.join(sum_clauses),
+          ordering=ordering
+        )
+        self.cursor.execute(sql, (self.year,))
+      else:
+        # No data for years <= 2017 (except 0 which is handled above)
+        self.rankings = []
+        self.lastUpdate = int(time.time())
+        return
+
+      # Get the raw query results
+      query_results = self.cursor.fetchall()
+
+      if not query_results:
+        self.rankings = []
+        self.lastUpdate = int(time.time())
+        return
+
+      # Extract userids to fetch user data
+      userids = [row['userid'] for row in query_results]
+
+      # Get user data from the helper function
+      user_data_list = getUserData(userids)
+
+      # Create a lookup dictionary for quick access
+      user_data = {user['userid']: user for user in user_data_list}
+
+      # Combine query results with user data
+      rankings = []
+      pos = 0
+
+      for row in query_results:
+        pos += 1
+        userid = row['userid']
+
+        # Get user data for this userid, use defaults if missing
+        user_info = user_data.get(userid, {})
+
+        if user_info:
+          # User found - use actual data
+          name = user_info.get('name', 'Unknown User')
+          countryId = user_info.get('countryId', 0)
+          photo = user_info.get('photo', 'images/unknown_player.gif')
+        else:
+          # User missing - use defaults and log warning
+          app.logger.warning(f"Missing user data for userid: {userid}, using defaults")
+          name = "Unknown User"
+          countryId = 0
+          photo = "images/unknown_player.gif"
+
+        ranking_entry = {
+          'rank': pos,
+          'name': name,
+          'id': userid,
+          'countryId': countryId,
+          'photo': photo,
+          'values': {
+            'emerald': row['emerald'],
+            'ruby': row['ruby'],
+            'sapphire': row['sapphire'],
+            'gold': row['gold'],
+            'silver': row['silver'],
+            'bronze': row['bronze'],
+            'total': row['total']
+          }
+        }
+        rankings.append(ranking_entry)
+
+      self.rankings = rankings
+      self.lastUpdate = int(time.time())
+
+    except Exception as e:
+      app.logger.error(f"Database error in Awards.queryDatabase: {str(e)}")
+      self.rankings = []
+      self.lastUpdate = int(time.time())
+
+  def getRankingBounds(self):
+    ''' This was Rick's code. I have no idea what it does. '''
+    if self.displayType == 1:
+      bound = self.pageSize
+      if bound % 2 == 0:
+        self.pageSize += 1
+      else:
+        bound = bound - 1
+      bounds = int(bound / 2)
+      if self.userRank + bounds > self.userCount:
+        self.offset = max(self.userCount - self.pageSize, 0)
+      else:
+        self.offset = max(self.userRank - bounds - 1, 0)
+      self.pagetotal = 1
+      self.page = 1
+    else:
+      self.pageTotal = ceil(self.userCount / self.pageSize) if self.userCount > 0 else 1
+      if self.pageTotal == 0:
+        self.pageTotal = 1
+      self.page = min(self.pageNumber - 1, self.pageTotal - 1)  # Fixed: pageTotal-1 for zero-based
+      self.offset = self.pageSize * self.page
+
+  def findUserRank(self):
+    try:
+      self.userRank = [a["rank"] for a in self.rankings if a["id"] == g.uuid][0]
+    except (IndexError, KeyError, AttributeError):
+      self.userRank = -1
+
+  def getRankings(self):
+    return self.outData
+
+  def parseOutputParams(self, p_row):
+    outp = {
+      'rank': p_row['rank'],
+      'photo': p_row['photo'],
+      'name': p_row['name'],
+      'countryId': p_row['countryId'],
+      'values': p_row['values']
+    }
+    if 'isMe' in p_row:
+      outp['isMe'] = 1
+    return outp
+
+  def extractData(self):
+    if not self.rankings:
+      self.outData = {
+        "rankings": [],
+        "users": 0,
+        "lastUpdate": self.lastUpdate,
+        "page": 1
+      }
+      return
+
+    userFound = 0
+    result = []
+
+    # Ensure offset is within bounds
+    start_idx = min(self.offset, len(self.rankings))
+    end_idx = min(self.offset + self.pageSize, len(self.rankings))
+
+    for index, row in enumerate(self.rankings[start_idx:end_idx]):
+      actual_index = self.offset + index
+      if actual_index == self.userRank - 1:
+        row["isMe"] = 1
+        userFound = 1
+
+      # Transform the row to match frontend expectations
+      transformed_row = {
+        'rank': row['rank'],
+        'name': row['name'],
+        'id': row['id'],
+        'countryId': row['countryId'],
+        'photo': row['photo'],
+        'values': row['values'],
+        'users': [  # Add users array as expected by frontend
+          {
+            'name': row['name'],
+            'photo': row['photo']
+            # Add any other user-specific fields here if needed
+          }
+        ]
+      }
+      if 'isMe' in row:
+        transformed_row['isMe'] = row['isMe']
+
+      result.append(transformed_row)
+
+    if userFound == 0 and self.userRank != -1:
+      # Add the user's entry if not in current page
+      user_row = self.rankings[self.userRank - 1].copy()
+      user_row["isMe"] = 1
+
+      # Transform the user row
+      transformed_user = {
+        'rank': user_row['rank'],
+        'name': user_row['name'],
+        'id': user_row['id'],
+        'countryId': user_row['countryId'],
+        'photo': user_row['photo'],
+        'values': user_row['values'],
+        'users': [
+          {
+            'name': user_row['name'],
+            'photo': user_row['photo']
+          }
+        ],
+        'isMe': 1
+      }
+
+      if self.userRank < self.offset + 1:
+        result.insert(0, transformed_user)
+      else:
+        result.append(transformed_user)
+
+    # The top-level structure should have 'rankings' as the key
+    self.outData = {
+      "rankings": result,
+      "users": self.userCount,
+      "lastUpdate": self.lastUpdate,
+      "page": self.page + 1
+    }
+
+  def getUserAmount(self):
+    self.userCount = len(self.rankings)
+
+class Rankings():
+  def __init__(self, data):
+    if 'curDate' in data:
+      self.curDate = data['curDate']
+    else:
+      self.curDate = "curdate()"
+    self.pageSize = 10
+    if 'pageSize' in data:
+      try:
+        if 1 < int(data['pageSize']) <= 50:
+          self.pageSize = int(data['pageSize'])
+      except ValueError:
+        pass
+    self.pageNumber = 1
+    if 'pageNumber' in data:
+      try:
+        if int(data['pageNumber']) > 0:
+          self.pageNumber = int(data['pageNumber'])
+      except ValueError:
+        pass
+    if 'displayType' in data:
+      try:
+        self.displayType = int(data['displayType'])
+      except ValueError:
+        self.displayType = 0
+    else:
+      self.displayType = 0
+    if 'timeframe' in data:
+      if data['timeframe'] in RANKING_PERIODS:
+        self.period = data['timeframe']
+    else:
+      self.period = 'today'
+
+    self.countUsers()
+    self.findUser()
+    self.getRankingBounds()
+    self.getRankingsData()
+
+  def getTimeConditionsQuery(self):
+    ''' Return a where clause appropriate for the period in self.period '''
+    if self.period == 'today':
+      clause = 'dateStamp = @datevalue'
+    elif self.period == 'yesterday':
+      clause = 'dateStamp = @datevalue - INTERVAL 1 DAY'
+    elif self.period == 'thisWeek':
+      clause = 'WEEK(dateStamp, 7) = WEEK(@datevalue, 7) AND YEARWEEK(dateStamp, 7) = YEARWEEK(@datevalue, 7)'
+    elif self.period == 'lastWeek':
+      clause = 'WEEK(dateStamp,7) = WEEK(@datevalue - INTERVAL 7 DAY,7) AND YEARWEEK(dateStamp,7) = YEARWEEK(@datevalue - INTERVAL 7 DAY,7)'
+    elif self.period == 'thisMonth':
+      clause = 'MONTH(dateStamp) = MONTH(@datevalue) AND YEAR(dateStamp) = YEAR(@datevalue)'
+    elif self.period == 'lastMonth':
+      clause = 'MONTH(dateStamp) = MONTH(@datevalue - INTERVAL 1 MONTH) AND YEAR(dateStamp) = YEAR(@datevalue - INTERVAL 1 MONTH)'
+    elif self.period == 'thisYear':
+      clause = 'YEAR(dateStamp) = YEAR(@datevalue)'
+    elif self.period == 'lastYear':
+      clause = 'YEAR(dateStamp) = YEAR(@datevalue - INTERVAL 1 YEAR)'
+    else:
+      clause = ''
+    return clause
+
+  def runQuery(self):
+    """Run the mysql query in self.query"""
+    g.con.execute(f'SET @datevalue = {self.curDate}')
+    g.con.execute(self.query)
+    return g.con.fetchall()
+
+  def findUser(self):
+    ''' Find the rank of me in today's leaderboard
+        There's got to be an easy way to do this in MySQL: see issue #100 '''
+    self.query = f'''SELECT SUM(questionsAnswered) AS total, userid
+                     FROM leaderboard
+                     {self.checkEtern("WHERE")}{self.getTimeConditionsQuery()}
+                     GROUP BY userid
+                     ORDER BY total DESC'''
+    result = self.runQuery()
+    myIndex = [i for (i,j) in enumerate(result) if j[1] == g.uuid]
+    # at this point, myIndex is [<index>] where it's the index of the row matching my uuid in the result set
+    # if no match, myIndex is an empty list which is falsy -- note bool([0]) is True
+    if bool(myIndex):
+      self.userRank = myIndex[0]+1
+    else:
+      self.userRank = -1
+
+  def checkEtern(self, insert):
+    """Used for query formatting that changes when certain whereclauses aren't needed"""
+    if self.period != 'eternity':
+      return f' {insert} '
+    return ''
+
+  def countUsers(self):
+    ''' Return number of users in leaderboard for the given period '''
+    self.query = f'SELECT COUNT(DISTINCT userid) AS users FROM leaderboard{self.checkEtern("WHERE")}{self.getTimeConditionsQuery()}'
+    result = self.runQuery()
+    for row in result:
+      self.userCount = row[0]
+
+  def getRankingBounds(self):
+    ''' This was Rick's code. I have no idea what it does. '''
+    if self.displayType == 1:
+      bound = self.pageSize
+      if bound % 2 == 0:
+        self.pageSize += 1
+      if bound % 2 != 0:
+        bound = bound - 1
+      bounds = int(bound / 2)
+      self.offset = max(self.userRank - bounds - 1, 0)
+      if self.userRank + bounds > self.userCount:
+        self.offset = max(self.userCount - self.pageSize, 0)
+      self.pageTotal = 1
+      self.page = 1
+    else:
+      self.pageTotal = ceil(self.userCount / self.pageSize)
+      if self.pageTotal == 0:
+        self.pageTotal = 1
+      self.page = min(self.pageNumber-1, self.pageTotal)
+      self.offset = self.pageSize * self.page
+
+  def getRankingsData(self):
+    """Process rankings data from the database"""
+    queryStart = 'SELECT SUM(questionsAnswered) AS total, userid FROM leaderboard '
+    self.query = f'''{queryStart}{self.checkEtern("WHERE")}{self.getTimeConditionsQuery()}
+                    GROUP BY userid ORDER BY total DESC
+                    LIMIT {self.offset},{self.pageSize}'''
+    result = self.runQuery()
+    self.rankData = [ ]
+    user_info_list = getUserData([row[1] for row in result])
+    user_info_dict = {user["userid"]: user for user in user_info_list}
+    foundMe = False
+    for index, row in enumerate(result):
+      userid = row[1]
+      user_info = user_info_dict.get(userid, {"name": "Mystery User",
+                                              "photo": "images/unknown_player.gif",
+                                              "countryId": 0})
+      rowDict = { "total": row[0],
+                  "userid": row[1],
+                  "name": user_info.get("name", "Mystery User"),
+                  "photo": user_info.get("photo", "images/unknown_player.gif"),
+                  "countryId": user_info.get("countryId", 0)}
+      if rowDict["userid"] == g.uuid:
+        rowDict['isMe'] = True
+        foundMe = True
+      rowDict['rank'] = self.offset + index + 1
+      self.rankData.append(rowDict)
+    if not foundMe:
+      self.query = f'''{queryStart} WHERE userid='{g.uuid}'{self.checkEtern('AND')}{self.getTimeConditionsQuery()}
+                    GROUP BY userid ORDER BY total DESC LIMIT 1'''
+      result = self.runQuery()
+      # I think no rows returned gets me an empty list
+      if result:
+        row = result[0]
+        rowDict = {"total": row[0], "userid": row[1]}
+        rowDict['isMe'] = True
+        if self.userRank:
+          rowDict['rank'] = self.userRank
+        if rowDict['rank'] < self.rankData[0]['rank']:
+          self.rankData.insert(0, rowDict)
+        else:
+          self.rankData.append(rowDict)
+
+  def getRankings(self):
+    """Format the data structures to output to the client"""
+    rankingsList = [ ]
+    for row in self.rankData:
+      userData = { }
+      subData = {'answered': row['total']}
+      if 'isMe' in row:
+        subData["photo"] = g.photo
+        subData["name"] = g.name
+        userData['countryId'] = g.countryId
+        userData["isMe"] = row["isMe"]
+      else:
+        subData['photo'] = row['photo']
+        subData['name'] = row['name']
+        userData['countryId'] = row.get('countryId', "0")
+
+      userData['rank'] = row['rank']
+      userData['users'] = [ subData ]
+
+      rankingsList.append(userData)
+    result = { "rankings": rankingsList, "myRank": self.userRank,
+               "period": self.period, "users": self.userCount, "page": self.page+1}
+    return result
+
+class SlothRankings():
+  def __init__(self, data):
+    self.curDate = data.get('curDate', 'curdate()')
+    self.type = data.get('type', '100s')
+    self.pageSize = data.get('pageSize', 10)
+    try:
+      self.pageSize = int(self.pageSize)
+      if 1 < self.pageSize <= 50:
+        pass
+      else:
+        self.pageSize = 10
+    except ValueError:
+      self.pageSize = 10
+    self.pageNumber = data.get('pageNumber', 1)
+    try:
+      self.pageNumber = min(int(self.pageNumber), 1)
+    except ValueError:
+      self.pageSize = 1
+    self.displayType = data.get('displayType', 0)
+    try:
+      self.displayType = int(self.displayType)
+    except ValueError:
+      self.displayType = 0
+    self.period = data.get('timeframe', 'today')
+    if self.period not in RANKING_PERIODS:
+      self.period = 'today'
+
+    self.countUsers()
+    self.findUser()
+    self.getRankingBounds()
+    self.getRankingsData()
+
+  def getTimeConditionsQuery(self):
+    if self.period == 'today':
+      clause = 'date = @datevalue'
+    elif self.period == 'yesterday':
+      clause = 'date = @datevalue - INTERVAL 1 DAY'
+    elif self.period == 'thisWeek':
+      clause = 'WEEK(date, 7) = WEEK(@datevalue, 7) AND YEARWEEK(date, 7) = YEARWEEK(@datevalue, 7)'
+    elif self.period == 'lastWeek':
+      clause = 'WEEK(date,7) = WEEK(@datevalue - INTERVAL 7 DAY,7) AND YEARWEEK(date,7) = YEARWEEK(@datevalue - INTERVAL 7 DAY,7)'
+    elif self.period == 'thisMonth':
+      clause = 'MONTH(date) = MONTH(@datevalue) AND YEAR(date) = YEAR(@datevalue)'
+    elif self.period == 'lastMonth':
+      clause = 'MONTH(date) = MONTH(@datevalue - INTERVAL 1 MONTH) AND YEAR(date) = YEAR(@datevalue - INTERVAL 1 MONTH)'
+    elif self.period == 'thisYear':
+      clause = 'YEAR(date) = YEAR(@datevalue)'
+    elif self.period == 'lastYear':
+      clause = 'YEAR(date) = YEAR(@datevalue - INTERVAL 1 YEAR)'
+    elif self.period == 'eternity':
+      clause = '1'
+    else:
+      clause = ''
+    return clause
+
+  def getSlothSubFilter(self):
+    if self.type in ['unique', 'all']:
+      result = "1"
+    elif self.type in ['100s', 'all100s']:
+      result = "correct>=100"
+    elif self.type in ['perfect', 'allPerfect']:
+      result = "correct>=100 AND accuracy>=100"
+    else:
+      result = "1"
+    return result
+
+  def getSlothSubSelect(self):
+    if self.type in ['unique', '100s', 'perfect']:
+      result = "DISTINCT "
+    elif self.type in ['all', 'all100s', 'allPerfect']:
+      result = ""
+    else:
+      result = "DISTINCT "
+    return result
+
+  def runQuery(self):
+    """Run the mysql query in self.query"""
+    g.con.execute(f'SET @datevalue = {self.curDate}')
+    g.con.execute(self.query)
+    return g.con.fetchall()
+
+  def findUser(self):
+    self.query = f'''SELECT COUNT({self.getSlothSubSelect()} alphagram) AS total, userid
+                   FROM sloth_completed
+                   WHERE {self.getTimeConditionsQuery()} AND {self.getSlothSubFilter()}
+                   GROUP BY userid
+                   ORDER BY total DESC'''
+    result = self.runQuery()
+    myIndex = [i for (i,j) in enumerate(result) if j[1] == g.uuid]
+    # at this point, myIndex is [<index>] where it's the index of the row matching my uuid in the result set
+    # if no match, myIndex is an empty list which is falsy
+    if bool(myIndex):
+      self.userRank = myIndex[0]+1
+    else:
+      self.userRank = -1
+
+  def checkEtern(self, insert):
+    if self.period != 'eternity':
+      return f' {insert} '
+    return ''
+
+  def countUsers(self):
+    self.query = f'''SELECT COUNT(DISTINCT userid) AS users
+                   FROM sloth_completed
+                   WHERE {self.getTimeConditionsQuery()} AND {self.getSlothSubFilter()}'''
+    result = self.runQuery()
+    for row in result:
+      self.userCount = row[0]
+
+  def getRankingBounds(self):
+    ''' This was Rick's code. I have no idea what it does. '''
+    if self.displayType == 1:
+      bound = self.pageSize
+      if bound % 2 == 0:
+        self.pageSize += 1
+      if bound % 2 != 0:
+        bound = bound - 1
+      bounds = int(bound / 2)
+      self.offset = max(self.userRank - bounds - 1, 0)
+      if self.userRank + bounds > self.userCount:
+        self.offset = max(self.userCount - self.pageSize, 0)
+      self.pageTotal = 1
+      self.page = 1
+    else:
+      self.pageTotal = ceil(self.userCount / self.pageSize)
+      if self.pageTotal == 0:
+        self.pageTotal = 1
+      self.page = min(self.pageNumber-1, self.pageTotal)
+      self.offset = self.pageSize * self.page
+
+  def getRankingsData(self):
+    ''' Query the rankings data and load it into self.rankData '''
+    queryStart = f'''SELECT COUNT({self.getSlothSubSelect()}alphagram) AS total, userid
+                    FROM sloth_completed'''
+    self.query = f'''{queryStart}
+                    WHERE {self.getTimeConditionsQuery()} AND {self.getSlothSubFilter()}
+                    GROUP BY userid
+                    ORDER BY total DESC
+                    LIMIT {self.offset},{self.pageSize}'''
+    result = self.runQuery
+    self.rankData = [ ]
+    user_info_list = getUserData([row[1] for row in result])
+    user_info_dict = {user["userid"]: user for user in user_info_list}
+    foundMe = False
+    for index, row in enumerate(result):
+      userid = row[1]
+      user_info = user_info_dict.get(userid, {"name": "Mystery User",
+                                              "photo": "images/unknown_player.gif",
+                                              "countryId": 0})
+      rowDict = { "total": row[0],
+                  "userid": row[1],
+                  "name": user_info["name"],
+                  "photo": user_info["photo"],
+                  "countryId": user_info["countryId"]}
+      if rowDict["userid"] == g.uuid:
+        rowDict['isMe'] = True
+        foundMe = True
+      rowDict['rank'] = self.offset + index + 1
+      self.rankData.append(rowDict)
+    if not foundMe:
+      self.query = f'''{queryStart} WHERE userid='{g.uuid}'
+                       AND {self.getSlothSubFilter()} AND {self.getTimeConditionsQuery()}
+                       GROUP BY userid ORDER BY total DESC LIMIT 1'''
+      result = self.runQuery()
+      # I think no rows returned gets me an empty list
+      if result:
+        row = result[0]
+        rowDict = {"total": row[0], "userid": row[1]}
+        rowDict['isMe'] = True
+        if self.userRank:
+          rowDict['rank'] = self.userRank
+        if rowDict['rank'] < self.rankData[0]['rank']:
+          self.rankData.insert(0, rowDict)
+        else:
+          self.rankData.append(rowDict)
+
+  def getRankings(self):
+    """Format the data structures to output to the client"""
+    rankingsList = [ ]
+    for row in self.rankData:
+      userData = { }
+      subData = {'answered': row['total']}
+      if 'isMe' in row:
+        subData["photo"] = g.photo
+        subData["name"] = g.name
+        userData['countryId'] = g.countryId
+        userData["isMe"] = row["isMe"]
+      else:
+        subData['photo'] = row['photo']
+        subData['name'] = row['name']
+        userData['countryId'] = row.get('countryId', '0')
+
+      userData['rank'] = row['rank']
+      userData['users'] = [ subData ]
+
+      rankingsList.append(userData)
+    result = { "rankings": rankingsList, "myRank": self.userRank,
+               "period": self.period, "users": self.userCount, "page": self.page+1}
+    return result
