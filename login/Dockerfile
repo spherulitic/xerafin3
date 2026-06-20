@@ -11,7 +11,6 @@ RUN pip3 install -r requirements.txt
 RUN useradd --no-create-home --shell /bin/false appuser
 
 COPY . .
-RUN mkdir -p /app/user-photos && chown -R appuser:appuser /app/user-photos
 
 USER appuser
 

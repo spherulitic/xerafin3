@@ -22,7 +22,7 @@ Volume=/var/lib/xerafin/user-photos:/app/user-photos:rw,z
 
 # Ensure the correct runtime and conmon are used
 Environment=CONTAINER_CONMON=/usr/local/bin/conmon
-PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
+PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun --userns=keep-id
 
 [Service]
 Restart=always
