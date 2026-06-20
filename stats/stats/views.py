@@ -1,1 +1,90 @@
-ZnJvbSBtYXRoIGltcG9ydCBjZWlsCmZyb20gbG9nZ2luZy5jb25maWcgaW1wb3J0IGRpY3RDb25maWcKZnJvbSBkYXRldGltZSBpbXBvcnQgZGF0ZXRpbWUsIHRpbWVkZWx0YQpmcm9tIGZ1bmN0b29scyBpbXBvcnQgbHJ1X2NhY2hlCmZyb20gTXlTUUxkYi5jdXJzb3JzIGltcG9ydCBEaWN0Q3Vyc29yCmltcG9ydCBqc29uCmltcG9ydCB1cmxsaWIKaW1wb3J0IHJlcXVlc3RzCmltcG9ydCBqd3QKaW1wb3J0IHRpbWUKZnJvbSB0eXBpbmcgaW1wb3J0IERpY3QsIEFueSwgVHVwbGUsIE9wdGlvbmFsCmZyb20gZmxhc2sgaW1wb3J0IHJlcXVlc3QsIGpzb25pZnksIGcKZnJvbSBkYXRldXRpbC5yZWxhdGl2ZWRlbHRhIGltcG9ydCByZWxhdGl2ZWRlbHRhLCBNTwppbXBvcnQgdHJhY2ViYWNrCmltcG9ydCB4ZXJhZmluVXRpbC54ZXJhZmluVXRpbCBhcyB4dQpmcm9tIHN0YXRzIGltcG9ydCBhcHAKCkRBWVMgPSBbIm1vbmRheSIsInR1ZXNkYXkiLCJ3ZWRuZXNkYXkiLCJ0aHVyc2RheSIsImZyaWRheSIsInNhdHVyZGF5Iiwic3VuZGF5Il0KTU9OVEhTID0gWyJqYW51YXJ5IiwiZmVicnVhcnkiLCJtYXJjaCIsImFwcmlsIiwibWF5IiwianVuZSIsImp1bHkiLAogICAgICAgICAgImF1Z3VzdCIsInNlcHRlbWJlciIsIm9jdG9iZXIiLCJub3ZlbWJlciIsImRlY2VtYmVyIl0KUEVSSU9EUyA9IFsiZGFpbHkiLCJ3ZWVrbHkiLCJtb250aGx5IiwieWVhcmx5Il0gKyBEQVlTICsgTU9OVEhTClJBTktJTkdfUEVSSU9EUyA9IFsidG9kYXkiLCAieWVzdGVyZGF5IiwgInRoaXNXZWVrIiwgImxhc3RXZWVrIiwgInRoaXNNb250aCIsCiAgICAgICAgICAgICAgICAgICAibGFzdE1vbnRoIiwgInRoaXNZZWFyIiwgImxhc3RZZWFyIiwgImV0ZXJuaXR5Il0KCkFXQVJEU19ESVIgPSAnL2FwcC9hd2FyZHMnCgpkaWN0Q29uZmlnKHsKICAgICd2ZXJzaW9uJzogMSwKICAgICdmb3JtYXR0ZXJzJzogeydkZWZhdWx0JzogewogICAgICAgICdmb3JtYXQnOiAnWyUoYXNjdGltZSlzXSAlKGxldmVsbmFtZSlzIGluICUobW9kdWxlKXM6ICUobWVzc2FnZSlzJywKICAgIH19LAogICAgJ2hhbmRsZXJzJzogeyd3c2dpJzogewogICAgICAgICdjbGFzcyc6ICdsb2dnaW5nLlN0cmVhbUhhbmRsZXInLAogICAgICAgICdzdHJlYW0nOiAnZXh0Oi8vZmxhc2subG9nZ2luZy53c2dpX2Vycm9yc19zdHJlYW0nLAogICAgICAgICdmb3JtYXR0ZXInOiAnZGVmYXVsdCcKICAgIH19LAogICAgJ3Jvb3QnOiB7CiAgICAgICAgJ2xldmVsJzogJ0lORk8nLAogICAgICAgICdoYW5kbGVycyc6IFsnd3NnaSddCiAgICB9Cn0pCgpAbHJ1X2NhY2hlKG1heHNpemU9MSkKZGVmIGdldF9wdWJsaWNfa2V5KCk6CiAgICBwdWJsaWNfa2V5X3VybCA9ICdodHRwOi8va2V5Y2xvYWs6ODA4MC9yZWFsbXMvWGVyYWZpbicKICAgIHdpdGggdXJsbGliLnJlcXVlc3QudXJsb3BlbihwdWJsaWNfa2V5X3VybCkgYXMgcjoKICAgICAgICBwdWJsaWNfa2V5ID0ganNvbi5sb2FkcyhyLnJlYWQoKSlbJ3B1YmxpY19rZXknXQogICAgICAgIHJldHVybiBmJycnLS0tLS1CRUdJTiBQVUJMSUMgS0VZLS0tLS0Ke3B1YmxpY19rZXl9Ci0tLS0tRU5EIFBVQkxJQyBLRVktLS0tLScnJwoKQGFwcC5iZWZvcmVfcmVxdWVzdApkZWYgZ2V0X3VzZXIoKToKICAjIFNraXAgdmVyaWZpY2F0aW9uIGZvciBwdWJsaWMgcm91dGVzCiAgaWYgcmVxdWVzdC5lbmRwb2ludCBpbiBbJ2hlYWx0aCddOgogICAgcmV0dXJuCgogIHRyeToKICAgIHB1YmxpY19rZXkgPSBnZXRfcHVibGljX2tleSgpCiAgICByYXdfdG9rZW4gPSByZXF1ZXN0LmhlYWRlcnMuZ2V0KCJBdXRob3JpemF0aW9uIikKICAgIGlmIG5vdCByYXdfdG9rZW46CiAgICAgIHJldHVybiBqc29uaWZ5KHsnZXJyb3InOiAnQXV0aG9yaXphdGlvbiBoZWFkZXIgbWlzc2luZyd9KSwgNDAxCiAgICBpZiByYXdfdG9rZW4uc3RhcnRzd2l0aCgnQmVhcmVyICcpOgogICAgICByYXdfdG9rZW4gPSByYXdfdG9rZW5bNzpdCgogICAgYXV0aF90b2tlbiA9IGp3dC5kZWNvZGUocmF3X3Rva2VuLCBwdWJsaWNfa2V5LCBhdWRpZW5jZT0ieC1jbGllbnQiLCBhbGdvcml0aG1zPVsnUlMyNTYnXSkKICAgIGcudXVpZCA9IGF1dGhfdG9rZW5bInN1YiJdCiAgICBnLm5hbWUgPSBhdXRoX3Rva2VuLmdldCgibmFtZSIsICJVbmtub3duIikKCiAgICBnLnBob3RvID0gYXV0aF90b2tlbi5nZXQoJ2NhcmRib3hQcmVmcycsIHt9KS5nZXQoJ3Bob3RvJywgJ2ltYWdlcy91bmtub3duX3BsYXllci5naWYnKQogICAgZy5jb3VudHJ5SWQgPSBhdXRoX3Rva2VuLmdldCgnY2FyZGJveFByZWZzJywge30pLmdldCgnY291bnRyeUlkJywgMCkKICAgIGcuaGFuZGxlID0gYXV0aF90b2tlbi5nZXQoJ3ByZWZlcnJlZF91c2VybmFtZScsIGcubmFtZSkKICAgICMgaGVhZGVycyB0byBzZW5kIHRvIG90aGVyIHNlcnZpY2VzCiAgICBnLmhlYWRlcnMgPSB7IkFjY2VwdCI6ICJhcHBsaWNhdGlvbi9qc29uIiwgIkF1dGhvcml6YXRpb24iOiByYXdfdG9rZW59CgogICAgZy5teXNxbGNvbiA9IHh1LmdldE15c3FsQ29uKCkKICAgIGcuY29uID0gZy5teXNxbGNvbi5jdXJzb3IoKQoKICAgIHJldHVybiBOb25lCgogIGV4Y2VwdCBqd3QuRXhwaXJlZFNpZ25hdHVyZUVycm9yOgogICAgcmV0dXJuIGpzb25pZnkoeydlcnJvcic6ICdUb2tlbiBoYXMgZXhwaXJlZCd9KSwgNDAxCiAgZXhjZXB0IGp3dC5JbnZhbGlkVG9rZW5FcnJvciBhcyBlOgogICAgcmV0dXJuIGpzb25pZnkoeydlcnJvcic6IGYnSW52YWxpZCB0b2tlbjoge3N0cihlKX0nfSksIDQwMQogIGV4Y2VwdCBLZXlFcnJvciBhcyBlOgogICAgcmV0dXJuIGpzb25pZnkoeydlcnJvcic6IGYnTWlzc2luZyByZXF1aXJlZCB0b2tlbiBmaWVsZDoge3N0cihlKX0nfSksIDQwMQogIGV4Y2VwdCB1cmxsaWIuZXJyb3IuVVJMRXJyb3IgYXMgZToKICAgIHJldHVybiBqc29uaWZ5KHsnZXJyb3InOiBmJ0Nhbm5vdCByZWFjaCBhdXRoZW50aWNhdGlvbiBzZXJ2aWNlOiB7c3RyKGUpfSd9KSwgNTAzCiAgZXhjZXB0IEV4Y2VwdGlvbiBhcyBlOgogICAgcmV0dXJuIGpzb25pZnkoeydlcnJvcic6IGYnQXV0aGVudGljYXRpb24gZmFpbGVkOiB7c3RyKGUpfSd9KSwgNDAx
+from math import ceil
+from logging.config import dictConfig
+from datetime import datetime, timedelta
+from functools import lru_cache
+from MySQLdb.cursors import DictCursor
+import json
+import urllib
+import requests
+import jwt
+import time
+from typing import Dict, Any, Tuple, Optional
+from flask import request, jsonify, g
+from dateutil.relativedelta import relativedelta, MO
+import traceback
+import xerafinUtil.xerafinUtil as xu
+from stats import app
+
+DAYS = ["monday","tuesday","wednesday","thursday","friday","saturday","sunday"]
+MONTHS = ["january","february","march","april","may","june","july",
+          "august","september","october","november","december"]
+PERIODS = ["daily","weekly","monthly","yearly"] + DAYS + MONTHS
+RANKING_PERIODS = ["today", "yesterday", "thisWeek", "lastWeek", "thisMonth",
+                   "lastMonth", "thisYear", "lastYear", "eternity"]
+
+AWARDS_DIR = '/app/awards'
+
+dictConfig({
+    'version': 1,
+    'formatters': {'default': {
+        'format': '[%(asctime)s] %(levelname)s in %(module)s: %(message)s',
+    }},
+    'handlers': {'wsgi': {
+        'class': 'logging.StreamHandler',
+        'stream': 'ext://flask.logging.wsgi_errors_stream',
+        'formatter': 'default'
+    }},
+    'root': {
+        'level': 'INFO',
+        'handlers': ['wsgi']
+    }
+})
+
+@lru_cache(maxsize=1)
+def get_public_key():
+    public_key_url = 'http://keycloak:8080/realms/Xerafin'
+    with urllib.request.urlopen(public_key_url) as r:
+        public_key = json.loads(r.read())['public_key']
+        return f'''-----BEGIN PUBLIC KEY-----
+{public_key}
+-----END PUBLIC KEY-----'''
+
+@app.before_request
+def get_user():
+  # Skip verification for public routes
+  if request.endpoint in ['health']:
+    return
+
+  try:
+    public_key = get_public_key()
+    raw_token = request.headers.get("Authorization")
+    if not raw_token:
+      return jsonify({'error': 'Authorization header missing'}), 401
+    if raw_token.startswith('Bearer '):
+      raw_token = raw_token[7:]
+
+    auth_token = jwt.decode(raw_token, public_key, audience="x-client", algorithms=['RS256'])
+    g.uuid = auth_token["sub"]
+    g.name = auth_token.get("name", "Unknown")
+
+    g.photo = auth_token.get('cardboxPrefs', {}).get('photo', 'images/unknown_player.gif')
+    g.countryId = auth_token.get('cardboxPrefs', {}).get('countryId', 0)
+    g.handle = auth_token.get('preferred_username', g.name)
+    # headers to send to other services
+    g.headers = {"Accept": "application/json", "Authorization": raw_token}
+
+    g.mysqlcon = xu.getMysqlCon()
+    g.con = g.mysqlcon.cursor()
+
+    return None
+
+  except jwt.ExpiredSignatureError:
+    return jsonify({'error': 'Token has expired'}), 401
+  except jwt.InvalidTokenError as e:
+    return jsonify({'error': f'Invalid token: {str(e)}'}), 401
+  except KeyError as e:
+    return jsonify({'error': f'Missing required token field: {str(e)}'}), 401
+  except urllib.error.URLError as e:
+    return jsonify({'error': f'Cannot reach authentication service: {str(e)}'}), 503
+  except Exception as e:
+    return jsonify({'error': f'Authentication failed: {str(e)}'}), 401
