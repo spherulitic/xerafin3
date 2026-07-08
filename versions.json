@@ -4,7 +4,7 @@
   "cron": "1.0.5",
   "frontend": "1.0.12",
   "lexicon": "1.0.5",
-  "lexicon-loader": "1.0.1",
+  "lexicon-loader": "1.0.2",
   "login": "1.0.9",
   "quiz": "1.0.9",
   "stats": "1.0.7",
