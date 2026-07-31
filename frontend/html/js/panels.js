@@ -78,6 +78,7 @@ function panelFunctionLookup(panel){
     case '1_e': startQuiz(); break;
     case '1_f': startQuiz(); break;
     case '1_g': initWordWall(); break;
+    case '1_h': initWordSiege(); break;
     case '2': startChat(); break;
     case '3': initLeaderboard(); break;
     case '4': showCardboxStats(); break;
