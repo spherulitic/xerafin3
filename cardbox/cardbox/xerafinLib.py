@@ -36,10 +36,24 @@ def getDBFile(userid):
   dbFile = os.path.join(sys.path[0], CARDBOX_DB_PATH, userid + ".db")
   return dbFile
 
-def getDBCur(userid):
-  ''' Return a sqlite DB connection to the user's cardbox
+def getDBCon(userid=None, dbFile=None):
+  ''' Open a sqlite connection to a user's cardbox with WAL, busy timeout,
+      and synchronous=NORMAL pragmas applied.
+      WAL lets readers run concurrently with a writer and makes commits
+      cheaper (single sequential append + fsync to the -wal file).
   '''
-  return lite.connect(getDBFile(userid)).cursor()
+  if dbFile is None:
+    dbFile = getDBFile(userid)
+  con = lite.connect(dbFile)
+  con.execute("PRAGMA journal_mode=WAL")
+  con.execute("PRAGMA busy_timeout=5000")
+  con.execute("PRAGMA synchronous=NORMAL")
+  return con
+
+def getDBCur(userid):
+  ''' Return a sqlite DB cursor to the user's cardbox
+  '''
+  return getDBCon(userid).cursor()
 
 def getAllPrefs(userid):
   ''' Returns a dict with all user preferences
@@ -155,7 +169,7 @@ def getDueByDay(userid, cardbox = None):
   '''
   result = { }
   estart = datetime(1970, 1, 1, 0, 0) # First date of the Epoch
-  with lite.connect(getDBFile(userid)) as con:
+  with getDBCon(userid) as con:
     cur = con.cursor()
     statement = ("select next_scheduled/86400, count(*) from questions ? " +
       "group by next_scheduled/86400")
@@ -176,7 +190,7 @@ def getTotalByLength(userid):
         describing total words in cardbox broken out by length
   '''
   result = { }
-  with lite.connect(getDBFile(userid)) as con:
+  with getDBCon(userid) as con:
     cur = con.cursor()
     command = ("select length(question), count(*) from questions " +
       "where next_scheduled is not null group by length(question)")
@@ -222,7 +236,7 @@ def correct (alpha, userid, nextCardbox=None, quizid=-1) :
   if quizid == -1:
     now = int(time.time())
     schedVersion = getPrefs("schedVersion", userid)
-    with lite.connect(getDBFile(userid)) as con :
+    with getDBCon(userid) as con :
       cur = con.cursor()
       if nextCardbox is None:
         cur.execute(f"select cardbox from questions where question='{alpha}'")
@@ -245,7 +259,7 @@ def wrong (alpha, userid, quizid=-1) :
   '''
   if quizid == -1:
     schedVersion = getPrefs("schedVersion", userid)
-    with lite.connect(getDBFile(userid)) as con:
+    with getDBCon(userid) as con:
       cur = con.cursor()
       if schedVersion in (1, 2, 3):
         cur.execute(f"select cardbox from questions where question='{alpha}'")
@@ -272,7 +286,7 @@ def skipWord (alpha, userid) :
   # twelve hour delay
   SKIP_DELAY = 3600*12 # pylint: disable=invalid-name
   now = int(time.time())
-  with lite.connect(getDBFile(userid)) as con:
+  with getDBCon(userid) as con:
     cur = con.cursor()
     command = ("update questions set next_scheduled = max(next_scheduled + ?, ?), " +
       "difficulty=4 where question = ?")
@@ -318,7 +332,7 @@ def addWords (numWords, userid, cur) :
 def getNextAddedCount(userid):
   ''' Returns number of items in next_added
   '''
-  with lite.connect(getDBFile(userid)) as con:
+  with getDBCon(userid) as con:
     cur = con.cursor()
     cur.execute("select count(*) from next_added")
     return cur.fetchone()[0]
@@ -342,7 +356,7 @@ def getAllNextAdded(userid):
   '''
 
   result = [ ]
-  with lite.connect(getDBFile(userid)) as con:
+  with getDBCon(userid) as con:
     cur = con.cursor()
     cur.execute("select question, timeStamp from next_added order by timestamp")
     for row in cur.fetchone():
@@ -395,7 +409,7 @@ def isAlphagramValid(alpha, userid):
 def ghostbuster(userid):
   ''' Removes questions that have no answer
   '''
-  with lite.connect(getDBFile(userid)) as con:
+  with getDBCon(userid) as con:
     cur = con.cursor()
     cur.execute("select question from questions")
     rows = cur.fetchall()
@@ -484,7 +498,7 @@ def getBingoFromCardbox (userid, cardbox=0):
   """
   Returns a list of alphagrams that are due, length 7 or greater
   """
-  with lite.connect(getDBFile(userid)) as con:
+  with getDBCon(userid) as con:
     cur = con.cursor()
     cur.execute("select question from questions " +
       "where cardbox is not null and length(question) >= 7 and difficulty in (-1,0,2) " +
@@ -536,7 +550,7 @@ def getQuestions (numNeeded, userid, cardbox, questionLength=None, isCardbox=Tru
     else:
       diffToGet = (-1,)
       dFormat = "?"
-    with lite.connect(getDBFile(userid)) as qCon:
+    with getDBCon(userid) as qCon:
       cur = qCon.cursor()
       getCardsQry = ("select question from questions " +
         f"where difficulty in ({dFormat}) and next_scheduled is not null " +
@@ -572,7 +586,7 @@ def getQuestions (numNeeded, userid, cardbox, questionLength=None, isCardbox=Tru
 ##  numAvailable = 0
 ##  futureSweep()
 ##
-##  with lite.connect(getDBFile(userid)) as con:
+##  with getDBCon(userid) as con:
 ##    cur = con.cursor()
 ##
 ##    cur.execute("update questions set difficulty = -1
@@ -623,7 +637,7 @@ def getAuxInfo (alpha, userid):
   Returns dict: {"cardbox": x, "nextScheduled": x, "correct": x,
       incorrect: x, difficulty: x }
   '''
-  with lite.connect(getDBFile(userid)) as con:
+  with getDBCon(userid) as con:
     cur = con.cursor()
     cur.execute('select cardbox, next_scheduled, correct, incorrect, difficulty ' +
                 f'from questions where question = "{alpha}" ' +
@@ -686,7 +700,7 @@ def checkCardboxDatabase (userid):
   '''
   now = int(time.time())
   try:
-    with lite.connect(getDBFile(userid)) as con:
+    with getDBCon(userid) as con:
       cur = con.cursor()
       cur.execute("select name from sqlite_master where type='table'")
       tables = [x[0] for x in cur.fetchall()]
@@ -746,7 +760,7 @@ def checkOut (alpha, userid, lock, isCardbox=True, quizid=-1) :
     else:
       difficulty = 0
 
-    with lite.connect(getDBFile(userid)) as con:
+    with getDBCon(userid) as con:
       cur = con.cursor()
       cur.execute("update questions set difficulty = ? where question = ?", (difficulty, alpha))
   else:
@@ -759,7 +773,7 @@ def isInCardbox(alpha, userid) :
   '''Takes in an alphagram and userid
   Returns boolean indicating if alphagram is in the user's cardbox '''
 
-  with lite.connect(getDBFile(userid)) as con:
+  with getDBCon(userid) as con:
     cur = con.cursor()
     cur.execute("select count(*) from questions " +
                 "where question = ? and next_scheduled is not null", (alpha,))

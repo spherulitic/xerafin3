@@ -144,6 +144,13 @@ def get_user():
     g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
     g.con = lite.connect(getDBFile())
+    # WAL allows readers to run concurrently with a writer and makes commits
+    # cheaper (single sequential append + fsync to the -wal file).
+    # synchronous=NORMAL is crash-safe in WAL mode; busy_timeout keeps a second
+    # writer from failing immediately with "database is locked".
+    g.con.execute("PRAGMA journal_mode=WAL")
+    g.con.execute("PRAGMA busy_timeout=5000")
+    g.con.execute("PRAGMA synchronous=NORMAL")
     g.cur = g.con.cursor()
     # Debug for slow queries
     g.start_time = time.time()
@@ -459,6 +466,9 @@ def uploadCardbox():
   filename = getTempFile()
   file.save(filename)
   if checkCardboxDatabase():
+    # Flush any WAL data into the live .db before replacing the file, so a
+    # stale -wal file can't be replayed onto the newly uploaded cardbox.
+    g.con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
     shutil.move(filename, getDBFile())
     result = {"status": "success"}
     reset_start_score()
@@ -476,6 +486,9 @@ def initCardbox():
 @app.route('/downloadCardbox', methods=['GET', 'POST'])
 def downloadCardbox():
   ''' Presents the user's cardbox for download '''
+  # Flush committed WAL data into the main .db so the raw file served includes
+  # everything the user has committed, not just what's been checkpointed so far.
+  g.con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
   filename = getDBFile()
   return send_file(filename, as_attachment=True, download_name="cardbox.db")
 
