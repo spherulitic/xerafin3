@@ -119,12 +119,15 @@ def createCardboxPrefs():
   return jsonify(resp)
 
 @app.route('/setCardboxPrefs', methods=['POST'])
-def setCardboxPrefs():
-  ''' Take cardbox prefs from the client and update keycloak attributes '''
+def setCardboxPrefs(params=None):
+  ''' Take cardbox prefs from the client and update keycloak attributes.
+      Can be called internally with a params dict instead of reading from request. '''
+  if params is None:
+    params = request.get_json(force=True)
+
   keycloak_admin = getKeycloakAdmin()
   user = keycloak_admin.get_user(g.uuid)
 
-  params = request.get_json(force=True)
   att = user['attributes']
   if 'cb0max' in params:
     att['cb0max'] = [ params.get('cb0max') ]
@@ -138,9 +141,51 @@ def setCardboxPrefs():
     att['schedVersion'] = [ params.get('schedVersion') ]
   if 'countryId' in params:
     att['countryId'] = [ params.get('countryId') ]
+  if 'photo' in params:
+    att['photo'] = [ params.get('photo') ]
 
   resp = keycloak_admin.update_user(g.uuid, user)
   return jsonify(resp)
+
+@app.route('/uploadProfileImage', methods=['POST'])
+def uploadProfileImage():
+  ''' Accept a photo upload, resize to 128x128 padded on black, save to disk,
+      and update Keycloak attribute. '''
+  from PIL import Image as PILImage
+
+  if 'file' not in request.files:
+    return jsonify({'error': 'No file provided'}), 400
+
+  file = request.files['file']
+  if file.filename == '':
+    return jsonify({'error': 'Empty filename'}), 400
+
+  # Determine extension from original filename
+  ext = os.path.splitext(file.filename)[1].lower()
+  if ext not in ('.png', '.jpg', '.jpeg', '.gif'):
+    ext = '.png'
+
+  # Build filename: <user_uuid>.<ext>
+  filename = f'{g.uuid}{ext}'
+  upload_dir = '/app/user-photos'
+  os.makedirs(upload_dir, exist_ok=True)
+  save_path = os.path.join(upload_dir, filename)
+
+  # Open, resize to 128x128 keeping aspect ratio, pad with black center
+  img = PILImage.open(file)
+  img = img.convert('RGB')
+  img.thumbnail((128, 128), PILImage.LANCZOS)
+  canvas = PILImage.new('RGB', (128, 128), (0, 0, 0))
+  x_offset = (128 - img.width) // 2
+  y_offset = (128 - img.height) // 2
+  canvas.paste(img, (x_offset, y_offset))
+  canvas.save(save_path)
+
+  # Update Keycloak attribute via setCardboxPrefs
+  photo_value = f'images/users/{filename}'
+  setCardboxPrefs({'photo': photo_value})
+
+  return jsonify({'status': 'success', 'photo': photo_value})
 
 @app.route("/getCountries", methods=['GET', 'POST'])
 def countries():

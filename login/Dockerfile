@@ -11,6 +11,7 @@ RUN pip3 install -r requirements.txt
 RUN useradd --no-create-home --shell /bin/false appuser
 
 COPY . .
+
 USER appuser
 
 CMD [ "gunicorn", "--bind", "0.0.0.0:5000", "login:app"]

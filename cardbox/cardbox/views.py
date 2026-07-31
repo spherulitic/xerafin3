@@ -526,6 +526,21 @@ def triumphList():
 
   return jsonify({"status": "success"})
 
+@app.route('/rescheduleOverdue', methods=['POST'])
+def rescheduleOverdueView():
+  ''' Reschedules overdue words so they are distributed evenly in the future.
+      Takes optional minCardbox (default 0) and maxCardbox (default all).
+      Required: wordsPerDay - how many overdue words should come due per day.
+      All rescheduled words get difficulty = 5. '''
+  params = request.get_json(force=True)
+  words_per_day = params.get("wordsPerDay")
+  if words_per_day is None:
+    return jsonify({"error": "wordsPerDay is required"}), 400
+  min_cb = params.get("minCardbox", 0)
+  max_cb = params.get("maxCardbox")
+  count = rescheduleOverdue(words_per_day, min_cb, max_cb)
+  return jsonify({"rescheduled": count})
+
 @app.route('/addQuestionToCardbox', methods=['POST'])
 def addQuestionToCardbox():
   ''' Add one alphagram to cardbox zero, if it's valid '''
@@ -560,6 +575,67 @@ def getNextBingo():
   return jsonify({"result": result, "error": {"status": "success"}})
 
 # Library functions
+
+def rescheduleOverdue(words_per_day, min_cb=0, max_cb=None):
+  ''' Reschedule overdue words distributed evenly across future days.
+
+      Finds questions where next_scheduled < now within the given cardbox
+      range (inclusive). Assigns new next_scheduled values so that N words
+      (words_per_day) come due each day, starting from now. Words are
+      ordered by their current next_scheduled (oldest first) so the most
+      overdue stays most urgent. All rescheduled words get difficulty = 5.
+
+      Returns the number of words rescheduled. '''
+  now = int(time.time())
+  DAY = 86400  # seconds in a day
+
+  # Build the cardbox filter
+  cb_conditions = []
+  cb_params = []
+  cb_conditions.append("cardbox >= ?")
+  cb_params.append(min_cb)
+  if max_cb is not None:
+    cb_conditions.append("cardbox <= ?")
+    cb_params.append(max_cb)
+  cb_clause = " AND ".join(cb_conditions)
+
+  # Fetch overdue questions ordered by next_scheduled (oldest first)
+  g.cur.execute(
+    f"SELECT question, next_scheduled FROM questions "
+    f"WHERE next_scheduled < ? AND {cb_clause} "
+    f"ORDER BY next_scheduled ASC",
+    (now, *cb_params))
+  rows = g.cur.fetchall()
+
+  if not rows:
+    return 0
+
+  questions = [row[0] for row in rows]
+  total = len(questions)
+
+  # Assign new times: N words per day, evenly distributed with intra-day jitter
+  now_float = float(now)
+  updates = []
+  for idx, question in enumerate(questions):
+    day_index = idx // words_per_day
+    position_in_day = idx % words_per_day  # 0..words_per_day-1
+    # Divide the day into N equal slots and pick the midpoint of slot,
+    # then add a random jitter up to +/- half a slot width
+    slot_width = DAY / words_per_day
+    base_offset = position_in_day * slot_width + slot_width / 2
+    jitter = random.uniform(-slot_width / 2, slot_width / 2)
+    offset_seconds = day_index * DAY + base_offset + jitter
+    offset_seconds = max(0, offset_seconds)  # clamp to non-negative
+    new_time = int(now_float + offset_seconds)
+    updates.append((new_time, question))
+
+  # Apply all updates
+  g.cur.executemany(
+    "UPDATE questions SET next_scheduled = ?, difficulty = 5 WHERE question = ?",
+    updates)
+
+  return total
+
 
 def getEarliestDueDate():
   ''' Returns the earliest date a cardbox question is due.

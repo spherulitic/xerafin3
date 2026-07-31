@@ -328,16 +328,27 @@ function uploadProfileImage() {
   $("#profileButton").val("Uploading...");
   var file = document.getElementById('profileFile').files[0];
   var formdata = new FormData();
-  formdata.append("userid", userid);
   formdata.append("file", file);
-  $.ajax({ type: 'POST',
-     url: 'uploadProfileImage.py',
-          data: formdata,
-          processData: false,
-          contentType: false,
-          success: function(response, responseStatus) {
-                      $('#profileButton').prop('disabled', false);
-                      $('#profileButton').val('Success');
-                      gFloatingAlert("profileAlert",3000,"Profile Image", "Profile Image Uploaded!",500);
-          }});
+  fetch("uploadProfileImage", {
+     method: 'POST',
+     headers: {'Authorization': keycloak.token},
+     body: formdata
+  })
+  .then(function(response) {
+    if (!response.ok) {
+      throw new Error('Upload failed');
+    }
+    return response.json();
+  })
+  .then(function(response) {
+    $('#profileButton').prop('disabled', false);
+    $('#profileButton').val('Success');
+    gFloatingAlert("profileAlert",3000,"Profile Image", "Profile Image Uploaded!",500);
+  })
+  .catch(function(error) {
+    $('#profileButton').prop('disabled', false);
+    $('#profileButton').val('Error');
+    gFloatingAlert("profileAlert",3000,"Profile Image", "Upload failed.",500);
+    console.log("Profile image upload error: " + error);
+  });
 }

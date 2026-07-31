@@ -67,7 +67,7 @@ def get_user():
     g.uuid = auth_token["sub"]
     g.name = auth_token.get("name", "Unknown")
 
-    g.photo = 'images/unknown_player.gif'
+    g.photo = auth_token.get('cardboxPrefs', {}).get('photo', 'images/unknown_player.gif')
     g.countryId = auth_token.get('cardboxPrefs', {}).get('countryId', 0)
     g.handle = auth_token.get('preferred_username', g.name)
     # headers to send to other services
