@@ -115,6 +115,43 @@ def getLookaheadDays(cardbox, version):
   min_days = sched[cb][0]
   return max(cardbox, int(min_days * 0.2))
 
+def _cardbox_groups():
+  ''' Partition every possible cardbox by its lookahead window, derived from
+      the schedule alone (no table scan). getLookaheadDays is non-decreasing
+      in cardbox and clamps at len(sched)-1, so the highest window is
+      `cardbox >= k` and covers every cardbox above it.
+      Returns [(lookahead_days, sql_clause, params)]. '''
+  groups = {}
+  for cb in range(0, 13):
+    groups.setdefault(getLookaheadDays(cb, g.schedVersion), []).append(cb)
+  result = []
+  top = max(groups)
+  for lookahead, cbs in sorted(groups.items()):
+    if lookahead == top:
+      result.append((lookahead, f"cardbox >= {min(cbs)}", ()))
+    else:
+      ph = ','.join('?' * len(cbs))
+      result.append((lookahead, f"cardbox in ({ph})", tuple(cbs)))
+  return result
+
+def _effective_difficulty(difficulty, cardbox, next_scheduled, now):
+  ''' Effective difficulty for a cardbox row: applies the lookahead window to
+      the time-derived states (0/4/50) so callers see the same value a fresh
+      futureSweep would have produced. Action-derived states pass through. '''
+  if difficulty in (0, 4, 50) and cardbox is not None and next_scheduled is not None:
+    if next_scheduled > now + getLookaheadDays(cardbox, g.schedVersion) * 86400:
+      return 4
+    return 0
+  return difficulty
+
+def _lookahead_seconds_case():
+  ''' SQL CASE mapping cardbox to its lookahead window in seconds. Cardboxes
+      beyond the schedule (>= 13) clamp to the highest window. '''
+  top = getLookaheadDays(12, g.schedVersion) * 86400
+  parts = " ".join(f"WHEN {cb} THEN {getLookaheadDays(cb, g.schedVersion) * 86400}"
+                   for cb in range(0, 13))
+  return f"CASE cardbox {parts} ELSE {top} END"
+
 def _ensure_indexes():
   ''' Create the indexes the hot queries depend on, if missing.
       Guarded by PRAGMA index_list so the common case is a cheap read-only
@@ -546,10 +583,14 @@ def triumphList():
   for alpha in validAlphas:
     if not isInCardbox(alpha):
       continue
-    # Check if eligible (difficulty != 4)
-    g.cur.execute("select difficulty from questions where question=?", (alpha,))
+    # Check if eligible: skip words that are still in the future (beyond their
+    # lookahead window), which is what a fresh sweep would flag difficulty 4.
+    g.cur.execute("select difficulty, cardbox, next_scheduled "
+                  "from questions where question=?", (alpha,))
     row = g.cur.fetchone()
-    if row is None or row[0] == 4:
+    if row is None:
+      continue
+    if _effective_difficulty(row[0], row[1], row[2], int(time.time())) == 4:
       continue
     correct(alpha)
 
@@ -671,10 +712,18 @@ def getEarliestDueDate():
       If this date is in the future, return cleared_until instead
   '''
   now = int(time.time())
-  command = ("select min(next_scheduled) from questions " +
-      "where next_scheduled is not null and next_Scheduled > 0 and difficulty != 4")
-  g.cur.execute(command)
-  mns = g.cur.fetchone()[0]
+  mns = None
+  # Compute "due" from next_scheduled + lookahead window (no sweep), which is
+  # what a fresh sweep + min() would have returned.
+  for lookahead, clause, cparams in _cardbox_groups():
+    threshold = now + lookahead * 86400
+    g.cur.execute(f"""select min(next_scheduled) from questions
+                      where {clause} and next_scheduled > 0
+                      and (difficulty not in (0, -1, 4, 50)
+                           or next_scheduled <= ?)""", (*cparams, threshold))
+    group_min = g.cur.fetchone()[0]
+    if group_min is not None and (mns is None or group_min < mns):
+      mns = group_min
   try:
     if mns > now:
       command = "select * from cleared_until"
@@ -703,21 +752,28 @@ def getCurrentDue (summarize=False):
   '''
   now = int(time.time())
   result = { }
-# What's due excludes difficulty 4 so let's make that accurate
-  futureSweep()
   g.cur.execute("select * from cleared_until")
   clearedUntil = max(g.cur.fetchone()[0], now)
-  if summarize:
-    g.cur.execute("""SELECT COUNT(*) FROM questions
-                      WHERE next_scheduled < ?
-                      AND cardbox is not null AND difficulty != 4""", (clearedUntil,))
-    result["total"] = g.cur.fetchone()[0]
-  else:
-    g.cur.execute("""select cardbox, count(*) from questions
-                      where next_scheduled < ? and cardbox is not null
-                      and difficulty != 4 group by cardbox""", (clearedUntil,))
-    for row in g.cur.fetchall():
-      result[row[0]] = row[1]
+  # "Due" is computed from next_scheduled against the cardbox lookahead window
+  # instead of the materialized difficulty=4 flag (no sweep). This reproduces
+  # exactly what a fresh futureSweep followed by the old count returned.
+  for lookahead, clause, cparams in _cardbox_groups():
+    threshold = now + lookahead * 86400
+    if summarize:
+      g.cur.execute(f"""select count(*) from questions
+                        where {clause} and next_scheduled < ?
+                        and (difficulty not in (0, -1, 4, 50)
+                             or next_scheduled <= ?)""",
+                    (*cparams, clearedUntil, threshold))
+      result["total"] = result.get("total", 0) + g.cur.fetchone()[0]
+    else:
+      g.cur.execute(f"""select cardbox, count(*) from questions
+                        where {clause} and next_scheduled < ?
+                        and (difficulty not in (0, -1, 4, 50)
+                             or next_scheduled <= ?)
+                        group by cardbox""", (*cparams, clearedUntil, threshold))
+      for row in g.cur.fetchall():
+        result[row[0]] = row[1]
   return result
 
 def getDueInRange(start, end):
@@ -776,9 +832,12 @@ def getTotalByLength():
 
 def futureSweep():
   """
-  Sets things to difficulty 4 which are in the future but are in a cardbox too low to be quizzed now
-  Only moves difficulty 0 and -1 -> 4
-  Note difficulty 2 and 4 are exclusive
+  Sets things to difficulty 4 which are in the future but are in a cardbox too
+  low to be quizzed now. Only moves difficulty 0 and -1 -> 4.
+  Note difficulty 2 and 4 are exclusive.
+  Only run from newQuiz: normalizes eligibility across the whole cardbox at
+  session start. The read path computes eligibility lazily instead of
+  sweeping, so this no longer runs on getQuestions/getCardboxStats.
   """
   t_start = time.time()
   now = int(time.time())
@@ -786,31 +845,21 @@ def futureSweep():
   # with no cardbox, and the per-cardbox sweep never re-marked them.
   g.cur.execute("update questions set difficulty = 0 " +
                 "where cardbox is null and difficulty in (4, 50)")
-  # Group the cardboxes that actually exist by their lookahead window so we
-  # issue one pair of index-backed UPDATEs per distinct lookahead instead of
-  # re-sweeping the whole table per cardbox. Only rows whose state actually
-  # changes are written (no blanket 4->0 reset first).
-  g.cur.execute("select distinct cardbox from questions where cardbox is not null")
-  groups = {}
-  max_cb = 0
-  for (cb,) in g.cur.fetchall():
-    groups.setdefault(getLookaheadDays(cb, g.schedVersion), []).append(cb)
-    if cb > max_cb:
-      max_cb = cb
-  for lookahead, cbs in groups.items():
+  # Group cardboxes by their lookahead window (schedule-derived, no table
+  # scan) and only write rows whose state actually changes.
+  for lookahead, clause, cparams in _cardbox_groups():
     threshold = now + lookahead * 86400
-    ph = ','.join('?' * len(cbs))
     # un-sweep: future-flagged words that have come back into their window
-    g.cur.execute(f"update questions set difficulty = 0 where cardbox in ({ph}) " +
-                  "and next_scheduled <= ? and difficulty in (4, 50)", (*cbs, threshold))
+    g.cur.execute(f"update questions set difficulty = 0 where {clause} " +
+                  "and next_scheduled <= ? and difficulty in (4, 50)", (*cparams, threshold))
     # sweep: eligible words that are now past their lookahead window
-    g.cur.execute(f"update questions set difficulty = 4 where cardbox in ({ph}) " +
-                  "and next_scheduled > ? and difficulty in (0, -1, 50)", (*cbs, threshold))
+    g.cur.execute(f"update questions set difficulty = 4 where {clause} " +
+                  "and next_scheduled > ? and difficulty in (0, -1, 50)", (*cparams, threshold))
   g.con.commit()
   duration = time.time() - t_start
   if duration > 1.0:
     app.logger.warning(
-      f"⚠️ SLOW futureSweep: {duration:.3f}s | max cardbox={max_cb} | "
+      f"⚠️ SLOW futureSweep: {duration:.3f}s | "
       f"user: {g.get('uuid', 'unknown')}")
 
 def dbClean():
@@ -885,9 +934,6 @@ def makeWordsAvailable(words_needed) :
   Used by getQuestionsFromCardbox
   """
   now = int(time.time())
-  with _time_query('makeWordsAvailable.futureSweep'):
-    futureSweep()
-
   with _time_query('makeWordsAvailable.max_cardbox'):
     g.cur.execute("select max(cardbox) from questions")
   max_cardbox = g.cur.fetchone()[0] or 0
@@ -918,18 +964,33 @@ def makeWordsAvailable(words_needed) :
     g.cur.execute("select count(*) from questions where cardbox = 0")
   cb0_available = g.cb0max - (g.cur.fetchone()[0] or 0)
 
-  with _time_query('makeWordsAvailable.next_row'):
-    g.cur.execute('''SELECT question, cardbox, next_scheduled, difficulty
-                     FROM questions WHERE next_scheduled > ?
-                     ORDER BY next_scheduled ASC limit 1''',(cleared_until,))
-  row = g.cur.fetchone()
+  def earliest_eligible(bounded):
+    ''' Earliest word eligible to be quizzed now: difficulty 0/4/50 within its
+        lookahead window. If bounded, restricted to next_scheduled <
+        cleared_until. Returns (question, next_scheduled) or (None, None). '''
+    best = (None, None)
+    for lookahead, clause, cparams in _cardbox_groups():
+      threshold = now + lookahead * 86400
+      if bounded:
+        g.cur.execute(f"""select question, next_scheduled from questions
+                          where {clause} and difficulty in (0, 4, 50)
+                            and next_scheduled < ? and next_scheduled <= ?
+                          order by next_scheduled asc limit 1""",
+                      (*cparams, cleared_until, threshold))
+      else:
+        g.cur.execute(f"""select question, next_scheduled from questions
+                          where {clause} and difficulty in (0, 4, 50)
+                            and next_scheduled <= ?
+                          order by next_scheduled asc limit 1""",
+                      (*cparams, threshold))
+      row = g.cur.fetchone()
+      if row and (best[1] is None or row[1] < best[1]):
+        best = row
+    return best
 
   for i in range(0,words_needed):
-    g.cur.execute(""" SELECT question FROM questions
-                      WHERE difficulty = 0 AND next_scheduled < ?
-                      ORDER BY next_scheduled ASC LIMIT 1""", (cleared_until,))
-    row = g.cur.fetchone()
-    if row:
+    row = earliest_eligible(True)
+    if row[0]:
       g.cur.execute("UPDATE questions SET difficulty = -1 WHERE question = ?", (row[0],))
       continue
     if backlog_size > i:
@@ -944,15 +1005,11 @@ def makeWordsAvailable(words_needed) :
         cb0_available = cb0_available - 1
         new_words_at = new_words_at + seconds_per_new_word
     else: # no backlog
-      g.cur.execute('SELECT min(next_scheduled) FROM questions WHERE difficulty = 0')
-      min_eligible = g.cur.fetchone()[0] or 0
+      row = earliest_eligible(False)
+      min_eligible = row[1] or 0
       if min_eligible == 0: # the emergency situation
         addWords(1)
       elif min_eligible < new_words_at or cb0_available < 1:
-        g.cur.execute("""SELECT question FROM questions
-                         WHERE difficulty = 0 AND next_scheduled = ?
-                         LIMIT 1""",(min_eligible,))
-        row = g.cur.fetchone()
         g.cur.execute("UPDATE questions SET difficulty = -1 WHERE question = ?", (row[0],))
         cleared_until = min_eligible
       else:
@@ -1040,8 +1097,12 @@ def getAuxInfo (alpha):
                 'and next_scheduled is not null', (alpha,))
     result = g.cur.fetchone()
   if result:
+    # Report the effective difficulty: eligibility is derived from
+    # next_scheduled against the cardbox lookahead window instead of the
+    # possibly-stale materialized flag. Action-derived states pass through.
+    difficulty = _effective_difficulty(result[4], result[0], result[1], int(time.time()))
     auxInfo["aux"] = {"cardbox": result[0], "nextScheduled": result[1],
-      "correct": result[2], "incorrect": result[3], "difficulty": result[4] }
+      "correct": result[2], "incorrect": result[3], "difficulty": difficulty }
   else:
     auxInfo["aux"] = { }
   return auxInfo
@@ -1070,16 +1131,18 @@ def _get_bingo_from_cardbox(cardbox=0):
 
         # First query: get due questions from cardbox
         with _time_query('get_bingo.cardbox', f'cardbox={cardbox}'):
-            cur.execute("""
+            cur.execute(f"""
                 SELECT question FROM questions
                 WHERE cardbox IS NOT NULL
                 AND length(question) >= 7
-                AND difficulty IN (-1, 0, 2, 5)
+                AND (difficulty IN (-1, 2, 5)
+                     OR (difficulty IN (0, 4, 50)
+                         AND next_scheduled <= ? + ({_lookahead_seconds_case()})))
                 ORDER BY CASE cardbox WHEN ? THEN -2
                          ELSE difficulty END,
                          cardbox, next_scheduled
                 LIMIT 1
-            """, (cardbox,))
+            """, (int(time.time()), cardbox))
 
             result = cur.fetchone()
             if result is not None:
