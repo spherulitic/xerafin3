@@ -115,6 +115,21 @@ def getLookaheadDays(cardbox, version):
   min_days = sched[cb][0]
   return max(cardbox, int(min_days * 0.2))
 
+def _ensure_indexes():
+  ''' Create the indexes the hot queries depend on, if missing.
+      Guarded by PRAGMA index_list so the common case is a cheap read-only
+      check (no per-request schema write lock). '''
+  g.cur.execute("pragma index_list('questions')")
+  existing = {row[1] for row in g.cur.fetchall()}
+  stmts = {
+    'idx_q_cardbox_sched': "create index idx_q_cardbox_sched on questions(cardbox, next_scheduled)",
+    'idx_q_diff_sched': "create index idx_q_diff_sched on questions(difficulty, next_scheduled)",
+    'idx_q_next_sched': "create index idx_q_next_sched on questions(next_scheduled, cardbox)",
+  }
+  for name, stmt in stmts.items():
+    if name not in existing:
+      g.cur.execute(stmt)
+
 @app.before_request
 def get_user():
   # Skip verification for public routes
@@ -152,6 +167,7 @@ def get_user():
     g.con.execute("PRAGMA busy_timeout=5000")
     g.con.execute("PRAGMA synchronous=NORMAL")
     g.cur = g.con.cursor()
+    _ensure_indexes()
     # Debug for slow queries
     g.start_time = time.time()
 
@@ -766,15 +782,30 @@ def futureSweep():
   """
   t_start = time.time()
   now = int(time.time())
-  g.cur.execute("update questions set difficulty = 0 where difficulty in (4, 50)")
-  g.cur.execute("select coalesce(max(cardbox), 0) from questions")
-  max_cb = g.cur.fetchone()[0]
-  for cb in range(0, max_cb + 1):
-    lookahead = getLookaheadDays(cb, g.schedVersion)
-    g.cur.execute(
-      "update questions set difficulty = 4 where cardbox = ? "
-      "and next_scheduled > ?+(3600*24*?) and difficulty in (0, -1)",
-      (cb, now, lookahead))
+  # Preserve legacy behavior: the old blanket reset also cleared 4/50 on rows
+  # with no cardbox, and the per-cardbox sweep never re-marked them.
+  g.cur.execute("update questions set difficulty = 0 " +
+                "where cardbox is null and difficulty in (4, 50)")
+  # Group the cardboxes that actually exist by their lookahead window so we
+  # issue one pair of index-backed UPDATEs per distinct lookahead instead of
+  # re-sweeping the whole table per cardbox. Only rows whose state actually
+  # changes are written (no blanket 4->0 reset first).
+  g.cur.execute("select distinct cardbox from questions where cardbox is not null")
+  groups = {}
+  max_cb = 0
+  for (cb,) in g.cur.fetchall():
+    groups.setdefault(getLookaheadDays(cb, g.schedVersion), []).append(cb)
+    if cb > max_cb:
+      max_cb = cb
+  for lookahead, cbs in groups.items():
+    threshold = now + lookahead * 86400
+    ph = ','.join('?' * len(cbs))
+    # un-sweep: future-flagged words that have come back into their window
+    g.cur.execute(f"update questions set difficulty = 0 where cardbox in ({ph}) " +
+                  "and next_scheduled <= ? and difficulty in (4, 50)", (*cbs, threshold))
+    # sweep: eligible words that are now past their lookahead window
+    g.cur.execute(f"update questions set difficulty = 4 where cardbox in ({ph}) " +
+                  "and next_scheduled > ? and difficulty in (0, -1, 50)", (*cbs, threshold))
   g.con.commit()
   duration = time.time() - t_start
   if duration > 1.0:
