@@ -1,9 +1,13 @@
+// Bump on every release so browsers fetch fresh copies of deployed scripts
+// and the script config instead of serving stale caches.
+const XERAFIN_JS_VERSION = '20260803';
+
 XScripts.prototype = {
     constructor: XScripts,
     loadScript: function(d){
       let self=this;
       return new Promise(resolve =>  {
-        let path = 'js/' + d.title + ".js";
+        let path = 'js/' + d.title + ".js?v=" + XERAFIN_JS_VERSION;
         $.getScript(path)
         .then(
           function(data,textStatus){
@@ -52,7 +56,7 @@ XScripts.prototype = {
         if (this.logged) {
             xerafin.error.log.add("Downloading Required Scripts","HTTP");
         }
-        $.get(this.path, async function(response) {
+        $.get(this.path + '?v=' + XERAFIN_JS_VERSION, async function(response) {
 //        $.ajax({
 //          method: "POST",
 //          url: this.path,
