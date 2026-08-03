@@ -97,7 +97,6 @@
       "files": [
         {"title": "app.basicQuiz","level": 1},
         {"title": "app.sloth","level": 1},
-        {"title": "basicQuiz","level": 1},
         {"title": "invaders","level": 1},
         {"title": "wordwall","level": 1}
       ]
@@ -111,7 +110,7 @@
                 {
                     "icon": "images\/icons\/question-png-icon-1.jpg",
                     "title": "Basic Quiz",
-                    "onClick": "startQuiz()",
+                    "onClick": "initBQ()",
                     "hasChildren": false,
                     "privLevel": "1",
                     "lastChild": false,

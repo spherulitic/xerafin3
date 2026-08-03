@@ -75,8 +75,8 @@ function panelFunctionLookup(panel){
     case '1_b': initSloth(); break;
     case '1_c': initInvaders(); break;
     case '1_d': initUserPrefs(); break;
-    case '1_e': startQuiz(); break;
-    case '1_f': startQuiz(); break;
+    case '1_e': initBQ(); break;
+    case '1_f': initBQ(); break;
     case '1_g': initWordWall(); break;
     case '2': startChat(); break;
     case '3': initLeaderboard(); break;
