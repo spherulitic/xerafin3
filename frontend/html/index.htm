@@ -168,8 +168,8 @@ function debounce(fn, delay) {
 function isMobileTwo() {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
   }
+  localStorage.deviceType = Number(isMobileTwo());
   function isMobile(){
-    if (typeof localStorage.deviceType==='undefined') {localStorage.deviceType = Number(isMobileTwo());}
     return (Number(localStorage.deviceType)===1);
   }
 
