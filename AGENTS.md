@@ -5,7 +5,7 @@ Xerafin is a word-study/anagramming web app for word gamers. v3 is a microservic
 ## Architecture
 
 - **Monorepo of independently-deployed containers**, one top-level dir per service. CI builds only the dirs changed on `main` (canonical list in `versions.json`). Keep each service self-contained in its own dir.
-- **Flask microservices** (Python 3.11, gunicorn, port 5000): `cardbox`, `lexicon`, `login`, `quiz`, `sloth`, `stats`. `chat/` is a **Go 1.22 service** (`chat/cmd`, `chat/internal`), not Flask — the README is stale on this.
+- **Flask microservices** (Python 3.11, gunicorn, port 5000): `cardbox`, `lexicon`, `login`, `quiz`, `sloth`, `stats`. `chat/` is a **Go 1.22 service** (`chat/cmd`, `chat/internal`), not Flask.
 - **`frontend/`**: nginx serving a vanilla JS/jQuery Bootstrap SPA (`frontend/html/`) and reverse-proxying every API route. Adding a backend endpoint requires a matching `location` block in `frontend/locations.conf` (included by both `default.conf.dev` and `default.conf.prod`); otherwise it 404s behind nginx.
 - **Keycloak** is the IdP; realm `Xerafin`, client `x-client`. Services verify JWTs against the realm public key at `http://keycloak:8080/realms/Xerafin`; `login` uses the Keycloak admin API.
 - **Data stores**: MongoDB for the lexicon (populated at startup by `lexicon-loader` from `/var/lib/xerafin/word-data`), plus one MySQL database per service (`chat`, `login`, `quiz`, `stats`, `sloth`); DDL lives in `mysql/`.
