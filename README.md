@@ -2,7 +2,7 @@ Xerafin Word Study System v3.0
 
 ABOUT XERAFIN
 
-Xerafin is an application to assist word gamers in studying word lists an anagramming skills. 
+Xerafin is an application to assist word gamers in studying word lists an anagramming skills.
 
 It began as an attempt to extend the feature set of the popular Zyzzyva word study tool. V2.0 saw Xerafin made web-bassed. Xerafin still stores user data in a format compatible with the Zyzzyva sqlite .db format.
 
@@ -22,7 +22,7 @@ Xerafin 3.0 is a major rewrite of the Xerafin back end. The architecture consist
  * a Keycloak instance for IdP
  * A MongoDB instance to hold the lexicon. This is populated at startup by a containerized lexicon-loader script
  * A python container holding the daily cron scripts.
- * Seven Flask-based microservices (chat, cardbox, lexicon, login, quiz, sloth, stats)
+ * Six Flask-based microservices (cardbox, lexicon, login, quiz, sloth, stats) plus a Go-based chat service
 
 The containers are run as systemd services using Podman quadlets. This Github repo contains CI/CD actions to automatically rebuild and deploy updated containers to prod on each merge to main.
 

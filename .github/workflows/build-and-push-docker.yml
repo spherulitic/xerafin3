@@ -252,6 +252,9 @@ jobs:
             # Fix path to certs for keycloak
             sed -i 's|Volume=/home/spherulitic/xerafin3/frontend/ssl/dev|Volume=/etc/letsencrypt/archive/x3.xerafin.net|' ~/.config/containers/systemd/keycloak.container
 
+            # Fix path to certs for frontend (dev dir -> prod Let's Encrypt files)
+            sed -i 's|Volume=/home/spherulitic/xerafin3/frontend/ssl/dev:/etc/nginx/ssl:ro|Volume=/etc/letsencrypt/live/x3.xerafin.net/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro\nVolume=/etc/letsencrypt/live/x3.xerafin.net/privkey.pem:/etc/nginx/ssl/privkey.pem:ro|' ~/.config/containers/systemd/frontend.container
+
             # Reload systemd to pick up unit file changes
             systemctl --user daemon-reload
 
