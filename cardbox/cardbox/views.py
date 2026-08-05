@@ -549,9 +549,11 @@ def downloadCardbox():
 def shameList():
   ''' The List of Shame: Takes in a list of alphagrams.
         Any alphagrams in cardbox are marked wrong.
-        Any alphagrams not in cardbox are queued to be added. '''
+        Any alphagrams not in cardbox are queued to be added, unless
+        addToCardbox is set, in which case they go straight to cardbox 0. '''
   params = request.get_json(force=True) # returns dict
   questions = params.get('questions', [ ])
+  addToCardbox = params.get('addToCardbox', False)
   url = 'http://lexicon:5000/returnValidAlphas'
   resp = requests.post(url, headers=g.headers, json={'alphas': questions})
   validAlphas = resp.json()
@@ -561,10 +563,13 @@ def shameList():
 
     if isInCardbox(alpha):
       wrong(alpha)
+    elif addToCardbox:
+      _add_word(alpha)
     else:
       alphasToAdd.append(alpha)
 
-  insertIntoNextAdded(alphasToAdd)
+  if not addToCardbox:
+    insertIntoNextAdded(alphasToAdd)
 # let's deal with this later
 #  return jsonify(getCardboxStats())
   return jsonify({"status": "success"})

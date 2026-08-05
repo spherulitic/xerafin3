@@ -1070,6 +1070,7 @@ color:rgba(213,213,200,1);box-shadow:0px 0px 3px #444,0px 0px 3px #444;vertical-
 .shameList {font-family: 'Montserrat', sans-serif;background-color:rgba(230,230,220,1);resize:none;width:95%!important;outline:none;margin:5px;}
 .shameList:focus {border:1px solid #222;}
 .shameButton {margin:auto;font-family: 'Montserrat', sans-serif;}
+.shameModeWrap {text-align:left;margin:5px;font-family:'Montserrat', sans-serif;font-size:0.85em;}
 
 .animOne {
 	background-color:rgba(140,176,48,1);color:#ddd;
