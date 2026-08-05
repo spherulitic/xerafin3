@@ -224,9 +224,15 @@ function manageDatabaseFile(){
 function manageListOfShame(){
   gCreateElemArray([
       ['a0','div','prefContent','shameDiv','manageParams',''],
-      ['a1','div','shameDesc highlightRow','shameDesc','a0','Enter a list of alphagrams or words.<br>Each of these will be reset to cardbox 0 or queued to be added to your cardbox.'],
+      ['a1','div','shameDesc highlightRow','shameDesc','a0','Enter a list of alphagrams or words.<br>Each of these will be reset to cardbox 0. New words can be queued for later or added to cardbox 0 immediately.'],
       ['a2','div','shameWrap','shameWrap','a0',''],
       ['a2a','textArea','shameList','shameList','a2',''],
+      ['a2b','div','shameModeWrap','shameModeWrap','a2',''],
+      ['a2b1','input','','shameModeQueue','a2b',''],
+      ['a2b1a','label','shameCbLabel','shameModeQueueLabel','a2b','Queue new words for later'],
+      ['a2b2','div','','shameModeSpacer','a2b',''],
+      ['a2b3','input','','shameModeAdd','a2b',''],
+      ['a2b3a','label','shameCbLabel','shameModeAddLabel','a2b','Add new words to Cardbox 0 immediately'],
       ['a3','div','','prefBtnShameWrap','a0',''],
       ['a3a','button','btn btn-default btnPrefs shameButton','shameButton','a3','Submit']
     ]);
@@ -235,6 +241,17 @@ function manageListOfShame(){
     $('#shameList').prop('cols',40);
     $('#shameList').prop('rows',10);
     $('#shameList').css('textTransform','uppercase');
+    $('#shameModeQueue').prop('type','radio');
+    $('#shameModeQueue').prop('name','shameMode');
+    $('#shameModeQueue').prop('value','0');
+    $('#shameModeQueue').prop('checked',true);
+    $('#shameModeQueueLabel').prop('for','shameModeQueue');
+    $('#shameModeAdd').prop('type','radio');
+    $('#shameModeAdd').prop('name','shameMode');
+    $('#shameModeAdd').prop('value','1');
+    $('#shameModeAddLabel').prop('for','shameModeAdd');
+    $('#shameModeWrap').css({'text-align':'left','margin':'5px','font-family':'Montserrat, sans-serif'});
+    $('#shameModeSpacer').css({'display':'inline-block','width':'15px'});
     $('#shameButton').click(function() { submitShameList($("#shameList").val()); });
 }
 function generateCardboxSettings(){
@@ -427,12 +444,13 @@ function submitShameList(text) {
   var shameArr = text.replace(/[\r\n]+/g, " ").split(" ").filter((val) => val);
   var newArr = shameArr.map(function(x, i, arr) { return toAlpha(x.toUpperCase().replace(/[^A-Z]/g, ""));});
   shameArr = Array.from( new Set (newArr)); // remove duplicates
+  var addToCardbox = $('input[name=shameMode]:checked').val() === '1';
   var callbackEnd = function(response, responseStatus) {alert("Updating words complete."); };
   $.ajax({
      headers: {"Accept": "application/json", "Authorization": keycloak.token},
      type: "POST",
      url: "shameList",
-     data: JSON.stringify({questions: shameArr}),
+     data: JSON.stringify({questions: shameArr, addToCardbox: addToCardbox}),
      success: callbackEnd,
      error: function(jqXHR, textStatus, errorThrown) { console.log("Error: " + textStatus); }
         });
