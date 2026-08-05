@@ -3,8 +3,12 @@ frontend/localhost*
 frontend/ssl
 lex_upd/prob
 lex_upd/json
+lex_update/prob
+lex_update/json
 word-data
 .env
 .scannerwork
 config
+migration/all_ddl.sql
+migration/m_export2.sql
 migration/migration_export.sql
