@@ -297,7 +297,7 @@ def correct(alpha, cardbox=None):
     if cardbox is None:
       g.cur.execute("select cardbox from questions where question=?", (alpha,))
       currentCardbox = g.cur.fetchone()[0]
-      cardbox = currentCardbox + 1
+      cardbox = (currentCardbox or 0) + 1
     g.cur.execute("update questions set cardbox = ?, " +
       "next_scheduled = ?, " +
       "correct=correct+1, streak=streak+1, last_correct = ?, difficulty=4 " +
