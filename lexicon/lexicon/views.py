@@ -11,7 +11,8 @@ import itertools
 import dawg
 from pymongo import MongoClient # pylint: disable=E0401
 from pymongo.errors import PyMongoError
-from flask import jsonify, request, g # pylint: disable=E0401
+from flask import jsonify, request, g, abort # pylint: disable=E0401
+from werkzeug.exceptions import HTTPException
 from lexicon import app
 
 dictConfig({
@@ -353,6 +354,8 @@ def get_sloth_data():
       "error": {"status": "success"}
       })
 
+  except HTTPException:
+    raise
   except Exception as e:
     # Log the error
     app.logger.error(f"Error in get_sloth_data: {e}")
@@ -399,6 +402,8 @@ def getAuxInfoBatch(alphalist):
         if response.status_code == 200:
             data = response.json()
             return data
+        elif response.status_code == 401:
+            abort(401, description=response.text)
         else:
             app.logger.error(f"Cardbox service returned error: {response.status_code}")
             return {}

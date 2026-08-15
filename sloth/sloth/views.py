@@ -263,6 +263,10 @@ def complete_game():
     g.cur.execute(delete_active_query, (token, g.uuid))
 
     # 3. Submit to chat if it's a record (correct >= 100)
+    # Commit the game result before the (best-effort) chat notification so a
+    # propagated 401 doesn't lose it or cause a duplicate row on client retry.
+    g.con.commit()
+
     chat_sent = False
     if correct >= 50 and isTopScore(token, active_game['alphagram'], active_game['lex']):
       try:
@@ -277,7 +281,7 @@ def complete_game():
           message = f"{username} has set a new record in Subword Sloth for {active_game['alphagram']}. <a href='#' onclick='initSloth(\"{active_game['alphagram']}\",\"{active_game['lex']}\")'>Click here</a> to try it yourself!"
 
         # Call chat service
-        chat_response = requests.post(
+        chat_response = xu.check401(requests.post(
           'http://chat:5000/submitChat',
           headers=g.headers,
           json={
@@ -285,14 +289,14 @@ def complete_game():
               'chatText': message
           },
           timeout=5
-        )
+        ))
         chat_sent = chat_response.status_code == 200
 
+      except xu.DownstreamError:
+        raise
       except Exception as chat_error:
         app.logger.error(f"Chat notification failed: {chat_error}", exc_info=True)
         # Don't fail the whole request if chat fails
-
-    g.con.commit()
 
     return jsonify({
       'status': 'game_completed',
@@ -300,6 +304,8 @@ def complete_game():
       'time_taken': time_taken
     })
 
+  except xu.DownstreamError:
+    raise
   except Exception as e:
     app.logger.error(f"Error completing game: {e}")
     g.con.rollback()
@@ -371,10 +377,10 @@ def getUserAttributes(user_list):
      [ {"userid": uuid, "name": name, "photo": photo}, { .... } ]
   '''
   try:
-    response = requests.post('http://login:5000/getUserNamesAndPhotos',
+    response = xu.check401(requests.post('http://login:5000/getUserNamesAndPhotos',
                    headers=g.headers,
                    json={'userList': user_list},
-                   timeout=10)
+                   timeout=10))
     if response.status_code == 200:
       return response.json()
     return { }

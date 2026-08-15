@@ -164,7 +164,7 @@ def increment():
                     where userid = '{g.uuid}' and dateStamp = curdate()''')
   if g.con.rowcount == 0:
     url = 'http://cardbox:5000/getCardboxScore'
-    resp = requests.get(url, headers=g.headers).json()
+    resp = xu.check401(requests.get(url, headers=g.headers)).json()
     startScore = resp["score"]
     questionsAnswered = 1
     g.con.execute(f'''insert into leaderboard (userid, dateStamp, questionsAnswered, startScore)
@@ -434,7 +434,7 @@ def getUserStatsToday():
   else:
     questionsAnswered = 0
     url = 'http://cardbox:5000/getCardboxScore'
-    resp = requests.get(url, headers=g.headers).json()
+    resp = xu.check401(requests.get(url, headers=g.headers)).json()
     startScore = resp["score"]
 
   return {'questionsAnswered': questionsAnswered, 'startScore': startScore}
@@ -446,7 +446,7 @@ def getUserData(uuidList):
    '''
 
   url = 'http://login:5000/getUserNamesAndPhotos'
-  resp = requests.get(url, headers=g.headers, json={"userList": uuidList}).json()
+  resp = xu.check401(requests.get(url, headers=g.headers, json={"userList": uuidList})).json()
   return resp
 
 def get_users_by_period(period: str, con) -> int:
