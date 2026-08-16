@@ -234,7 +234,25 @@ def complete_game():
     active_game = g.cur.fetchone()
 
     if not active_game:
-      return jsonify({'error': 'Active game not found or unauthorized'}), 404
+      # No active game: this may be a client retry after the game was already
+      # recorded (a propagated 401 aborted the response after the commit).
+      # Be idempotent - if the completion exists, re-send the record chat
+      # announcement and return success instead of 404.
+      completed_query = """
+        SELECT userid, alphagram, lex, time_taken, correct, accuracy
+        FROM sloth_completed
+        WHERE token = %s AND userid = %s
+      """
+      g.cur.execute(completed_query, (token, g.uuid))
+      completed = g.cur.fetchone()
+      if not completed:
+        return jsonify({'error': 'Active game not found or unauthorized'}), 404
+      chat_sent = False
+      if completed['correct'] >= 50 and isTopScore(token, completed['alphagram'], completed['lex']):
+        chat_sent = _submit_record_chat(g.uuid, completed['alphagram'], completed['lex'],
+                                        completed['correct'], completed['accuracy'])
+      return jsonify({'status': 'game_completed', 'chat_sent': chat_sent,
+                      'time_taken': completed['time_taken']})
 
     # Calculate time taken
     time_taken = time.time() - active_game['start_time']
@@ -263,36 +281,14 @@ def complete_game():
     g.cur.execute(delete_active_query, (token, g.uuid))
 
     # 3. Submit to chat if it's a record (correct >= 100)
+    # Commit the game result before the (best-effort) chat notification so a
+    # propagated 401 doesn't lose it or cause a duplicate row on client retry.
+    g.con.commit()
+
     chat_sent = False
     if correct >= 50 and isTopScore(token, active_game['alphagram'], active_game['lex']):
-      try:
-        # Get user info for chat message
-        user_info = getUserAttributes([g.uuid])
-        username = user_info[0].get('name', 'A player')
-
-        # Build chat message
-        if correct >= 100 and accuracy >= 100:
-          message = f"{username} has set a new record in Subword Sloth for {active_game['alphagram']} with a perfect score! <a href='#' onclick='initSloth(\"{active_game['alphagram']}\",\"{active_game['lex']}\")'>Click here</a> to try it yourself!"
-        else:
-          message = f"{username} has set a new record in Subword Sloth for {active_game['alphagram']}. <a href='#' onclick='initSloth(\"{active_game['alphagram']}\",\"{active_game['lex']}\")'>Click here</a> to try it yourself!"
-
-        # Call chat service
-        chat_response = requests.post(
-          'http://chat:5000/submitChat',
-          headers=g.headers,
-          json={
-              'userid': '1',  # Subword Sloth system user
-              'chatText': message
-          },
-          timeout=5
-        )
-        chat_sent = chat_response.status_code == 200
-
-      except Exception as chat_error:
-        app.logger.error(f"Chat notification failed: {chat_error}", exc_info=True)
-        # Don't fail the whole request if chat fails
-
-    g.con.commit()
+      chat_sent = _submit_record_chat(g.uuid, active_game['alphagram'], active_game['lex'],
+                                      correct, accuracy)
 
     return jsonify({
       'status': 'game_completed',
@@ -300,10 +296,47 @@ def complete_game():
       'time_taken': time_taken
     })
 
+  except xu.DownstreamError:
+    raise
   except Exception as e:
     app.logger.error(f"Error completing game: {e}")
     g.con.rollback()
     return jsonify({'error': 'Internal server error'}), 500
+
+def _submit_record_chat(userid, alpha, lex, correct, accuracy):
+  '''
+  Announce a new record in Subword Sloth in chat.
+  Returns True if the chat message was submitted, False if it failed.
+  '''
+  try:
+    # Get user info for chat message
+    user_info = getUserAttributes([userid])
+    username = user_info[0].get('name', 'A player')
+
+    # Build chat message
+    if correct >= 100 and accuracy >= 100:
+      message = f"{username} has set a new record in Subword Sloth for {alpha} with a perfect score! <a href='#' onclick='initSloth(\"{alpha}\",\"{lex}\")'>Click here</a> to try it yourself!"
+    else:
+      message = f"{username} has set a new record in Subword Sloth for {alpha}. <a href='#' onclick='initSloth(\"{alpha}\",\"{lex}\")'>Click here</a> to try it yourself!"
+
+    # Call chat service
+    chat_response = xu.check401(requests.post(
+      'http://chat:5000/submitChat',
+      headers=g.headers,
+      json={
+          'userid': '1',  # Subword Sloth system user
+          'chatText': message
+      },
+      timeout=5
+    ))
+    return chat_response.status_code == 200
+
+  except xu.DownstreamError:
+    raise
+  except Exception as chat_error:
+    app.logger.error(f"Chat notification failed: {chat_error}", exc_info=True)
+    # Don't fail the whole request if chat fails
+    return False
 
 def getAlphaRankings(alpha, lexicon):
   try:
@@ -371,10 +404,10 @@ def getUserAttributes(user_list):
      [ {"userid": uuid, "name": name, "photo": photo}, { .... } ]
   '''
   try:
-    response = requests.post('http://login:5000/getUserNamesAndPhotos',
+    response = xu.check401(requests.post('http://login:5000/getUserNamesAndPhotos',
                    headers=g.headers,
                    json={'userList': user_list},
-                   timeout=10)
+                   timeout=10))
     if response.status_code == 200:
       return response.json()
     return { }

@@ -139,8 +139,8 @@ def getQuestions():
 
   if isCardbox:
     url = 'http://cardbox:5000/getQuestions'
-    response = requests.post(url, headers=g.headers, json=params).json()
-    return jsonify(response)
+    response = xu.check401(requests.post(url, headers=g.headers, json=params))
+    return jsonify(response.json())
   else:
     # Build a non-cardbox quiz
     numQuestions = params.get("numQuestions", 1)
@@ -174,7 +174,7 @@ def getQuestions():
       template["answers"] = questions[alpha]
       url = 'http://cardbox:5000/getAuxInfo'
       data = {"alpha": alpha}
-      auxInfo = requests.post(url, headers=g.headers, json=data).json()["aux"]
+      auxInfo = xu.check401(requests.post(url, headers=g.headers, json=data)).json()["aux"]
       template["correct"] = auxInfo.get("correct")
       template["incorrect"] = auxInfo.get("incorrect")
       template["nextScheduled"] = auxInfo.get("nextScheduled")
@@ -186,8 +186,8 @@ def getQuestions():
       lex_service = 'http://lexicon:5000'
       for word in template["answers"]:
         word_json = {"word": word}
-        word_info = requests.post(f'{lex_service}/getWordInfo', headers=g.headers, json=word_json).json()
-        inner_hooks = requests.post(f'{lex_service}/getDots', headers=g.headers, json=word_json).json()
+        word_info = xu.check401(requests.post(f'{lex_service}/getWordInfo', headers=g.headers, json=word_json)).json()
+        inner_hooks = xu.check401(requests.post(f'{lex_service}/getDots', headers=g.headers, json=word_json)).json()
      # [ front hooks, back hooks, definition, [inner hooks], lexicon symbols ]
         template["words"][word] = [ word_info["front_hooks"], word_info["back_hooks"], word_info["definition"], inner_hooks, word_info.get("lexicon_symbols") ]
       result["questions"].append(template)
@@ -220,7 +220,7 @@ def submitQuestion():
   if increment:
     # call the stats service to increment leaderboard
     url = 'http://stats:5000/increment'
-    resp = requests.get(url, headers=g.headers).json()
+    resp = xu.check401(requests.get(url, headers=g.headers)).json()
     result["qAnswered"] = int(resp["questionsAnswered"])
     result["startScore"] = resp["startScore"]
 
@@ -244,7 +244,7 @@ def submitQuestion():
       data['cardbox'] = currentCardbox + 1
     else:
       url = 'http://cardbox:5000/wrong'
-    resp = requests.post(url, headers=g.headers, json=data).json()
+    resp = xu.check401(requests.post(url, headers=g.headers, json=data)).json()
     result['aux'] = resp['auxInfo']
     result['score'] = resp['score']
   else: # non-cardbox quiz
@@ -253,10 +253,10 @@ def submitQuestion():
     else:
       mark_wrong(alpha, quizid)
     url = 'http://cardbox:5000/getCardboxScore'
-    resp = requests.get(url, headers=g.headers).json()
+    resp = xu.check401(requests.get(url, headers=g.headers)).json()
     result['score'] = resp['score']
     url = 'http://cardbox:5000/getAuxInfo'
-    result['aux'] = requests.post(url, headers=g.headers, json={"alpha": alpha}).json()
+    result['aux'] = xu.check401(requests.post(url, headers=g.headers, json={"alpha": alpha})).json()
 
   return jsonify(result)
 
@@ -513,7 +513,7 @@ def newQuiz():
   if isCardbox:
     result["quizName"] = "Cardbox Quiz"
     url = 'http://cardbox:5000/newQuiz'
-    requests.get(url, headers=g.headers)
+    xu.check401(requests.get(url, headers=g.headers))
   else:
     # Get quiz name - use parameterized query
     g.con.execute(
@@ -559,7 +559,7 @@ def newQuiz():
   # Get cardbox score
   url = 'http://cardbox:5000/getCardboxScore'
   try:
-    response = requests.get(url, headers=g.headers)
+    response = xu.check401(requests.get(url, headers=g.headers))
     response.raise_for_status()
     cbxResponse = response.json()
     cbxScore = cbxResponse.get("score", 0)
@@ -568,7 +568,7 @@ def newQuiz():
 
   # Get stats
   url = 'http://stats:5000/getUserStatsToday'
-  statsResponse = requests.get(url, headers=g.headers).json()
+  statsResponse = xu.check401(requests.get(url, headers=g.headers)).json()
 
   result["qAnswered"] = statsResponse["questionsAnswered"]
   result["startScore"] = statsResponse["startScore"]
@@ -584,7 +584,7 @@ def submitMilestoneChat(milestone):
           'milestoneOf': g.uuid,
           'chatText': f'{g.name} has completed {milestone} questions today.',
           'expire': True}
-  requests.post(url, headers=g.headers, json=data)
+  xu.check401(requests.post(url, headers=g.headers, json=data))
 
 def mark_correct (alpha, quizid) :
 
@@ -642,7 +642,7 @@ def generateQuiz(**kwargs):
   data = {"quantity": kwargs['quantity'], 'lengths': kwargs['lengths']}
   quizJSON = {
     "name": f'{kwargs["descr"]} {datetime.now().strftime(kwargs["datemask"])}',
-    "alphagrams": requests.post(url, headers=g.headers, json=data).json(),
+    "alphagrams": xu.check401(requests.post(url, headers=g.headers, json=data)).json(),
     "id": quizid,
     "size": kwargs['quantity']
   }
@@ -690,7 +690,7 @@ def getNonCardboxQuestions (numNeeded, quizid) : # pylint: disable=unused-argume
   allQuestions = [x[0] for x in g.con.fetchall()]
   url = 'http://lexicon:5000/getManyAnagrams'
   data = {"alphagrams": allQuestions}
-  quiz = requests.post(url, headers=g.headers, json=data).json()
+  quiz = xu.check401(requests.post(url, headers=g.headers, json=data)).json()
   return quiz
 
 def checkOut(alpha, quizid, lock):

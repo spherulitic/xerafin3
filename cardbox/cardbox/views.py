@@ -367,11 +367,14 @@ def getQuestions():
                                headers=g.headers,
                                json=words_batch,
                                timeout=10)
+    xu.check401(response)
     if response.status_code == 200:
       word_info_batch = response.json()
     else:
       app.logger.error(f"Word info batch failed: {response.status_code}")
       word_info_batch = {word: {} for word in all_words}
+  except xu.DownstreamError:
+    raise
   except Exception as e:
     app.logger.error(f"Error getting word info: {str(e)}")
     word_info_batch = {word: {} for word in all_words}
@@ -383,11 +386,14 @@ def getQuestions():
                                headers=g.headers,
                                json=words_batch,
                                timeout=10)
+    xu.check401(response)
     if response.status_code == 200:
       dots_batch = response.json()
     else:
       app.logger.error(f"Dots batch failed: {response.status_code}")
       dots_batch = {word: {} for word in all_words}
+  except xu.DownstreamError:
+    raise
   except Exception as e:
     app.logger.error(f"Error getting dots: {str(e)}")
     dots_batch = {word: {} for word in all_words}
@@ -503,7 +509,7 @@ def uploadNewWordList():
         alphaSet.add(alpha)
 
   url = 'http://lexicon:5000/returnValidAlphas'
-  resp = requests.post(url, headers=g.headers, json={'alphas': list(alphaSet)})
+  resp = xu.check401(requests.post(url, headers=g.headers, json={'alphas': list(alphaSet)}))
   validAlphas = resp.json()
 
   insertIntoNextAdded(validAlphas)
@@ -555,7 +561,7 @@ def shameList():
   questions = params.get('questions', [ ])
   addToCardbox = params.get('addToCardbox', False)
   url = 'http://lexicon:5000/returnValidAlphas'
-  resp = requests.post(url, headers=g.headers, json={'alphas': questions})
+  resp = xu.check401(requests.post(url, headers=g.headers, json={'alphas': questions}))
   validAlphas = resp.json()
 
   alphasToAdd = [ ]
@@ -582,7 +588,7 @@ def triumphList():
   params = request.get_json(force=True) # returns dict
   questions = params.get('questions', [ ])
   url = 'http://lexicon:5000/returnValidAlphas'
-  resp = requests.post(url, headers=g.headers, json={'alphas': questions})
+  resp = xu.check401(requests.post(url, headers=g.headers, json={'alphas': questions}))
   validAlphas = resp.json()
 
   for alpha in validAlphas:
@@ -1086,7 +1092,7 @@ def getAnagrams(alpha):
       Should return a list of words ['baa', 'aba']'''
 
   url = 'http://lexicon:5000/getAnagrams'
-  return requests.post(url, headers=g.headers, json={'alpha': alpha}).json()
+  return xu.check401(requests.post(url, headers=g.headers, json={'alpha': alpha})).json()
 
 def getAuxInfo (alpha):
   '''
@@ -1272,7 +1278,7 @@ def reset_start_score():
   '''
   data = {"score": getCardboxScore()}
   url = 'http://stats:5000/resetStartScore'
-  resp = requests.post(url, headers=g.headers, json={"score": getCardboxScore()}).json()
+  resp = xu.check401(requests.post(url, headers=g.headers, json={"score": getCardboxScore()})).json()
   if not resp["success"]:
     app.logger.info(f"Unable to reset cardbox score on upload for {g.uuid}. See stats log for more info.")
   return
