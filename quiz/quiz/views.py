@@ -260,12 +260,10 @@ def submitQuestion():
 
   return jsonify(result)
 
-@app.route("/getQuizList", methods=["GET", "POST"])
-def getQuizList():
-  '''Returns a dict where the quizid is the keys'''
-  params = request.get_json(force=True) # returns a dict
-  result = { }
-
+def buildQuizIdList(params):
+  '''Builds the list of quiz ids matching the given search parameters.
+  Shared by getQuizList and resetQuizList so bulk resets match the
+  search results exactly.'''
   QUIZ_INACTIVE_TIMER = 4 # how many days before inactive quizzes drop off the list
   QUIZ_TYPE_NEW = 2
   QUIZ_TYPE_VOWEL = 5
@@ -368,9 +366,16 @@ def getQuizList():
   else:
     quizidList = [ ]
 
-  # we have a list of quizids to return. Get the metadata and status
+  return quizidList[:50] # hard limit of 50 results
 
-  quizidList = quizidList[:50] # hard limit of 50 results
+@app.route("/getQuizList", methods=["GET", "POST"])
+def getQuizList():
+  '''Returns a dict where the quizid is the keys'''
+  params = request.get_json(force=True) # returns a dict
+  result = { }
+
+  # Supported search types - myQuizzes, daily, quizid, completed
+  quizidList = buildQuizIdList(params)
 
   # Batch fetch all data to avoid N+1 queries
   quiz_metadata = {}
@@ -427,11 +432,6 @@ def getQuizList():
         template["untried"] = template["quizsize"] - int(sum_completed)
         if template["untried"] == 0:
           template["status"] = "Completed"
-          if max_last_answered:
-            lastCorrect = max_last_answered
-            # if it's completed more than four days ago, drop it off the list entirely
-            if (datetime.today() - lastCorrect).days > QUIZ_INACTIVE_TIMER:
-              continue
         else:
           template["status"] = "Active"
 
@@ -440,11 +440,61 @@ def getQuizList():
         template["incorrect"] = int(sum_completed) - int(sum_correct)
 
       template["bookmarked"] = qid in bookmarked_set
-      template["sub"] = (searchType == "myQuizzes" and qid != -1 and not template["bookmarked"] )
+      template["sub"] = (params.get('searchType') == "myQuizzes" and qid != -1 and not template["bookmarked"] )
 
       result[index] = template
 
   return jsonify(result)
+
+@app.route("/resetQuiz", methods=["POST"])
+def resetQuiz():
+  '''Resets progress for a single quiz for the current user.'''
+  params = request.get_json(force=True) # returns a dict
+  quizid = params.get('quizid', params.get('quiz'))
+  action = params.get('action', 'resetall')
+
+  if action not in ("resetall", "resetwrong"):
+    return jsonify({'error': 'invalid action'}), 400
+
+  if action == "resetall":
+    g.con.execute("update quiz_user_detail set locked=0, completed=0, correct=0, "
+        + "incorrect=0, last_answered=NULL where quiz_id=%s and user_id=%s", (quizid, g.uuid))
+  else:
+    g.con.execute("update quiz_user_detail set locked=0, completed=0, correct=0, "
+        + "incorrect=0, last_answered=NULL where quiz_id=%s and user_id=%s and incorrect=1",
+        (quizid, g.uuid))
+
+  return jsonify({'reset': quizid, 'action': action})
+
+@app.route("/resetQuizList", methods=["POST"])
+def resetQuizList():
+  '''Resets progress for every quiz matching the given search parameters.
+  Mirrors getQuizList so the reset exactly covers the current search results.'''
+  params = request.get_json(force=True) # returns a dict
+  action = params.get('action', 'resetall')
+
+  quizidList = [qid for qid in buildQuizIdList(params) if qid != -1]
+
+  if not quizidList:
+    return jsonify({'count': 0, 'quizids': []})
+
+  placeholders = ','.join(['%s'] * len(quizidList))
+  g.con.execute("update quiz_user_detail set locked=0, completed=0, correct=0, "
+      + "incorrect=0, last_answered=NULL where user_id=%s and quiz_id in (" + placeholders + ")",
+      [g.uuid] + quizidList)
+
+  return jsonify({'count': len(quizidList), 'quizids': quizidList})
+
+@app.route("/discardBookmark", methods=["POST"])
+def discardBookmark():
+  '''Removes the quiz (and its progress) from the current user's quizzes.'''
+  params = request.get_json(force=True) # returns a dict
+  quizid = params.get('quizid')
+
+  g.con.execute("delete from quiz_user_detail where quiz_id=%s and user_id=%s", (quizid, g.uuid))
+  g.con.execute("delete from user_quiz_bookmark where quiz_id=%s and user_id=%s", (quizid, g.uuid))
+
+  return jsonify({'discarded': quizid})
 
 @app.route("/subscribe", methods=["POST"])
 def subscribe():

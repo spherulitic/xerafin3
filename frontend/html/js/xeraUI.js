@@ -64,6 +64,7 @@ XeraOverviewManager.prototype = {
     overviewAH.add('SEARCH_SELECTION',{'action': "overview.searchSelectionList",'watch':true});
     overviewAH.add('SEARCH_SET_GO_NAME',{'action': "overview.searchSetGoName",'watch':true});
     overviewAH.add('SEARCH_ADD',{'action': "overview.searchAdd",'watch':true});
+    overviewAH.add('SEARCH_RESET_RESULTS',{'action': "overview.resetSearchResults",'watch':true});
 
   //Any Go Action:  Context passed into function
     overviewAH.add('SET_GO_ACTION',{'action': "overview.setGoAction",'watch':true});
@@ -217,6 +218,7 @@ XeraOverviewManager.prototype = {
       ["SEARCH_TOGGLE_SEARCH", {'action': "overviewUI.childUI['overviewSearch'].toggleSearch", 'watch':true}],
       ["SEARCH_CLEAR_SELECTION", {'action': "overviewUI.childUI['searchList'].clearSelection", 'watch':true}],
       ["SEARCH_EMPTY", {'action': "overviewUI.childUI['searchList'].clearAll", 'watch':true}],
+      ["SEARCH_SET_RESET_STATE", {'action': "overviewUI.childUI['overviewSearch'].setResetState", 'watch':true}],
 
     ]);
   },
@@ -481,6 +483,7 @@ XeraOverviewManager.prototype = {
       });
       overviewUI.update("SEARCH_CLEAR_SELECTION");
       overviewUI.update("SEARCH_EMPTY");
+      overviewUI.update("SEARCH_SET_RESET_STATE",0);
     }
     this.data.lexicon.initialized = true;
     //do a redraw of quizlists
@@ -492,6 +495,7 @@ XeraOverviewManager.prototype = {
     this.setGoButtons(false);
     this.resetWritePoll(function(){
       self.fetchData();
+      self.refreshSearchResults();
     });
   },
   resetWrong:function(x){
@@ -501,7 +505,32 @@ XeraOverviewManager.prototype = {
     this.setGoButtons(false);
     this.resetWritePoll(function(){
       self.fetchData();
+      self.refreshSearchResults();
     });
+  },
+  refreshSearchResults:function(){
+    if (typeof this.data.searchQuery!=='undefined'){
+      this.data.searchList.refreshQuizList(this.data.searchQuery);
+      this.data.searchList.fetched = false;
+      this.fetchQuizList('SRH');
+    }
+  },
+  resetSearchResults:function(){
+    let self=this;
+    if (typeof this.data.searchQuery==='undefined'){
+      return;
+    }
+    let count = Object.keys(this.data.searchList.quizList).length;
+    if (confirm("This will reset all progress for every quiz in the current search results ("+count+" quiz"+(count===1 ? "" : "zes")+"). Continue?")){
+      this.setGoButtons(false);
+      this.data.writeList.resetQuizList(this.data.searchQuery, "resetall");
+      this.data.writeList.fetched = false;
+      this.resetWritePoll(function(){
+        self.fetchData();
+        self.refreshSearchResults();
+        self.setGoButtons(true);
+      });
+    }
   },
   discard:function(x){
     let self=this;
@@ -562,6 +591,7 @@ XeraOverviewManager.prototype = {
     d.lexicon = this.data.lexicon.lexicon;
     d.version = this.data.lexicon.version;
     xerafin.error.log.add(d,'JSON');
+    this.data.searchQuery = d;
     this.data.searchList.refreshQuizList(d);
     this.data.searchList.fetched = false;
     this.fetchQuizList('SRH');
@@ -631,6 +661,7 @@ XeraOverviewManager.prototype = {
       if (obj==='searchList'){
         overviewUI.update('LST_UPD_SRH',this.data.searchList.quizList);
         overviewUI.update('SEARCH_TOGGLE_SEARCH',true);
+        overviewUI.update('SEARCH_SET_RESET_STATE',Object.keys(this.data.searchList.quizList).length);
       }
       overviewUI.update('LST_UPD_'+type,this.data[obj].quizList);
       this.setMySelectionRow([this.data.currentQuiz]);

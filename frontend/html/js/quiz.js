@@ -49,7 +49,7 @@ class QuizList {
     $.ajax({type: "POST",
             data: JSON.stringify(d),
             headers: {"Accept": "application/json", "Authorization": keycloak.token},
-            url: "discardBookmark.py",
+            url: "discardBookmark",
             success: function(response, responseStatus) { self.refreshQuizList(self.data); },
             error: function(jqXHR, textStatus, errorThrown) {
                  var msg = "error, status = " + textStatus + " error: " + errorThrown;
@@ -66,8 +66,25 @@ class QuizList {
     $.ajax({type: "POST",
             data: JSON.stringify(d),
             headers: {"Accept": "application/json", "Authorization": keycloak.token},
-            url: "resetQuiz.py",
+            url: "resetQuiz",
             success: function(response, responseStatus) { //console.log("Quiz reset");
+                                                          self.refreshQuizList(self.data);
+                              },
+            error: function(jqHXR, textStatus, errorThrown) {
+                 var msg = "error, status = " + textStatus + " error: " + errorThrown;
+                 appendDebugLog(msg); }
+          });
+    }
+
+  resetQuizList(query, action) {
+    var self = this;
+    self.initialized = false;
+    var d = Object.assign({}, query, {action: action});
+    $.ajax({type: "POST",
+            data: JSON.stringify(d),
+            headers: {"Accept": "application/json", "Authorization": keycloak.token},
+            url: "resetQuizList",
+            success: function(response, responseStatus) {
                                                           self.refreshQuizList(self.data);
                               },
             error: function(jqHXR, textStatus, errorThrown) {

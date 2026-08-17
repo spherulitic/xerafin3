@@ -10,6 +10,7 @@ OverviewSearch.prototype = {
 		this.drawSearchRows();
 		$(this.cont).append(this.getTypeOption(),this.params);
 		$(this.cont).append(this.addSearchButton());
+		$(this.cont).append(this.addResetResultsButton());
 	},
 
 //---------------------------------------------------------------------
@@ -115,6 +116,34 @@ OverviewSearch.prototype = {
 		});
 		$(this.searchRow).append(this.searchButton);
 		return this.searchRow;
+	},
+
+//---------------------------------------------------------------------
+
+	addResetResultsButton: function() {
+		let self=this;
+		this.resetResultsButton = document.createElement('button');
+		$(this.resetResultsButton).addClass('overviewButton');
+		$(this.resetResultsButton).html('↻ Reset All Results');
+		$(this.resetResultsButton).prop('disabled',true);
+		$(this.resetResultsButton).attr('title','Resets all progress for every quiz in the current search results.');
+		$(this.resetResultsButton).css({'margin':'auto!important'});
+		$(this.resetResultsButton).on('click',function(){
+			self.action('SEARCH_RESET_RESULTS');
+		});
+		this.resetResultsRow = document.createElement('div');
+		$(this.resetResultsRow).addClass('overviewQueryRow');
+		$(this.resetResultsRow).css({'padding-top':'2px','padding-bottom':'2px','text-align':'center'});
+		$(this.resetResultsRow).append(this.resetResultsButton);
+		return this.resetResultsRow;
+	},
+
+//---------------------------------------------------------------------
+
+	setResetState:function(count){
+		if (typeof this.resetResultsButton!=='undefined'){
+			$(this.resetResultsButton).prop('disabled', Number(count)===0);
+		}
 	},
 
 //---------------------------------------------------------------------
