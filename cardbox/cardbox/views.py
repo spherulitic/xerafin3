@@ -152,21 +152,6 @@ def _lookahead_seconds_case():
                    for cb in range(0, 13))
   return f"CASE cardbox {parts} ELSE {top} END"
 
-def _ensure_indexes():
-  ''' Create the indexes the hot queries depend on, if missing.
-      Guarded by PRAGMA index_list so the common case is a cheap read-only
-      check (no per-request schema write lock). '''
-  g.cur.execute("pragma index_list('questions')")
-  existing = {row[1] for row in g.cur.fetchall()}
-  stmts = {
-    'idx_q_cardbox_sched': "create index idx_q_cardbox_sched on questions(cardbox, next_scheduled)",
-    'idx_q_diff_sched': "create index idx_q_diff_sched on questions(difficulty, next_scheduled)",
-    'idx_q_next_sched': "create index idx_q_next_sched on questions(next_scheduled, cardbox)",
-  }
-  for name, stmt in stmts.items():
-    if name not in existing:
-      g.cur.execute(stmt)
-
 @app.before_request
 def get_user():
   # Skip verification for public routes
@@ -204,7 +189,8 @@ def get_user():
     g.con.execute("PRAGMA busy_timeout=5000")
     g.con.execute("PRAGMA synchronous=NORMAL")
     g.cur = g.con.cursor()
-    _ensure_indexes()
+    if not checkCardboxDatabase():
+      raise RuntimeError("cardbox database could not be initialized")
     # Debug for slow queries
     g.start_time = time.time()
 
@@ -1257,6 +1243,19 @@ def checkCardboxDatabase ():
         g.cur.execute("create table next_Added (question varchar(16), timeStamp integer)")
       g.cur.execute("create unique index if not exists question_index on questions(question)")
       g.cur.execute("create unique index if not exists next_added_question_idx on next_added(question)")
+      # Create the indexes the hot queries depend on, if missing. Guarded by
+      # PRAGMA index_list so the common case is a cheap read-only check (no
+      # per-request schema write lock).
+      g.cur.execute("pragma index_list('questions')")
+      existing = {row[1] for row in g.cur.fetchall()}
+      stmts = {
+        'idx_q_cardbox_sched': "create index idx_q_cardbox_sched on questions(cardbox, next_scheduled)",
+        'idx_q_diff_sched': "create index idx_q_diff_sched on questions(difficulty, next_scheduled)",
+        'idx_q_next_sched': "create index idx_q_next_sched on questions(next_scheduled, cardbox)",
+      }
+      for name, stmt in stmts.items():
+        if name not in existing:
+          g.cur.execute(stmt)
 
       g.cur.execute("select * from cleared_until")
       row = g.cur.fetchone()
