@@ -317,7 +317,8 @@ def buildQuizIdList(params):
   elif searchType == "completed":
     stmt = '''select quiz_id from quiz_user_detail where user_id = %s
            group by quiz_id having sum(completed) = count(*)
-           and max(last_answered) > DATE_SUB(CURDATE(), INTERVAL %s DAY)'''
+           and max(last_answered) > DATE_SUB(CURDATE(), INTERVAL %s DAY)
+           order by max(last_answered) desc'''
     g.con.execute(stmt, [g.uuid, QUIZ_INACTIVE_TIMER])
     quizidList = [x[0] for x in g.con.fetchall()]
 
@@ -495,6 +496,44 @@ def discardBookmark():
   g.con.execute("delete from user_quiz_bookmark where quiz_id=%s and user_id=%s", (quizid, g.uuid))
 
   return jsonify({'discarded': quizid})
+
+@app.route("/addQuizToCardbox", methods=["POST"])
+def addQuizToCardbox():
+  '''Adds a completed quiz's alphagrams to the user's cardbox.
+  action 'all' adds every alphagram (correct -> cardbox 1, incorrect -> cardbox 0).
+  action 'wrong' adds only the missed alphagrams (-> cardbox 0).
+  Alphagrams already in the cardbox are skipped. Returns the count added.'''
+  error = {"status": "success"}
+  result = { }
+  params = request.get_json(force=True)
+  quizid = params.get("quizid")
+  action = params.get("action", "all")
+
+  if quizid is None or action not in ("all", "wrong"):
+    return jsonify([{"numAdded": 0}, {"status": "invalid action"}]), 400
+
+  if action == "wrong":
+    stmt = ("select alphagram from quiz_user_detail "
+            "where completed = 1 and correct = 0 and quiz_id = %s and user_id = %s")
+  else:
+    stmt = "select alphagram from quiz_user_detail where quiz_id = %s and user_id = %s"
+  g.con.execute(stmt, (quizid, g.uuid))
+  alphas = [x[0] for x in g.con.fetchall()]
+
+  g.con.execute("select alphagram from quiz_user_detail where quiz_id = %s and user_id = %s and correct > 0",
+                (quizid, g.uuid))
+  correctAlphas = [x[0] for x in g.con.fetchall()]
+
+  result["numAdded"] = 0
+  if alphas:
+    url = 'http://cardbox:5000/addManyToCardbox'
+    resp = xu.check401(requests.post(url, headers=g.headers,
+                                     json={"alphas": alphas, "correctAlphas": correctAlphas})).json()
+    result["numAdded"] = resp.get("numAdded", 0)
+
+  result["quizid"] = quizid
+  result["action"] = action
+  return jsonify([result, error])
 
 @app.route("/subscribe", methods=["POST"])
 def subscribe():

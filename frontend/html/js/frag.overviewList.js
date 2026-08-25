@@ -76,9 +76,10 @@ OverviewList.prototype = {
 		if (!this.multiple){
 			if (this.rows){
 				this.clearSelectedRows();
-				if (this.rows[i]){
-					if (this.rows[i].data.sub) {$(this.rows[i].selector).removeClass('blueRowed overviewItemSub');}
-					$(this.rows[i].selector).addClass('highlightRow overviewListHighlight');
+				let row = Object.values(this.rows).find(r => Number(r.data.quizid) === Number(i));
+				if (row){
+					if (row.data.sub) {$(row.selector).removeClass('blueRowed overviewItemSub');}
+					$(row.selector).addClass('highlightRow overviewListHighlight');
 				}
 
 			}
@@ -155,7 +156,7 @@ processSelectedRows: function() {
 		$(this.rows[index].resetAll).on('click',function(e){
 			e.stopPropagation();
 			if (confirm("This will reset all progress for the following quiz: "+self.rows[index].data.quizname)){
-				self.action('QID_RST_ALL', index);
+				self.action('QID_RST_ALL', self.rows[index].data.quizid);
 			}
 		});
 	},
@@ -167,7 +168,7 @@ processSelectedRows: function() {
 		$(this.rows[index].resetWrong).on('click',function(e){
 			e.stopPropagation();
 			//if (confirm("This will reset all wrong answers for the following quiz: "+self.rows[index].data.quizname)){
-				self.action('QID_RST_WNG', index);
+				self.action('QID_RST_WNG', self.rows[index].data.quizid);
 			//}
 		});
 	},
@@ -178,7 +179,7 @@ processSelectedRows: function() {
 		$(this.rows[index].discard).on('click',function(e){
 			e.stopPropagation();
 			if (confirm("This will remove the following quiz from your active quizzes: "+self.rows[index].data.quizname)){
-				self.action('QID_DISCARD', index);
+				self.action('QID_DISCARD', self.rows[index].data.quizid);
 			}
 		});
 	},
@@ -189,7 +190,7 @@ processSelectedRows: function() {
 		$(this.rows[index].addAll).on('click',function(e){
 			e.stopPropagation();
 			if (confirm("This will add up to "+self.rows[index].data.quizsize+" alphagrams from "+self.rows[index].data.quizname+ " to your cardbox.  Correct answers will go to Cardbox 1, Incorrect to Cardbox 0.  Continue?")){
-				self.action('QID_ADD_ALL', index);
+				self.action('QID_ADD_ALL', self.rows[index].data.quizid);
 			}
 		});
 	},
@@ -200,7 +201,7 @@ processSelectedRows: function() {
 		$(this.rows[index].addWrong).on('click',function(e){
 			e.stopPropagation();
 			if (confirm("This will add up to "+self.rows[index].data.incorrect+" incorrect responses in "+self.rows[index].data.quizname+" to cardbox 0.  Continue?")){
-				self.action('QID_ADD_WRONG', index);
+				self.action('QID_ADD_WRONG', self.rows[index].data.quizid);
 			}
 		});
 	},
@@ -222,9 +223,17 @@ processSelectedRows: function() {
 
 		//Update Rows that intersect.
 		let update = new Set([...c].filter(x => i.has(x))).forEach(function(v){
-			self.rows[v].update(d[v]);
-			self.rows[v].updateButtonStates();
-			self.data[v] = d[v];
+			if (d[v].quizid !== self.data[v].quizid){
+				$(self.rows[v].selectRegion).remove();
+				delete self.rows[v];
+				self.data[v]=d[v];
+				self.addDataRow(Number(v),d[v]);
+			}
+			else {
+				self.rows[v].update(d[v]);
+				self.rows[v].updateButtonStates();
+				self.data[v] = d[v];
+			}
 		});
 	},
 //-----------------------------------------------------------------------------------------------
@@ -245,7 +254,7 @@ processSelectedRows: function() {
 		let update = new Set([...c].filter(x => i.has(x)));
 		update.forEach(function(v){
 			let x = Number(v);
-			if ((d[x].status!==self.data[x].status) || (d[x].sub!==self.data[x].sub)){
+			if ((d[x].quizid!==self.data[x].quizid) || (d[x].status!==self.data[x].status) || (d[x].sub!==self.data[x].sub)){
 				delete self.data[x];
 				$(self.rows[x].selectRegion).remove();
 				delete self.rows[x];
