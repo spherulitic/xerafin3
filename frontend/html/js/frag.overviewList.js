@@ -223,9 +223,17 @@ processSelectedRows: function() {
 
 		//Update Rows that intersect.
 		let update = new Set([...c].filter(x => i.has(x))).forEach(function(v){
-			self.rows[v].update(d[v]);
-			self.rows[v].updateButtonStates();
-			self.data[v] = d[v];
+			if (d[v].quizid !== self.data[v].quizid){
+				$(self.rows[v].selectRegion).remove();
+				delete self.rows[v];
+				self.data[v]=d[v];
+				self.addDataRow(Number(v),d[v]);
+			}
+			else {
+				self.rows[v].update(d[v]);
+				self.rows[v].updateButtonStates();
+				self.data[v] = d[v];
+			}
 		});
 	},
 //-----------------------------------------------------------------------------------------------
@@ -246,7 +254,7 @@ processSelectedRows: function() {
 		let update = new Set([...c].filter(x => i.has(x)));
 		update.forEach(function(v){
 			let x = Number(v);
-			if ((d[x].status!==self.data[x].status) || (d[x].sub!==self.data[x].sub)){
+			if ((d[x].quizid!==self.data[x].quizid) || (d[x].status!==self.data[x].status) || (d[x].sub!==self.data[x].sub)){
 				delete self.data[x];
 				$(self.rows[x].selectRegion).remove();
 				delete self.rows[x];

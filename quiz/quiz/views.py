@@ -317,7 +317,8 @@ def buildQuizIdList(params):
   elif searchType == "completed":
     stmt = '''select quiz_id from quiz_user_detail where user_id = %s
            group by quiz_id having sum(completed) = count(*)
-           and max(last_answered) > DATE_SUB(CURDATE(), INTERVAL %s DAY)'''
+           and max(last_answered) > DATE_SUB(CURDATE(), INTERVAL %s DAY)
+           order by max(last_answered) desc'''
     g.con.execute(stmt, [g.uuid, QUIZ_INACTIVE_TIMER])
     quizidList = [x[0] for x in g.con.fetchall()]
 
