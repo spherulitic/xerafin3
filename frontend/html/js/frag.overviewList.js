@@ -76,9 +76,10 @@ OverviewList.prototype = {
 		if (!this.multiple){
 			if (this.rows){
 				this.clearSelectedRows();
-				if (this.rows[i]){
-					if (this.rows[i].data.sub) {$(this.rows[i].selector).removeClass('blueRowed overviewItemSub');}
-					$(this.rows[i].selector).addClass('highlightRow overviewListHighlight');
+				let row = Object.values(this.rows).find(r => Number(r.data.quizid) === Number(i));
+				if (row){
+					if (row.data.sub) {$(row.selector).removeClass('blueRowed overviewItemSub');}
+					$(row.selector).addClass('highlightRow overviewListHighlight');
 				}
 
 			}
