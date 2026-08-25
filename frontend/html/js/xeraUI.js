@@ -552,6 +552,8 @@ XeraOverviewManager.prototype = {
     overviewUI.update("COM_DISABLE_BUTTON_STATES");
     this.data.writeList.addQuizToCardbox(x,'wrong', function(d){
       self.addCardboxResponse(d);
+    }, function(){
+      self.addCardboxError();
     });
   },
   addCardboxAll:function(x){
@@ -559,14 +561,22 @@ XeraOverviewManager.prototype = {
     this.setGoButtons(false);
     this.data.writeList.addQuizToCardbox(x,'all',function(d){
       self.addCardboxResponse(d);
+    }, function(){
+      self.addCardboxError();
     });
+  },
+  addCardboxError:function(){
+    this.setGoButtons(true);
+    overviewUI.update("COM_UPDATE_BUTTON_STATES");
+    gFloatingAlert("addedQuizzes",2500,"Add to Cardbox","An error occurred adding this quiz to your cardbox. Please try again.",1000);
   },
   addCardboxResponse:function(d){
     this.setGoButtons(true);
     this.fetchCardboxSummary();
     overviewUI.update("COM_UPDATE_BUTTON_STATES");
     let content;
-    let header = this.data.completedList.quizList[d.quizid].quizname;
+    let quiz = Object.values(this.data.completedList.quizList).find(q => Number(q.quizid) === Number(d.quizid));
+    let header = quiz ? quiz.quizname : "Recently Completed";
     switch (d.action){
       case "all": content = d.numAdded + " alphagram"+((d.numAdded===0||d.numAdded>1) ? "s":"")+" added to cardboxes 0 & 1."; break;
       case "wrong": content = d.numAdded + " incorrect answer"+((d.numAdded===0||d.numAdded>1) ? "s":"")+" added to cardbox 0.";break;

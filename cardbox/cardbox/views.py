@@ -626,6 +626,26 @@ def addQuestionToCardbox():
 
   return jsonify(result)
 
+@app.route('/addManyToCardbox', methods=['POST'])
+def addManyToCardbox():
+  ''' Bulk-add alphagrams to the cardbox. Takes a list of alphas plus an
+      optional list of correctAlphas. Newly added alphagrams that are in
+      correctAlphas are scheduled into cardbox 1; the rest go to cardbox 0.
+      Alphagrams already in the cardbox are skipped. Returns the number of
+      alphagrams newly added. '''
+  params = request.get_json(force=True)
+  alphas = params.get('alphas', [ ])
+  correctAlphas = set(params.get('correctAlphas', [ ]))
+  addCount = 0
+  for alpha in alphas:
+    if _add_word(alpha):
+      addCount = addCount + 1
+      if alpha in correctAlphas:
+        correct(alpha, 1)
+      else:
+        wrong(alpha)
+  return jsonify({"numAdded": addCount})
+
 @app.route('/getNextBingo', methods=['GET', 'POST'])
 def getNextBingo():
   '''return the next word 7 letters or longer that's due'''

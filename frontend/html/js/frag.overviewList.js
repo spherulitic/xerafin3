@@ -155,7 +155,7 @@ processSelectedRows: function() {
 		$(this.rows[index].resetAll).on('click',function(e){
 			e.stopPropagation();
 			if (confirm("This will reset all progress for the following quiz: "+self.rows[index].data.quizname)){
-				self.action('QID_RST_ALL', index);
+				self.action('QID_RST_ALL', self.rows[index].data.quizid);
 			}
 		});
 	},
@@ -167,7 +167,7 @@ processSelectedRows: function() {
 		$(this.rows[index].resetWrong).on('click',function(e){
 			e.stopPropagation();
 			//if (confirm("This will reset all wrong answers for the following quiz: "+self.rows[index].data.quizname)){
-				self.action('QID_RST_WNG', index);
+				self.action('QID_RST_WNG', self.rows[index].data.quizid);
 			//}
 		});
 	},
@@ -178,7 +178,7 @@ processSelectedRows: function() {
 		$(this.rows[index].discard).on('click',function(e){
 			e.stopPropagation();
 			if (confirm("This will remove the following quiz from your active quizzes: "+self.rows[index].data.quizname)){
-				self.action('QID_DISCARD', index);
+				self.action('QID_DISCARD', self.rows[index].data.quizid);
 			}
 		});
 	},
@@ -189,7 +189,7 @@ processSelectedRows: function() {
 		$(this.rows[index].addAll).on('click',function(e){
 			e.stopPropagation();
 			if (confirm("This will add up to "+self.rows[index].data.quizsize+" alphagrams from "+self.rows[index].data.quizname+ " to your cardbox.  Correct answers will go to Cardbox 1, Incorrect to Cardbox 0.  Continue?")){
-				self.action('QID_ADD_ALL', index);
+				self.action('QID_ADD_ALL', self.rows[index].data.quizid);
 			}
 		});
 	},
@@ -200,7 +200,7 @@ processSelectedRows: function() {
 		$(this.rows[index].addWrong).on('click',function(e){
 			e.stopPropagation();
 			if (confirm("This will add up to "+self.rows[index].data.incorrect+" incorrect responses in "+self.rows[index].data.quizname+" to cardbox 0.  Continue?")){
-				self.action('QID_ADD_WRONG', index);
+				self.action('QID_ADD_WRONG', self.rows[index].data.quizid);
 			}
 		});
 	},

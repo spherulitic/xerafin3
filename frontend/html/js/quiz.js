@@ -117,30 +117,21 @@ class QuizList {
       .catch(error => { console.error("Error activating quiz: ", error); });
    }
 
-   addQuizToCardbox(quizid, action, after=function(){}) {
-    typeof this.addAttempts!=='undefined' ? this.addAttempts = 0 : this.addAttempts++;
-    if (typeof this.retryAdd!=='undefined'){clearTimeout(this.retryAdd);}
-    let self = this;
-    let d = {
+   addQuizToCardbox(quizid, action, after=function(){}, onError=function(){}) {
+    const d = {
       'quizid': quizid,
       'action': action
     };
-    $.ajax({
-      type: "POST",
-      data: JSON.stringify(d),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "addQuizToCardbox.py",
-      success: function(response, responseStatus) {
-        delete self.addAttempts;
-        after(response[0]);
-
-      },
-      error: function(jqHXR, textStatus, errorThrown) {
-        if (self.addAttempts > 9){
-          appendDebugLog("Quiz Activation Failed. ID: ["+quizid+", "+action+"]");
-        }
-      }
-    });
+    fetchWithAuth("addQuizToCardbox", { method: "POST", body: JSON.stringify(d) })
+      .then(response => {
+        if (!response.ok) { throw new Error(`HTTP ${response.status}`); }
+        return response.json();
+      })
+      .then(data => { after(data[0]); })
+      .catch(error => {
+        console.error("Error adding quiz to cardbox: ", error);
+        onError(error);
+      });
    }
 
 } // end class
