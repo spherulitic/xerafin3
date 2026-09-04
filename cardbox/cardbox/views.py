@@ -508,17 +508,40 @@ def uploadCardbox():
   ''' Replaces a user's cardbox with the uploaded sqlite database '''
 
   file = request.files.get('cardbox')
+  if file is None:
+    return jsonify({"status": "Invalid Cardbox"})
+
   filename = getTempFile()
   file.save(filename)
-  if checkCardboxDatabase():
-    # Flush any WAL data into the live .db before replacing the file, so a
-    # stale -wal file can't be replayed onto the newly uploaded cardbox.
-    g.con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-    shutil.move(filename, getDBFile())
-    result = {"status": "success"}
-    reset_start_score()
-  else:
-    result = {"status": "Invalid Cardbox"}
+  # Validate and normalize the uploaded cardbox BEFORE replacing the live one:
+  # it must be an openable sqlite db carrying the questions table the app uses.
+  # Zyzzyva exports only have that table; any missing aux tables, indexes, and
+  # seed rows are created here so the installed file is ready to serve.
+  con = lite.connect(filename)
+  try:
+    valid = _ensureCardboxSchema(con, create_if_missing=False)
+    con.commit()
+  finally:
+    con.close()
+  if not valid:
+    return jsonify({"status": "Invalid Cardbox"})
+
+  # Flush any WAL data into the live .db before replacing the file, so a stale
+  # -wal file can't be replayed onto the newly uploaded cardbox.
+  g.con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+  shutil.move(filename, getDBFile())
+  # The old connection now points at a replaced (unlinked) file. Close it and
+  # reopen against the new cardbox so reset_start_score() below reports the
+  # uploaded cardbox's score rather than the old one's.
+  g.con.close()
+  g.con = lite.connect(getDBFile())
+  g.con.execute("PRAGMA journal_mode=WAL")
+  g.con.execute("PRAGMA busy_timeout=5000")
+  g.con.execute("PRAGMA synchronous=NORMAL")
+  g.cur = g.con.cursor()
+
+  result = {"status": "success"}
+  reset_start_score()
 
   return jsonify(result)
 
@@ -1239,65 +1262,87 @@ def getTempFile():
   filename = os.path.join(sys.path[0], "temp-data", f'{g.uuid}.db')
   return filename
 
-def checkCardboxDatabase ():
-  ''' Does this database have a questions table? If not return false. If so, return true.
-        If other aux tables are missing, create them. This could be a Zyzzyva cardbox uploaded '''
+# Canonical schema for a user cardbox. Single source of truth for both creating
+# a fresh cardbox (initCardbox) and validating an uploaded one (uploadCardbox).
+_QUESTIONS_DDL = ("create table questions (question varchar(16), correct integer, incorrect integer, "
+                  "streak integer, last_correct integer, difficulty integer, "
+                  "cardbox integer, next_scheduled integer)")
+_QUESTIONS_COLUMNS = {'question', 'correct', 'incorrect', 'streak', 'last_correct',
+                      'difficulty', 'cardbox', 'next_scheduled'}
+
+def _ensureCardboxSchema(con, create_if_missing):
+  ''' Make sure an open cardbox database has the tables, indexes, and seed rows
+      the app needs.
+
+      Returns True if the database is usable, False otherwise. When
+      create_if_missing is False the caller is validating an uploaded cardbox:
+      a missing questions table, a questions table without the expected
+      columns, or duplicate questions all make the file unacceptable. '''
   now = int(time.time())
   try:
-      g.cur.execute("select name from sqlite_master where type='table'")
-      tables = [x[0] for x in g.cur.fetchall()]
-      if 'questions' not in tables:
-        g.cur.execute(''' create table questions (question varchar(16), correct integer, incorrect integer,
-                        streak integer, last_correct integer, difficulty integer,
-                        cardbox integer, next_scheduled integer)''')
-#        return False
-      ### For reference:
-      ###  create table questions (question varchar(16), correct integer, incorrect integer,
-      ###                          streak integer, last_correct integer, difficulty integer,
-      ###                          cardbox integer, next_scheduled integer)")
-      if 'cleared_until' not in tables:
-        g.cur.execute("create table cleared_until (timeStamp integer)")
-      if 'new_words_at' not in tables:
-        g.cur.execute("create table new_words_at (timeStamp integer)")
-      if 'next_Added' not in tables:
-        g.cur.execute("create table next_Added (question varchar(16), timeStamp integer)")
-      g.cur.execute("create unique index if not exists question_index on questions(question)")
-      g.cur.execute("create unique index if not exists next_added_question_idx on next_added(question)")
-      # Create the indexes the hot queries depend on, if missing. Guarded by
-      # PRAGMA index_list so the common case is a cheap read-only check (no
-      # per-request schema write lock).
-      g.cur.execute("pragma index_list('questions')")
-      existing = {row[1] for row in g.cur.fetchall()}
-      stmts = {
-        'idx_q_cardbox_sched': "create index idx_q_cardbox_sched on questions(cardbox, next_scheduled)",
-        'idx_q_diff_sched': "create index idx_q_diff_sched on questions(difficulty, next_scheduled)",
-        'idx_q_next_sched': "create index idx_q_next_sched on questions(next_scheduled, cardbox)",
-      }
-      for name, stmt in stmts.items():
-        if name not in existing:
-          g.cur.execute(stmt)
+    cur = con.cursor()
+    cur.execute("select name from sqlite_master where type='table'")
+    tables = {x[0] for x in cur.fetchall()}
+    if 'questions' not in tables:
+      if not create_if_missing:
+        return False
+      cur.execute(_QUESTIONS_DDL)
+    elif not create_if_missing:
+      cur.execute("pragma table_info(questions)")
+      columns = {row[1] for row in cur.fetchall()}
+      if not _QUESTIONS_COLUMNS.issubset(columns):
+        return False
 
-      g.cur.execute("select * from cleared_until")
-      row = g.cur.fetchone()
-      if row is None:
-        g.cur.execute("insert into cleared_until values (?)", (now,))
+    if 'cleared_until' not in tables:
+      cur.execute("create table cleared_until (timeStamp integer)")
+    if 'new_words_at' not in tables:
+      cur.execute("create table new_words_at (timeStamp integer)")
+    if 'next_Added' not in tables:
+      cur.execute("create table next_Added (question varchar(16), timeStamp integer)")
+    # Creating the unique index also rejects uploaded cardboxes whose questions
+    # table contains duplicate question values.
+    cur.execute("create unique index if not exists question_index on questions(question)")
+    cur.execute("create unique index if not exists next_added_question_idx on next_added(question)")
+    # Create the indexes the hot queries depend on, if missing. Guarded by
+    # PRAGMA index_list so the common case is a cheap read-only check (no
+    # per-request schema write lock).
+    cur.execute("pragma index_list('questions')")
+    existing = {row[1] for row in cur.fetchall()}
+    stmts = {
+      'idx_q_cardbox_sched': "create index idx_q_cardbox_sched on questions(cardbox, next_scheduled)",
+      'idx_q_diff_sched': "create index idx_q_diff_sched on questions(difficulty, next_scheduled)",
+      'idx_q_next_sched': "create index idx_q_next_sched on questions(next_scheduled, cardbox)",
+    }
+    for name, stmt in stmts.items():
+      if name not in existing:
+        cur.execute(stmt)
 
-      g.cur.execute("select * from new_words_at")
-      row = g.cur.fetchone()
-      if row is None:
-        g.cur.execute("insert into new_words_at values (?)", (now+1,))
+    cur.execute("select * from cleared_until")
+    row = cur.fetchone()
+    if row is None:
+      cur.execute("insert into cleared_until values (?)", (now,))
+
+    cur.execute("select * from new_words_at")
+    row = cur.fetchone()
+    if row is None:
+      cur.execute("insert into new_words_at values (?)", (now+1,))
 
   except:
     return False
 
   return True
 
+def checkCardboxDatabase ():
+  ''' Does this database have a questions table? If not return false. If so, return true.
+        If other aux tables are missing, create them. This could be a Zyzzyva cardbox uploaded '''
+  return _ensureCardboxSchema(g.con, create_if_missing=True)
+
 def reset_start_score():
   ''' Send a request to stats/resetStartScore to reset cardbox movment after upload
   '''
-  data = {"score": getCardboxScore()}
+  score = getCardboxScore()
   url = 'http://stats:5000/resetStartScore'
-  resp = xu.check401(requests.post(url, headers=g.headers, json={"score": getCardboxScore()})).json()
+  resp = xu.check401(requests.post(url, headers=g.headers, json={"score": score})).json()
   if not resp["success"]:
     app.logger.info(f"Unable to reset cardbox score on upload for {g.uuid}. See stats log for more info.")
   return
