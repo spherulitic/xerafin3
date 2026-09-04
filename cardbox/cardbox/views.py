@@ -152,6 +152,59 @@ def _lookahead_seconds_case():
                    for cb in range(0, 13))
   return f"CASE cardbox {parts} ELSE {top} END"
 
+def _looks_corrupt(err_msg):
+  ''' True when a sqlite error means the file itself is not a usable database
+      (as opposed to "database is locked" or other transient errors, which must
+      never trigger recovery). '''
+  return any(token in err_msg for token in ('not a database', 'malformed', 'disk image', 'encrypted'))
+
+def _open_cardbox_database():
+  ''' Open the user's cardbox and make sure it is usable.
+
+      A corrupt/unreadable cardbox file (e.g. a garbage file installed by an old
+      upload bug) would otherwise 401 every request for that user. Detect the
+      corrupt case, move the file aside, and re-create a fresh empty cardbox so
+      the user is never locked out. '''
+  def _connect():
+    con = lite.connect(getDBFile())
+    # WAL allows readers to run concurrently with a writer and makes commits
+    # cheaper (single sequential append + fsync to the -wal file).
+    # synchronous=NORMAL is crash-safe in WAL mode; busy_timeout keeps a second
+    # writer from failing immediately with "database is locked".
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA busy_timeout=5000")
+    con.execute("PRAGMA synchronous=NORMAL")
+    cur = con.cursor()
+    if not _ensureCardboxSchema(con, create_if_missing=True):
+      raise RuntimeError("cardbox database could not be initialized")
+    return con, cur
+
+  try:
+    g.con, g.cur = _connect()
+  except lite.DatabaseError as e:
+    if not _looks_corrupt(str(e)):
+      raise
+    dbFile = getDBFile()
+    backup = f"{dbFile}.corrupt-{int(time.time())}"
+    try:
+      if hasattr(g, 'con') and g.con:
+        try:
+          g.con.close()
+        except Exception:
+          pass
+      shutil.move(dbFile, backup)
+      for suffix in ('-wal', '-shm'):
+        sidecar = dbFile + suffix
+        if os.path.exists(sidecar):
+          os.remove(sidecar)
+    except OSError:
+      app.logger.error(f"Unable to recover corrupt cardbox for {g.uuid}: could not move {dbFile} aside")
+      raise
+    app.logger.warning(
+      f"Recovered corrupt cardbox for {g.uuid}: moved {dbFile} to {backup} and created a fresh empty cardbox")
+    g.con, g.cur = _connect()
+    g.con.commit()
+
 @app.before_request
 def get_user():
   # Skip verification for public routes
@@ -180,17 +233,7 @@ def get_user():
     # headers to send to other services
     g.headers = {"Accept": "application/json", "Authorization": raw_token}
 
-    g.con = lite.connect(getDBFile())
-    # WAL allows readers to run concurrently with a writer and makes commits
-    # cheaper (single sequential append + fsync to the -wal file).
-    # synchronous=NORMAL is crash-safe in WAL mode; busy_timeout keeps a second
-    # writer from failing immediately with "database is locked".
-    g.con.execute("PRAGMA journal_mode=WAL")
-    g.con.execute("PRAGMA busy_timeout=5000")
-    g.con.execute("PRAGMA synchronous=NORMAL")
-    g.cur = g.con.cursor()
-    if not checkCardboxDatabase():
-      raise RuntimeError("cardbox database could not be initialized")
+    _open_cardbox_database()
     # Debug for slow queries
     g.start_time = time.time()
 
@@ -513,13 +556,20 @@ def uploadCardbox():
 
   filename = getTempFile()
   file.save(filename)
-  # Validate and normalize the uploaded cardbox BEFORE replacing the live one:
-  # it must be an openable sqlite db carrying the questions table the app uses.
-  # Zyzzyva exports only have that table; any missing aux tables, indexes, and
-  # seed rows are created here so the installed file is ready to serve.
+  # Validate and normalize the uploaded cardbox BEFORE replacing the live one.
+  # An uploaded empty file (0 bytes, or a sqlite db with no tables) means
+  # "start fresh": build a proper initialized empty cardbox out of it. Anything
+  # else must be an openable sqlite db carrying the questions table the app
+  # uses; Zyzzyva exports only have that table, and any missing aux tables,
+  # indexes, and seed rows are created here so the installed file is ready.
   con = lite.connect(filename)
   try:
-    valid = _ensureCardboxSchema(con, create_if_missing=False)
+    try:
+      cur = con.execute("select count(*) from sqlite_master where type='table'")
+      empty = cur.fetchone()[0] == 0
+    except lite.DatabaseError:
+      empty = False
+    valid = _ensureCardboxSchema(con, create_if_missing=empty)
     con.commit()
   finally:
     con.close()

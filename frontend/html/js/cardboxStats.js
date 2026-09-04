@@ -402,15 +402,34 @@ function uploadCardbox() {
   data: formdata,
   processData: false,
   contentType: false,
-   success: cardboxUploadCallback}); }
+   success: cardboxUploadCallback,
+   error: cardboxUploadError}); }
   }
 }
 
-function cardboxUploadCallback(response, responseStatus) {
-  $( "#uploadButton" ).prop("disabled", false);
-  $( "#uploadButton" ).val("Upload");
-  appendDebugLog("Cardbox upload script status is " + response.status);
-  gFloatingAlert("cardboxUploadAlert",3000,"Cardbox File Management", "Cardbox Upload Complete!",500);
+function resetUploadButton() {
+  $("#uploadButton").prop("disabled", false);
+  $("#uploadButton").val("Upload");
+}
+
+function cardboxUploadCallback(response) {
+  resetUploadButton();
+  appendDebugLog("Cardbox upload response: " + JSON.stringify(response));
+  if (response && response.status === "success") {
+    gFloatingAlert("cardboxUploadAlert", 3000, "Cardbox File Management", "Cardbox Upload Complete!", 500);
+  } else {
+    var msg = (response && response.status === "Invalid Cardbox")
+      ? "Upload failed: the selected file is not a valid cardbox."
+      : "Upload failed: the server returned an unexpected response.";
+    gFloatingAlert("cardboxUploadAlert", 8000, "Cardbox File Management", msg, 500);
+  }
+}
+
+function cardboxUploadError(xhr) {
+  resetUploadButton();
+  var code = (xhr && xhr.status) ? xhr.status : "network";
+  appendDebugLog("Cardbox upload failed: HTTP " + code);
+  gFloatingAlert("cardboxUploadAlert", 8000, "Cardbox File Management", "Upload failed: server error (HTTP " + code + ").", 500);
 }
 
 function uploadNewWordList() {
