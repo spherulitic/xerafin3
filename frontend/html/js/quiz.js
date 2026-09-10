@@ -208,7 +208,7 @@ class Quiz {
                 for (let i=0;i<questionArray.length;i++) {
                   this.createQuestion(questionArray[i]);
                 }
-                if(this.isCardbox && Number(localStorage.cardboxCurrent)!==this.questions[this.questions.length-1].cardbox) {
+                if(this.isCardbox && this.questions.length > 0 && Number(localStorage.cardboxCurrent)!==this.questions[this.questions.length-1].cardbox) {
                   localStorage.cardboxSent='false';
                   localStorage.cardboxCurrent=this.questions[this.questions.length-1].cardbox;
                   if ($('#pan_4').length>0){
@@ -260,8 +260,9 @@ class Quiz {
        }
 
        closeQuestion(alpha) {
-         // modifies self.questions in place and returns a promise that resolves to true
+         // modifies self.questions in place and returns true if the question was found
    var q = this.getQuestionByAlpha(alpha);
+         if (!q) { return false; }
          var i = this.questions.indexOf(q);
    this.questions.splice(i, 1);
    this.questionsLoaded--;

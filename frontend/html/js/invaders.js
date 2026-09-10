@@ -14,23 +14,6 @@ function createNewAudio(ident, args, pare){
   }
 }
 
-function alpha(alphagram, answers, cardbox, invCfg) {
-  console.log(invCfg);
-  // answers is an object: { "WORD": [ aux info ... ], etc }
-  this.width = alphagram.length * invCfg.letterWidth;
-  this.height = invCfg.alphaHeight;
-  this.leftx = (Math.round(Math.random() * ((invCfg.INVW/invCfg.letterWidth) - alphagram.length)) * invCfg.letterWidth);
-  this.x = this.leftx + this.width/2;
-  this.y = 1.0;
-  this.alphagram = alphagram;
-  this.displayAlphagram = alphaSortMethod(alphagram, Number(localStorage.gAlphaSortInput));
-  this.answers = Object.keys(answers);
-  this.words = this.answers.slice();
-  this.wordAuxInfo = answers;
-  this.cardbox = cardbox;
-  this.timeout = 60000; // 60 seconds
-  this.active = true;
-}
 Invader.prototype = {
   constructor: Invader,
 //-------------------------------------------------------------------------------------------------------------------------------
@@ -42,23 +25,20 @@ Invader.prototype = {
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   getHighScores:function(){
-    var d = { userid: userid };
     var that=this;
     $.ajax({
       type: "POST",
-      data: JSON.stringify(d),
+      data: JSON.stringify({}),
       headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "getInvaderHighScores.py",
+      url: "getInvaderHighScores",
       success: function(response, responseStatus) {
-        that.personalHighScore = response[0].personal;
-        that.dailyHighScore = response[0].daily.score;
+        that.personalHighScore = response.personal;
+        that.dailyHighScore = response.daily.score;
       },
       error: function(jqXHR, textStatus, errorThrown) {
         console.log("Error, status = " + textStatus + " error: " + errorThrown);
       }
     });
-    this.personalHighScore=that.personalHighScore;
-    this.dailyHighScore=that.personalHighScore;
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   getLetterDimensions:function(){
@@ -89,13 +69,6 @@ Invader.prototype = {
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   getPosition:function(event) {
-    //var x = event.x;
-    //var y = event.y;
-    //var canvas = document.getElementById("invadersCanvas");
-    //var rect = canvas.getBoundingClientRect();
-    //x -= rect.left;
-    //y -= rect.top;
-    //console.log('x:'+x+' y:'+y);
     return { x: event.offsetX, y: event.offsetY }
   },
 //-------------------------------------------------------------------------------------------------------------------------------
@@ -122,8 +95,7 @@ Invader.prototype = {
         this.invadersAlphas[i].y-this.invadersAlphas[i].height<=pos.y && pos.y <= this.invadersAlphas[i].y) {
         if (this.invadersAlphas[i].active)
           this.invadersAlphas[i].timeout = 0; // clicking marks it wrong
-          this.displayWord(this.invadersAlphas[i], this.invadersAlphas[i].words, 'WRONG');
-          break;
+        break;
       }
     }
   },
@@ -133,11 +105,11 @@ Invader.prototype = {
     if (this.invaderStatus == "started") {
       this.invaderStatus = "paused";
             this.endGame(false, true);
-            $("#pauseButton").html("Resume");
+            $("#leftButton").html("Resume");
     }
     else if (this.invaderStatus == "paused") {
       this.invaderStatus = "started";
-      $("#pauseButton").html("Pause");
+      $("#leftButton").html("Pause");
       requestAnimationFrame(function(timestamp) {
         that.animateAlphas(timestamp, timestamp, timestamp);
       });
@@ -146,10 +118,10 @@ Invader.prototype = {
 //-------------------------------------------------------------------------------------------------------------------------------
   initEvents:function(){
     var that=this;
-    $('#resetButton').on('click', function(){that.endGame(true, false);});
-    $('#pauseButton').on('click', function(){that.pauseGame();});
-    $('#invadersCanvas').on('click', function(e){console.log(e);that.toggleSound(e);});
-    $('#invAnswerBox').on("keypress", function(e) {
+    $('#rightButton').off('click').on('click', function(){that.endGame(true, false);});
+    $('#leftButton').off('click').on('click', function(){that.pauseGame();});
+    $('#invadersCanvas').off('click').on('click', function(e){that.toggleSound(e);});
+    $('#answerBox').off('keydown').on("keydown", function(e) {
       if(e.ctrlKey) {
         $(this).val("");
       }
@@ -183,7 +155,7 @@ Invader.prototype = {
     }
     // deal with any completed questions
     for (var i=0;i<this.invadersAlphas.length;i++) {
-    if (this.invadersAlphas[i].answers.length == 0) {
+    if (this.invadersAlphas[i].unanswered.length == 0) {
       this.markAsCorrect(this.invadersAlphas[i]);
       // the explosion image is centered in a 64x64 square
       // so we want the center of the animation frame to be the alpha X,Y
@@ -209,14 +181,13 @@ Invader.prototype = {
     ctx.textAlign = "center";
     for (i=0;i<this.invadersAlphas.length;i++) {
       if (this.invadersAlphas[i].active) {
-        ctx.fillStyle = this.colorList[this.invadersAlphas[i].answers.length];
+        ctx.fillStyle = this.colorList[this.invadersAlphas[i].unanswered.length];
       }
       else {
         ctx.fillStyle = "grey";
-        ctx.fillRect(this.invadersAlphas[i].leftx, this.invadersAlphas[i].y-(this.alphaHeight), this.invadersAlphas[i].alphagram.length*this.letterWidth, this.alphaHeight+1);
+        ctx.fillRect(this.invadersAlphas[i].leftx, this.invadersAlphas[i].y-(this.alphaHeight), this.invadersAlphas[i].alpha.length*this.letterWidth, this.alphaHeight+1);
        ctx.fillStyle = this.colorList[0]; }
-//       ctx.fillText(this.invadersAlphas[i].alphagram, this.invadersAlphas[i].x, this.invadersAlphas[i].y);
-       ctx.fillText(this.invadersAlphas[i].displayAlphagram, this.invadersAlphas[i].x, this.invadersAlphas[i].y);
+       ctx.fillText(this.invadersAlphas[i].displayAlpha, this.invadersAlphas[i].x, this.invadersAlphas[i].y);
     }
 
     // display high scores
@@ -234,7 +205,7 @@ Invader.prototype = {
        for(var j=i-1;j>=0;j--)
          clear = clear && this.noCollision(this.invadersAlphas[i], this.invadersAlphas[j]);
        if (!clear && this.invadersAlphas[i].y - this.invadersAlphas[i].height <= 0) { // game over
-         invaderStatus = "gameover";
+         this.invaderStatus = "gameover";
      var invGameOver=document.createElement('div');
      invGameOver.id="invGameOver";
      invGameOver.className+=" invGameOver";
@@ -276,7 +247,7 @@ Invader.prototype = {
   submitAnswer:function() {
     var that=this;
     var ctx = document.getElementById('invadersCanvas').getContext('2d');
-    if (this.invaderStatus == 'paused') {$('#pauseButton').html('Pause');}
+    if (this.invaderStatus == 'paused') {$('#leftButton').html('Pause');}
     if (this.invaderStatus == 'finished' || this.invaderStatus == 'paused') {
       this.invaderStatus = 'started';
       ctx.font = this.alphaSize+'px courier';
@@ -285,70 +256,55 @@ Invader.prototype = {
       });
     }
     else if (this.invaderStatus == 'started')  {
-      var ans = document.getElementById('invAnswerBox').value.toUpperCase().trim();
-      var found = false;
-      $('#invAnswerBox').val("");
-      alphas:
-        for (var i=0;i<this.invadersAlphas.length;i++) {
-        if (!this.invadersAlphas[i].active)
-        continue;
-      answers:
-        for(var j=0;j<this.invadersAlphas[i].answers.length;j++) {
-          if (ans == this.invadersAlphas[i].answers[j]) {
-            console.log(ans);
-          // possible race condition with mult answers searched at once?
-            this.playLaserSound();
-            this.invadersAlphas[i].answers = this.invadersAlphas[i].answers.filter(function(el) {return (el != ans); });
-            this.displayWord(this.invadersAlphas[i], [ans], 'CURRENT');
-            found = true;
-          break alphas;
-          }
-
-        }
-        if ((this.invadersAlphas[i].alphagram==ans.split('').sort().join('')) && (found==false)){;
-          $('#invCurDiv').prepend($('#invAlphaDiv'+this.invadersAlphas[i].alphagram));
-          $('#invWordsWrong'+this.invadersAlphas[i].alphagram).append(" "+ans);
-          $('#invWordsWrong'+this.invadersAlphas[i].alphagram).css('visibility','visible');
-          $('.nav-pills a[href="#invCurDiv"]').tab('show');
-        }
+      var status = this.answerArea.submitAnswer();
+      if (status == 'correct' || status == 'solved') {
+        this.playLaserSound();
       }
-      if (found) {$('#invAnswerBox').toggleClass('slothFlashCorrect',200).delay(100).toggleClass('slothFlashCorrect',200);}
-      else {$('#invAnswerBox').toggleClass('flashTypo',200).delay(100).toggleClass('flashTypo',200);}
     }
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   getAlpha:function() {
-    // also need to lock words as we grab them
-    var d = { numQuestions: 1, user: userid, lock: true };
+    // ask the Quiz object for one new question and, once it arrives, drop it into play
     var that=this;
-    $.ajax({ type: "POST",
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "getQuestion.py",
-      data: JSON.stringify(d),
-      success: function (response, responseStatus) {
-        var r = response[0];
-        var question = r.questions;
-        var words = r.words;
-        var cardbox = r.aux[0].cardbox;
-        var alphagram = Object.keys(question)[0];
-        if (r.getFromStudyOrder)
-          prepareNewWords();
-        var newAlpha = new alpha(alphagram, words, cardbox, that);
-        that.invadersAlphas.push(newAlpha);
+    if (!this.q) { this.gettingWord = false; return; }
+    var quiz = this.q;
+    quiz.loadQuestions(1);
+    var waitForQuestion = function() {
+      if (!document.getElementById("invadersCanvas")) return;
+      if (that.q !== quiz) return; // a new game started while we were waiting
+      if (quiz.hasHTTPError) { that.gettingWord = false; return; }
+      if (quiz.initialized) {
+        var tracked = { };
+        for (var i=0;i<that.invadersAlphas.length;i++) {
+          tracked[that.invadersAlphas[i].alpha] = true;
+        }
+        for (var j=0;j<quiz.questions.length;j++) {
+          var question = quiz.questions[j];
+          if (!tracked[question.alpha]) {
+            that.addAlpha(question);
+            that.gettingWord = false;
+            return;
+          }
+        }
+        // no new question was returned (empty cardbox / end of quiz)
         that.gettingWord = false;
-        gCreateElemArray([
-          ['a','div','invAlphaDiv','invAlphaDiv'+alphagram,'invCurDiv',''],
-          ['a1','table','wordTable','invWords'+alphagram,'a',''],
-          ['a2','div','wordTableWrong','invWordsWrong'+alphagram,'a','']
-        ]);
-        $("#invAlphaDiv"+alphagram).css('visibility','hidden');
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        console.log("Error status = " + textStatus + " Error Thrown " + errorThrown);
+        return;
       }
-    });
-    this.invadersAlphas=that.invadersAlphas;
-    this.gettingWord=that.gettingWord;
+      setTimeout(waitForQuestion, 30);
+    };
+    setTimeout(waitForQuestion, 30);
+  },
+//-------------------------------------------------------------------------------------------------------------------------------
+  addAlpha:function(question) {
+    question.width = question.alpha.length * this.letterWidth;
+    question.height = this.alphaHeight;
+    question.leftx = (Math.round(Math.random() * ((this.INVW/this.letterWidth) - question.alpha.length)) * this.letterWidth);
+    question.x = question.leftx + question.width/2;
+    question.y = 1.0;
+    question.timeout = 60000; // 60 seconds
+    question.active = true;
+    this.invadersAlphas.push(question);
+    this.answerArea.setupWord(question);
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   blinkText:function(){
@@ -390,30 +346,30 @@ Invader.prototype = {
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   endGame:function(restart,pause) {
-    var d;
+    var that=this;
     console.log("endGame triggered");
-    if (this.currentScore >= this.personalHighScore || this.currentScore >= this.dailyHighScore) {
-      d = { userid: userid, score: this.currentScore, gameOver: !pause };
-      var that=this;
+    if (this.currentScore > 0) {
+      var d = { score: this.currentScore, gameOver: !pause };
       $.ajax({type: "POST",
         data: JSON.stringify(d),
         headers: {"Accept": "application/json", "Authorization": keycloak.token},
-        url: "setInvaderHighScores.py",
+        url: "setInvaderHighScores",
         success: function(response, responseStatus) {
-          that.personalHighScore = response[0].personal;
-          that.dailyHighScore = response[0].daily.score;
+          that.personalHighScore = response.personal;
+          that.dailyHighScore = response.daily.score;
         },
         error: function(jqXHR, textStatus, errorThrown) {
           console.log("Error, status = " + textStatus + " error: " + errorThrown);
         }
       });
-      this.personalHighScore = that.personalHighScore;
-      this.dailyHighScore = that.dailyHighScore;
     }
     if (restart){
       this.invaderStatus = "finished";
       $('#invGameOver').remove();
       invadersMusic.pause();
+      $('#invCurDiv').empty();
+      $('#invSolvedDiv').empty();
+      $('#invMissedDiv').empty();
       initInvaders();
     }
   },
@@ -423,63 +379,19 @@ Invader.prototype = {
     document.getElementById('invadersCanvas').width=this.INVW;
   },
 //-------------------------------------------------------------------------------------------------------------------------------
-  displayWord:function(alphaObj, words, state) {
-    var data = new Array();
-    var table = document.getElementById("invWords"+alphaObj.alphagram);
-    $(table).empty();
-    if (alphaObj.answers.length===0){state='SOLVED';}
-    var tabState;
-    switch (state) {
-      case 'CURRENT':
-        tabState= 'invCurDiv';
-        data = alphaObj.words.filter(function(val) {return alphaObj.answers.indexOf(val) == -1;})
-        data = data.sort();
-        $('.nav-pills a[href="#invCurDiv"]').tab('show');
-        break;
-      case 'SOLVED' :
-        tabState= 'invSolvedDiv';
-        data = alphaObj.words.sort();
-        $('.nav-pills a[href="#invSolvedDiv"]').tab('show');
-        break;
-      case 'WRONG':
-        tabState= 'invMissedDiv';
-        data = words.sort();
-        $('.nav-pills a[href="#invMissedDiv"]').tab('show');
-        break;
-    }
-    $("#invAlphaDiv"+alphaObj.alphagram).prependTo($("#"+tabState));
-    $("#invAlphaDiv"+alphaObj.alphagram).css('visibility','visible');
-    for (var x=0;x<data.length;x++) {
-      var datas = getTableLineData(data[x], eval("alphaObj.wordAuxInfo." + data[x]));
-
-      var row = table.insertRow(-1);
-      var cells = [ ];
-      var cellClassList = [" wordTableLeftHook", " wordTableInnerLeft", " wordTableWord", " wordTableInnerRight", " wordLexiconSymbol", " wordTableRightHook", " wordTableDefinition"];
-      for(var i=0;i<cellClassList.length;i++) {
-        cells[i] = row.insertCell(i);
-        cells[i].className += cellClassList[i];
-        cells[i].innerHTML = datas[i];
-      }
-    }
-    clearTimeout(this.clearAnswersTimer);
-    this.clearAnswersTimer = setTimeout(function () {
-      $('.nav-pills a[href="#invCurDiv"]').tab('show');
-    }, 3500);
-  },
-//-------------------------------------------------------------------------------------------------------------------------------
-  markAsCorrect:function(alphaObj) {
+  markAsCorrect:function(question) {
+    // the Question object has already submitted itself when its last answer was found;
+    // here we just account for the kill and stop tracking it in the Quiz
     this.currentScore++;
-    // mark as correct in cardbox
     if (this.currentScore > this.personalHighScore) {this.personalHighScore = this.currentScore; }
     if (this.currentScore > this.dailyHighScore) {this.dailyHighScore = this.currentScore; }
-    var d = {question: alphaObj.alphagram, correct: true, cardbox: alphaObj.cardbox, incrementQ: true};
-    slothSubmitQuestion(d);
+    this.q.closeQuestion(question.alpha);
   },
 //-------------------------------------------------------------------------------------------------------------------------------
-  markAsIncorrect:function(alphaObj) {
-    var  d = {question: alphaObj.alphagram, correct: false, cardbox: alphaObj.cardbox, incrementQ: true};
-    slothSubmitQuestion(d);
-    this.displayWord(alphaObj, alphaObj.words.sort(function (a, b) {return b[2] - a[2];}), 'WRONG');
+  markAsIncorrect:function(question) {
+    question.markWrong();
+    this.answerArea.displayWord(question, question.answers, 'WRONG');
+    this.q.closeQuestion(question.alpha);
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   explosion:function(options) {
@@ -533,42 +445,23 @@ Invader.prototype = {
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   init:function() {
-                var d = { cardbox: localStorage.cardboxCurrent };
-    $.ajax({
-      type: "POST",
-      data: JSON.stringify(d),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "newQuiz",
-      success: function(response,responseStatus){
-        gUpdateCardboxScores (response, 0);
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        console.log("Error, status = " + textStatus + " error: " + errorThrown);
-      }
-    });
+    // Quiz(submitStrict, isCardbox, blankQuiz, quizid)
+    // submitStrict=false so completing every answer always counts as correct,
+    // matching the original Invaders behaviour (wrong guesses don't fail the question)
+    $('#invCurDiv').empty();
+    $('#invSolvedDiv').empty();
+    $('#invMissedDiv').empty();
+    this.q = new Quiz(false, true, false, -1);
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   generateDOM:function() {
     gCreateElemArray([
       ['a','div','quizContentDark invWrapper','invadersWrapper','content_pan_1_c',''],
       ['a1','canvas','invCanvas','invadersCanvas','a',''],
-      ['ax','div','','colorStrip','a',''],
-      ['a2','div','invAnswerBoxRow','answerBoxRow','a',''],
-      ['a2a','div','invButtonBoxPause','buttonBox1','a2',''],
-      ['a2a1','button','btn btn-default invButton','pauseButton','a2a','Pause'],
-      ['a2b','div','invAnswerBoxField','answerBoxField','a2',''],
-      ['a2b1','input','quizAnswerBox invAnswerBox','invAnswerBox','a2b',''],
-      ['a2c','div','invButtonBoxReset','buttonBox2','a2',''],
-      ['a2c1','button','btn btn-default invButton','resetButton','a2c','Reset'],
-      ['a3','ul','nav nav-pills well sm-well metalBTwo nav-justified invTabs','invTabs','a',''],
-      ['a3a','li','active','invCurTab','a3','<a data-toggle="tab" href="#invCurDiv">Current</a>'],
-      ['a3b','li','','invSolvedTab','a3','<a data-toggle="tab" href="#invSolvedDiv">Solved</a>'],
-      ['a3c','li','','invMissedTab','a3','<a data-toggle="tab" href="#invMissedDiv">Missed</a>'],
-      ['a4','div','tab-content well well-sm quizContent pre-scrollable invWordDiv','invWordDiv','a',''],
-      ['a4a','div','tab-pane fade in active','invCurDiv','a4',''],
-      ['a4b','div','tab-pane fade','invSolvedDiv','a4',''],
-      ['a4c','div','tab-pane fade','invMissedDiv','a4','']
+      ['ax','div','','colorStrip','a','']
       ]);
+    this.answerArea.addDOM('invadersWrapper');
+    this.answerArea.setButtonText("Pause", "Reset");
     let x = xerafin.config.colorAnswers.slice(0);
     x.shift();
     let colorTest= new ColorStrip({'width':'80%','colors':x});
@@ -584,8 +477,8 @@ Invader.prototype = {
       this.setCanvasDimensions();
       this.getHighScores();
       this.plotPrescreen();
-      $('#pauseButton').html('Pause');
-      $('#invAnswerBox').focus();
+      $('#leftButton').html('Pause');
+      $('#answerBox').focus();
     }
     else {
       this.invLoad=setTimeout(Invader.prototype.main.bind(this),250);
@@ -594,6 +487,7 @@ Invader.prototype = {
 //-------------------------------------------------------------------------------------------------------------------------------
 }
 function Invader(){
+  this.answerArea = new AnswerArea(this);
   this.canvasIndent = 20;
   this.clearAnswersTimer = -1;
   this.colorList = xerafin.config.colorAnswers;
@@ -625,14 +519,8 @@ function initInvaders() {
     generatePanel(1,panelData,"leftArea");
     stopScrollTimer();
   }
-  if (typeof invader=='undefined'){var invader=new Invader();}
-  else {
-    if (invader.invaderStatus=='finished'){
-      invader=null;
-      delete invader;
-      var invader=new Invader();
-    }
-  }
+  if (typeof invader!=='undefined' && invader.invTimeout) {clearTimeout(invader.invTimeout);}
+  invader = new Invader();
   if (!document.getElementById('invadersCanvas')){
     explosionSound=createNewAudio("explosionSound",{src:'explosion_sm.wav'},"content_pan_1_c");
     laserSound=createNewAudio("laserSound",{src:'audio/laserShot.mp3'},"content_pan_1_c");
@@ -641,32 +529,11 @@ function initInvaders() {
     explosionImg = new Image();
     explosionImg.src = "images/explosion_sprite.png";
     invader.generateDOM();
-    invader.detectWindowClose();
-    invader.initEvents();
   }
+  invader.detectWindowClose();
+  invader.initEvents();
   if (localStorage.musicEnabled == "true") {invadersMusic.pause();invadersMusic.play(); }
-  $('#invAnswerBox').prop('disabled', false);
+  $('#answerBox').prop('disabled', false);
   invader.main();
   //console.log("panel container"+document.getElementById('content_pan_1_c').offsetWidth);
-
-  //  }
-  //}
-}
-
-function slothSubmitQuestion(d) {
-  $.ajax({
-    type: "POST",
-    data: JSON.stringify(d),
-    headers: {"Accept": "application/json", "Authorization": keycloak.token},
-    url: "submitQuestion",
-    success: function(response) {
-      if (d.incrementQ){
-        gUpdateCardboxScores (response);
-        gCheckMilestones(response.qAnswered);
-      }
-    },
-    error: function(jqXHR, textStatus, errorThrown) {
-      console.log("Error getting bingo, status = " + textStatus + " error: " + errorThrown);
-        }
-  });
 }
