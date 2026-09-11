@@ -1,6 +1,6 @@
 // Bump on every release so browsers fetch fresh copies of deployed scripts
 // and the script config instead of serving stale caches.
-const XERAFIN_JS_VERSION = '20260803';
+const XERAFIN_JS_VERSION = '20260911';
 
 XScripts.prototype = {
     constructor: XScripts,
