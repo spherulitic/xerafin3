@@ -146,7 +146,16 @@ Invader.prototype = {
     }
     if (this.invaderStatus != "started") return;
     var activeAlphas = this.invadersAlphas.filter(function(el) { return el.active; });
-    if ((activeAlphas.length == 0 || currentTime-lastWordTime > this.wordFreq) && !this.gettingWord) {
+    if (this.noMoreWords && activeAlphas.length == 0) {
+      // the quiz is exhausted and there is nothing left to solve
+      this.invaderStatus = "gameover";
+      this.postHighScores();
+      invadersMusic.pause();
+      this.drawEndText(ctx, "QUIZ COMPLETE");
+      $('#rightButton').html("New Game");
+      return;
+    }
+    if ((activeAlphas.length == 0 || currentTime-lastWordTime > this.wordFreq) && !this.gettingWord && !this.noMoreWords) {
       this.getAlpha();
       this.gettingWord = true;
       lastWordTime = currentTime;
@@ -263,7 +272,12 @@ Invader.prototype = {
   drawEndText:function(ctx, text) {
     // big solid green letters straight over the frozen board, no box
     ctx.textAlign = "center";
-    ctx.font = "bold " + Math.round(this.alphaSize*2) + "px courier";
+    var fontSize = Math.round(this.alphaSize*2);
+    ctx.font = "bold " + fontSize + "px courier";
+    while (ctx.measureText(text).width >= this.INVW-10 && fontSize > 12) {
+      fontSize--;
+      ctx.font = "bold " + fontSize + "px courier";
+    }
     ctx.lineWidth = 4;
     ctx.strokeStyle = "black";
     ctx.strokeText(text, this.INVW/2, this.INVH/2);
@@ -328,11 +342,13 @@ Invader.prototype = {
           var question = quiz.questions[j];
           if (!tracked[question.alpha]) {
             that.addAlpha(question);
+            that.noMoreWords = false;
             that.gettingWord = false;
             return;
           }
         }
-        // no new question was returned (empty cardbox / end of quiz)
+        // no new question was returned; a non-cardbox quiz is exhausted
+        if (that.quizid != -1) { that.noMoreWords = true; }
         that.gettingWord = false;
         return;
       }
@@ -367,15 +383,30 @@ Invader.prototype = {
     invaderBgImg.onload = function() {
       ctx.drawImage(invaderBgImg, 0, 0,that.INVW,that.INVH);
       ctx.textAlign = 'center';
-      ctx.font = (that.alphaSize+4)+'px courier';
-      ctx.fillStyle = 'rgb(255,48,48)';
       var mid = Math.round(that.INVW/2)
-      ctx.fillText('CARDBOX', mid, 3*scale);
-      ctx.fillText('INVADERS', mid, (4*scale)+5);
+      ctx.fillStyle = 'rgb(255,48,48)';
+      ctx.font = (that.alphaSize+4)+'px courier';
+      if (that.quizid == -1) {
+        ctx.fillText('CARDBOX', mid, 3*scale);
+        ctx.fillText('INVADERS', mid, (4*scale)+5);
+      } else {
+        ctx.fillText('INVADERS', mid, (3*scale)+5);
+      }
       ctx.fillStyle = 'white';
       ctx.font = (that.alphaSize-4)+'px courier';
-      ctx.fillText("Don't let your cardbox", mid, 7*scale);
-      ctx.fillText(" fill the screen", mid, (8*scale)+2);
+      if (that.quizid == -1) {
+        ctx.fillText("Don't let your cardbox", mid, 7*scale);
+        ctx.fillText(" fill the screen", mid, (8*scale)+2);
+      } else {
+        // show which quiz is being played, shrinking to fit if needed
+        var nameFont = that.alphaSize-4;
+        while (ctx.measureText(that.quizname).width >= that.INVW-10 && nameFont > 8) {
+          nameFont--;
+          ctx.font = nameFont+'px courier';
+        }
+        ctx.fillText(that.quizname, mid, (7*scale)+2);
+        ctx.font = (that.alphaSize-4)+'px courier';
+      }
       ctx.fillText('Click an alphagram to', mid, 11*scale);
       ctx.fillText('mark wrong and see answers', mid, (12*scale)+2);
       ctx.fillStyle = 'orange';
@@ -524,7 +555,8 @@ Invader.prototype = {
     $('#invCurDiv').empty();
     $('#invSolvedDiv').empty();
     $('#invMissedDiv').empty();
-    this.q = new Quiz(false, true, false, -1);
+    this.noMoreWords = false;
+    this.q = new Quiz(false, this.quizid==-1, false, this.quizid);
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   generateDOM:function() {
@@ -541,9 +573,13 @@ Invader.prototype = {
     $('#colorStrip').append(colorTest.output());
   },
 //-------------------------------------------------------------------------------------------------------------------------------
-  main:function() {
+  main:function(quizinfo) {
     if (this.invLoad) {clearTimeout(this.invLoad);}
     if ($('#'+this.targetDiv).width()>100){
+      if (quizinfo) {
+        this.quizid = quizinfo.quizid;
+        this.quizname = quizinfo.quizname;
+      }
       this.init();
       this.setDimensions();
       this.getLetterDimensions();
@@ -555,7 +591,7 @@ Invader.prototype = {
       $('#answerBox').focus();
     }
     else {
-      this.invLoad=setTimeout(Invader.prototype.main.bind(this),250);
+      this.invLoad=setTimeout(Invader.prototype.main.bind(this, quizinfo),250);
     }
   }
 //-------------------------------------------------------------------------------------------------------------------------------
@@ -573,13 +609,23 @@ function Invader(){
   this.invadersAlphas = [];
   this.invaderStatus = "finished";
   this.nextAlphaTimer = -1;
+  this.noMoreWords = false;
   this.personalHighScore = 0;
+  this.quizid = -1;
+  this.quizname = "Cardbox";
   this.targetDiv = "content_pan_1_c";
   this.wordFreq = 8000;
   this.maxWidth = 380;
 }
 
-function initInvaders() {
+function initInvaders(quizinfo) {
+  if (typeof quizinfo === 'undefined' || quizinfo === null ||
+      typeof quizinfo.quizid === 'undefined' || quizinfo.quizid === null) {
+    quizinfo = {
+      'quizid': xerafin.storage.data.overview.currentQuiz,
+      'quizname': xerafin.storage.data.overview.currentQuizName
+    };
+  }
   if (!document.getElementById("pan_1_c")) {
     panelData = {
       "contentClass" : "panelContentDefault",
@@ -593,13 +639,18 @@ function initInvaders() {
     generatePanel(1,panelData,"leftArea");
     stopScrollTimer();
   }
-  // If an Invaders game is already underway, keep it running. The Quiz reads
-  // the selected cardbox from localStorage on each loadQuestions call, so a
-  // mid-game cardbox change is picked up automatically.
+  // If an Invaders game is already underway, keep it running when the same quiz
+  // is requested. A different quiz prompts to abort (mirrors Wall of Words).
   if (typeof invader !== 'undefined' && document.getElementById('invadersCanvas') &&
       (invader.invaderStatus == 'started' || invader.invaderStatus == 'paused')) {
-    $('#answerBox').focus();
-    return;
+    if (Number(invader.quizid) === Number(quizinfo.quizid)) {
+      $('#answerBox').focus();
+      return;
+    }
+    if (!confirm("A new quiz has been sent to Cardbox Invaders.  Abort current game?")) {
+      return;
+    }
+    invader.invaderStatus = 'finished'; // stop the old animation loop before replacing it
   }
   if (typeof invader!=='undefined' && invader.invTimeout) {clearTimeout(invader.invTimeout);}
   invader = new Invader();
@@ -616,6 +667,6 @@ function initInvaders() {
   invader.initEvents();
   if (localStorage.musicEnabled == "true") {invadersMusic.pause();invadersMusic.play(); }
   $('#answerBox').prop('disabled', false);
-  invader.main();
+  invader.main(quizinfo);
   //console.log("panel container"+document.getElementById('content_pan_1_c').offsetWidth);
 }
