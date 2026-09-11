@@ -135,6 +135,62 @@ def getStats():
     app.logger.error(f"Error getting sloth stats: {e}", exc_info=True)
     return jsonify({"error": "Internal server error"}), 500
 
+@app.route("/getInvaderHighScores", methods=['GET', 'POST'])
+def getInvaderHighScores():
+  '''Return the requesting user's all-time and today's Cardbox Invaders scores.'''
+  try:
+    g.cur.execute("SELECT score FROM invaders_personal WHERE userid = %s", (g.uuid,))
+    row = g.cur.fetchone()
+    personal = row['score'] if row else 0
+
+    g.cur.execute("SELECT score FROM invaders_daily WHERE userid = %s AND dateStamp = CURDATE()", (g.uuid,))
+    row = g.cur.fetchone()
+    daily = row['score'] if row else 0
+
+    return jsonify({"personal": personal, "daily": {"score": daily}})
+
+  except Exception as e:
+    app.logger.error(f"Error getting invader high scores: {e}", exc_info=True)
+    return jsonify({"error": "Internal server error"}), 500
+
+@app.route("/setInvaderHighScores", methods=['GET', 'POST'])
+def setInvaderHighScores():
+  '''Record a Cardbox Invaders score, keeping the best all-time and daily score.'''
+  try:
+    params = request.get_json(force=True)
+    score = int(params.get("score", 0))
+
+    g.cur.execute("SELECT score FROM invaders_personal WHERE userid = %s", (g.uuid,))
+    row = g.cur.fetchone()
+    if row is None:
+      g.cur.execute("INSERT INTO invaders_personal (userid, score) VALUES (%s, %s)", (g.uuid, score))
+      personal = score
+    elif score > row['score']:
+      g.cur.execute("UPDATE invaders_personal SET score = %s WHERE userid = %s", (score, g.uuid))
+      personal = score
+    else:
+      personal = row['score']
+
+    g.cur.execute("SELECT score FROM invaders_daily WHERE userid = %s AND dateStamp = CURDATE()", (g.uuid,))
+    row = g.cur.fetchone()
+    if row is None:
+      g.cur.execute("INSERT INTO invaders_daily (userid, dateStamp, score) VALUES (%s, CURDATE(), %s)", (g.uuid, score))
+      daily = score
+    elif score > row['score']:
+      g.cur.execute("UPDATE invaders_daily SET score = %s WHERE userid = %s AND dateStamp = CURDATE()", (score, g.uuid))
+      daily = score
+    else:
+      daily = row['score']
+
+    return jsonify({"personal": personal, "daily": {"score": daily}})
+
+  except (ValueError, TypeError):
+    return jsonify({"error": "Invalid score"}), 400
+  except Exception as e:
+    app.logger.error(f"Error setting invader high scores: {e}", exc_info=True)
+    g.con.rollback()
+    return jsonify({"error": "Internal server error"}), 500
+
 @app.route('/slothWriteActive', methods=['POST'])
 def start_game():
   """

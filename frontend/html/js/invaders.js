@@ -14,23 +14,6 @@ function createNewAudio(ident, args, pare){
   }
 }
 
-function alpha(alphagram, answers, cardbox, invCfg) {
-  console.log(invCfg);
-  // answers is an object: { "WORD": [ aux info ... ], etc }
-  this.width = alphagram.length * invCfg.letterWidth;
-  this.height = invCfg.alphaHeight;
-  this.leftx = (Math.round(Math.random() * ((invCfg.INVW/invCfg.letterWidth) - alphagram.length)) * invCfg.letterWidth);
-  this.x = this.leftx + this.width/2;
-  this.y = 1.0;
-  this.alphagram = alphagram;
-  this.displayAlphagram = alphaSortMethod(alphagram, Number(localStorage.gAlphaSortInput));
-  this.answers = Object.keys(answers);
-  this.words = this.answers.slice();
-  this.wordAuxInfo = answers;
-  this.cardbox = cardbox;
-  this.timeout = 60000; // 60 seconds
-  this.active = true;
-}
 Invader.prototype = {
   constructor: Invader,
 //-------------------------------------------------------------------------------------------------------------------------------
@@ -42,23 +25,20 @@ Invader.prototype = {
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   getHighScores:function(){
-    var d = { userid: userid };
     var that=this;
     $.ajax({
       type: "POST",
-      data: JSON.stringify(d),
+      data: JSON.stringify({}),
       headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "getInvaderHighScores.py",
+      url: "getInvaderHighScores",
       success: function(response, responseStatus) {
-        that.personalHighScore = response[0].personal;
-        that.dailyHighScore = response[0].daily.score;
+        that.personalHighScore = response.personal;
+        that.dailyHighScore = response.daily.score;
       },
       error: function(jqXHR, textStatus, errorThrown) {
         console.log("Error, status = " + textStatus + " error: " + errorThrown);
       }
     });
-    this.personalHighScore=that.personalHighScore;
-    this.dailyHighScore=that.personalHighScore;
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   getLetterDimensions:function(){
@@ -89,13 +69,6 @@ Invader.prototype = {
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   getPosition:function(event) {
-    //var x = event.x;
-    //var y = event.y;
-    //var canvas = document.getElementById("invadersCanvas");
-    //var rect = canvas.getBoundingClientRect();
-    //x -= rect.left;
-    //y -= rect.top;
-    //console.log('x:'+x+' y:'+y);
     return { x: event.offsetX, y: event.offsetY }
   },
 //-------------------------------------------------------------------------------------------------------------------------------
@@ -122,34 +95,30 @@ Invader.prototype = {
         this.invadersAlphas[i].y-this.invadersAlphas[i].height<=pos.y && pos.y <= this.invadersAlphas[i].y) {
         if (this.invadersAlphas[i].active)
           this.invadersAlphas[i].timeout = 0; // clicking marks it wrong
-          this.displayWord(this.invadersAlphas[i], this.invadersAlphas[i].words, 'WRONG');
-          break;
+        break;
       }
     }
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   pauseGame:function(){
-    var that=this;
+    // the animation loop stays alive while paused; it draws the pause screen
+    // and freezes all timers until the status flips back to "started"
     if (this.invaderStatus == "started") {
       this.invaderStatus = "paused";
-            this.endGame(false, true);
-            $("#pauseButton").html("Resume");
+      $("#leftButton").html("Resume");
     }
     else if (this.invaderStatus == "paused") {
       this.invaderStatus = "started";
-      $("#pauseButton").html("Pause");
-      requestAnimationFrame(function(timestamp) {
-        that.animateAlphas(timestamp, timestamp, timestamp);
-      });
+      $("#leftButton").html("Pause");
     }
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   initEvents:function(){
     var that=this;
-    $('#resetButton').on('click', function(){that.endGame(true, false);});
-    $('#pauseButton').on('click', function(){that.pauseGame();});
-    $('#invadersCanvas').on('click', function(e){console.log(e);that.toggleSound(e);});
-    $('#invAnswerBox').on("keypress", function(e) {
+    $('#rightButton').off('click').on('click', function(){that.endCurrentGame();});
+    $('#leftButton').off('click').on('click', function(){that.pauseGame();});
+    $('#invadersCanvas').off('click').on('click', function(e){that.toggleSound(e);});
+    $('#answerBox').off('keydown').on("keydown", function(e) {
       if(e.ctrlKey) {
         $(this).val("");
       }
@@ -166,9 +135,27 @@ Invader.prototype = {
       return;
     }
     var ctx = document.getElementById('invadersCanvas').getContext('2d');
+    if (this.invaderStatus == "paused") {
+      // freeze the game: hide the alphagrams behind a pause screen and keep
+      // rescheduling without advancing the fall, word spawn, or question timers
+      this.drawPauseScreen(ctx);
+      requestAnimationFrame(function(timestamp) {
+        that.animateAlphas(currentTime, timestamp, currentTime);
+      });
+      return;
+    }
     if (this.invaderStatus != "started") return;
     var activeAlphas = this.invadersAlphas.filter(function(el) { return el.active; });
-    if ((activeAlphas.length == 0 || currentTime-lastWordTime > this.wordFreq) && !this.gettingWord) {
+    if (this.noMoreWords && activeAlphas.length == 0) {
+      // the quiz is exhausted and there is nothing left to solve
+      this.invaderStatus = "gameover";
+      this.postHighScores();
+      invadersMusic.pause();
+      this.drawEndText(ctx, "QUIZ COMPLETE");
+      $('#rightButton').html("New Game");
+      return;
+    }
+    if ((activeAlphas.length == 0 || currentTime-lastWordTime > this.wordFreq) && !this.gettingWord && !this.noMoreWords) {
       this.getAlpha();
       this.gettingWord = true;
       lastWordTime = currentTime;
@@ -183,7 +170,7 @@ Invader.prototype = {
     }
     // deal with any completed questions
     for (var i=0;i<this.invadersAlphas.length;i++) {
-    if (this.invadersAlphas[i].answers.length == 0) {
+    if (this.invadersAlphas[i].unanswered.length == 0) {
       this.markAsCorrect(this.invadersAlphas[i]);
       // the explosion image is centered in a 64x64 square
       // so we want the center of the animation frame to be the alpha X,Y
@@ -205,19 +192,7 @@ Invader.prototype = {
     }
     this.explosions = this.explosions.filter(Boolean);
     // display the alphagrams
-    ctx.font = this.alphaSize+"px courier";
-    ctx.textAlign = "center";
-    for (i=0;i<this.invadersAlphas.length;i++) {
-      if (this.invadersAlphas[i].active) {
-        ctx.fillStyle = this.colorList[this.invadersAlphas[i].answers.length];
-      }
-      else {
-        ctx.fillStyle = "grey";
-        ctx.fillRect(this.invadersAlphas[i].leftx, this.invadersAlphas[i].y-(this.alphaHeight), this.invadersAlphas[i].alphagram.length*this.letterWidth, this.alphaHeight+1);
-       ctx.fillStyle = this.colorList[0]; }
-//       ctx.fillText(this.invadersAlphas[i].alphagram, this.invadersAlphas[i].x, this.invadersAlphas[i].y);
-       ctx.fillText(this.invadersAlphas[i].displayAlphagram, this.invadersAlphas[i].x, this.invadersAlphas[i].y);
-    }
+    this.drawAlphas(ctx);
 
     // display high scores
        ctx.fillStyle = "white";
@@ -234,13 +209,11 @@ Invader.prototype = {
        for(var j=i-1;j>=0;j--)
          clear = clear && this.noCollision(this.invadersAlphas[i], this.invadersAlphas[j]);
        if (!clear && this.invadersAlphas[i].y - this.invadersAlphas[i].height <= 0) { // game over
-         invaderStatus = "gameover";
-     var invGameOver=document.createElement('div');
-     invGameOver.id="invGameOver";
-     invGameOver.className+=" invGameOver";
-     invGameOver.innerHTML="GAME OVER";
-     $('#invadersWrapper').prepend(invGameOver);
-         this.endGame(false, false);
+         this.invaderStatus = "gameover";
+         this.postHighScores();
+         invadersMusic.pause();
+         this.drawEndText(ctx, "GAME OVER");
+         $('#rightButton').html("New Game");
          return;
        }
        if (clear && this.invadersAlphas[i].y < this.INVH-25) {
@@ -262,6 +235,56 @@ Invader.prototype = {
     });
   },
 //-------------------------------------------------------------------------------------------------------------------------------
+  drawAlphas:function(ctx) {
+    ctx.font = this.alphaSize+"px courier";
+    ctx.textAlign = "center";
+    for (var i=0;i<this.invadersAlphas.length;i++) {
+      if (this.invadersAlphas[i].active) {
+        ctx.fillStyle = this.colorList[this.invadersAlphas[i].unanswered.length];
+      }
+      else {
+        ctx.fillStyle = "grey";
+        ctx.fillRect(this.invadersAlphas[i].leftx, this.invadersAlphas[i].y-(this.alphaHeight), this.invadersAlphas[i].alpha.length*this.letterWidth, this.alphaHeight+1);
+        ctx.fillStyle = this.colorList[0];
+      }
+      ctx.fillText(this.invadersAlphas[i].displayAlpha, this.invadersAlphas[i].x, this.invadersAlphas[i].y);
+    }
+  },
+//-------------------------------------------------------------------------------------------------------------------------------
+  drawPauseScreen:function(ctx) {
+    if (typeof invaderBgImg !== "undefined" && invaderBgImg) {
+      ctx.drawImage(invaderBgImg, 0, 0, this.INVH, this.INVW);
+    } else {
+      ctx.fillStyle = "black";
+      ctx.fillRect(0, 0, this.INVW, this.INVH);
+    }
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(0, 0, this.INVW, this.INVH);
+    ctx.textAlign = "center";
+    ctx.fillStyle = "white";
+    ctx.font = (this.alphaSize+4)+"px courier";
+    ctx.fillText("PAUSED", this.INVW/2, this.INVH/2);
+    ctx.font = (this.alphaSize-4)+"px courier";
+    ctx.fillText("Click Resume to continue", this.INVW/2, this.INVH/2 + (2*this.alphaSize));
+    this.drawSoundIcon();
+  },
+//-------------------------------------------------------------------------------------------------------------------------------
+  drawEndText:function(ctx, text) {
+    // big solid green letters straight over the frozen board, no box
+    ctx.textAlign = "center";
+    var fontSize = Math.round(this.alphaSize*2);
+    ctx.font = "bold " + fontSize + "px courier";
+    while (ctx.measureText(text).width >= this.INVW-10 && fontSize > 12) {
+      fontSize--;
+      ctx.font = "bold " + fontSize + "px courier";
+    }
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "black";
+    ctx.strokeText(text, this.INVW/2, this.INVH/2);
+    ctx.fillStyle = "rgba(140,176,48,1)";
+    ctx.fillText(text, this.INVW/2, this.INVH/2);
+  },
+//-------------------------------------------------------------------------------------------------------------------------------
   playLaserSound:function() {
     if (localStorage.musicEnabled == "true"){
       var x = getRandomInt(2);
@@ -275,80 +298,75 @@ Invader.prototype = {
 //-------------------------------------------------------------------------------------------------------------------------------
   submitAnswer:function() {
     var that=this;
-    var ctx = document.getElementById('invadersCanvas').getContext('2d');
-    if (this.invaderStatus == 'paused') {$('#pauseButton').html('Pause');}
-    if (this.invaderStatus == 'finished' || this.invaderStatus == 'paused') {
+    if (this.invaderStatus == 'ended' || this.invaderStatus == 'gameover') {
+      this.startNewGame();
+      return;
+    }
+    if (this.invaderStatus == 'paused') {
+      // loop is already alive; just unfreeze it
       this.invaderStatus = 'started';
-      ctx.font = this.alphaSize+'px courier';
-        requestAnimationFrame(function(timestamp) {
+      $('#leftButton').html('Pause');
+      return;
+    }
+    if (this.invaderStatus == 'finished') {
+      this.invaderStatus = 'started';
+      requestAnimationFrame(function(timestamp) {
         that.animateAlphas(timestamp, timestamp, timestamp);
       });
+      return;
     }
-    else if (this.invaderStatus == 'started')  {
-      var ans = document.getElementById('invAnswerBox').value.toUpperCase().trim();
-      var found = false;
-      $('#invAnswerBox').val("");
-      alphas:
-        for (var i=0;i<this.invadersAlphas.length;i++) {
-        if (!this.invadersAlphas[i].active)
-        continue;
-      answers:
-        for(var j=0;j<this.invadersAlphas[i].answers.length;j++) {
-          if (ans == this.invadersAlphas[i].answers[j]) {
-            console.log(ans);
-          // possible race condition with mult answers searched at once?
-            this.playLaserSound();
-            this.invadersAlphas[i].answers = this.invadersAlphas[i].answers.filter(function(el) {return (el != ans); });
-            this.displayWord(this.invadersAlphas[i], [ans], 'CURRENT');
-            found = true;
-          break alphas;
-          }
-
-        }
-        if ((this.invadersAlphas[i].alphagram==ans.split('').sort().join('')) && (found==false)){;
-          $('#invCurDiv').prepend($('#invAlphaDiv'+this.invadersAlphas[i].alphagram));
-          $('#invWordsWrong'+this.invadersAlphas[i].alphagram).append(" "+ans);
-          $('#invWordsWrong'+this.invadersAlphas[i].alphagram).css('visibility','visible');
-          $('.nav-pills a[href="#invCurDiv"]').tab('show');
-        }
+    if (this.invaderStatus == 'started')  {
+      var status = this.answerArea.submitAnswer();
+      if (status == 'correct' || status == 'solved') {
+        this.playLaserSound();
       }
-      if (found) {$('#invAnswerBox').toggleClass('slothFlashCorrect',200).delay(100).toggleClass('slothFlashCorrect',200);}
-      else {$('#invAnswerBox').toggleClass('flashTypo',200).delay(100).toggleClass('flashTypo',200);}
     }
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   getAlpha:function() {
-    // also need to lock words as we grab them
-    var d = { numQuestions: 1, user: userid, lock: true };
+    // ask the Quiz object for one new question and, once it arrives, drop it into play
     var that=this;
-    $.ajax({ type: "POST",
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "getQuestion.py",
-      data: JSON.stringify(d),
-      success: function (response, responseStatus) {
-        var r = response[0];
-        var question = r.questions;
-        var words = r.words;
-        var cardbox = r.aux[0].cardbox;
-        var alphagram = Object.keys(question)[0];
-        if (r.getFromStudyOrder)
-          prepareNewWords();
-        var newAlpha = new alpha(alphagram, words, cardbox, that);
-        that.invadersAlphas.push(newAlpha);
+    if (!this.q) { this.gettingWord = false; return; }
+    var quiz = this.q;
+    quiz.loadQuestions(1);
+    var waitForQuestion = function() {
+      if (!document.getElementById("invadersCanvas")) return;
+      if (that.q !== quiz) return; // a new game started while we were waiting
+      if (quiz.hasHTTPError) { that.gettingWord = false; return; }
+      if (quiz.initialized) {
+        var tracked = { };
+        for (var i=0;i<that.invadersAlphas.length;i++) {
+          tracked[that.invadersAlphas[i].alpha] = true;
+        }
+        for (var j=0;j<quiz.questions.length;j++) {
+          var question = quiz.questions[j];
+          if (!tracked[question.alpha]) {
+            that.addAlpha(question);
+            that.noMoreWords = false;
+            that.gettingWord = false;
+            return;
+          }
+        }
+        // no new question was returned; a non-cardbox quiz is exhausted
+        if (that.quizid != -1) { that.noMoreWords = true; }
         that.gettingWord = false;
-        gCreateElemArray([
-          ['a','div','invAlphaDiv','invAlphaDiv'+alphagram,'invCurDiv',''],
-          ['a1','table','wordTable','invWords'+alphagram,'a',''],
-          ['a2','div','wordTableWrong','invWordsWrong'+alphagram,'a','']
-        ]);
-        $("#invAlphaDiv"+alphagram).css('visibility','hidden');
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        console.log("Error status = " + textStatus + " Error Thrown " + errorThrown);
+        return;
       }
-    });
-    this.invadersAlphas=that.invadersAlphas;
-    this.gettingWord=that.gettingWord;
+      setTimeout(waitForQuestion, 30);
+    };
+    setTimeout(waitForQuestion, 30);
+  },
+//-------------------------------------------------------------------------------------------------------------------------------
+  addAlpha:function(question) {
+    question.width = question.alpha.length * this.letterWidth;
+    question.height = this.alphaHeight;
+    question.leftx = (Math.round(Math.random() * ((this.INVW/this.letterWidth) - question.alpha.length)) * this.letterWidth);
+    question.x = question.leftx + question.width/2;
+    question.y = 1.0;
+    question.timeout = 60000; // 60 seconds
+    question.active = true;
+    this.invadersAlphas.push(question);
+    this.answerArea.setupWord(question);
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   blinkText:function(){
@@ -365,15 +383,30 @@ Invader.prototype = {
     invaderBgImg.onload = function() {
       ctx.drawImage(invaderBgImg, 0, 0,that.INVW,that.INVH);
       ctx.textAlign = 'center';
-      ctx.font = (that.alphaSize+4)+'px courier';
-      ctx.fillStyle = 'rgb(255,48,48)';
       var mid = Math.round(that.INVW/2)
-      ctx.fillText('CARDBOX', mid, 3*scale);
-      ctx.fillText('INVADERS', mid, (4*scale)+5);
+      ctx.fillStyle = 'rgb(255,48,48)';
+      ctx.font = (that.alphaSize+4)+'px courier';
+      if (that.quizid == -1) {
+        ctx.fillText('CARDBOX', mid, 3*scale);
+        ctx.fillText('INVADERS', mid, (4*scale)+5);
+      } else {
+        ctx.fillText('INVADERS', mid, (3*scale)+5);
+      }
       ctx.fillStyle = 'white';
       ctx.font = (that.alphaSize-4)+'px courier';
-      ctx.fillText("Don't let your cardbox", mid, 7*scale);
-      ctx.fillText(" fill the screen", mid, (8*scale)+2);
+      if (that.quizid == -1) {
+        ctx.fillText("Don't let your cardbox", mid, 7*scale);
+        ctx.fillText(" fill the screen", mid, (8*scale)+2);
+      } else {
+        // show which quiz is being played, shrinking to fit if needed
+        var nameFont = that.alphaSize-4;
+        while (ctx.measureText(that.quizname).width >= that.INVW-10 && nameFont > 8) {
+          nameFont--;
+          ctx.font = nameFont+'px courier';
+        }
+        ctx.fillText(that.quizname, mid, (7*scale)+2);
+        ctx.font = (that.alphaSize-4)+'px courier';
+      }
       ctx.fillText('Click an alphagram to', mid, 11*scale);
       ctx.fillText('mark wrong and see answers', mid, (12*scale)+2);
       ctx.fillStyle = 'orange';
@@ -389,33 +422,60 @@ Invader.prototype = {
 
   },
 //-------------------------------------------------------------------------------------------------------------------------------
-  endGame:function(restart,pause) {
-    var d;
-    console.log("endGame triggered");
-    if (this.currentScore >= this.personalHighScore || this.currentScore >= this.dailyHighScore) {
-      d = { userid: userid, score: this.currentScore, gameOver: !pause };
-      var that=this;
-      $.ajax({type: "POST",
-        data: JSON.stringify(d),
-        headers: {"Accept": "application/json", "Authorization": keycloak.token},
-        url: "setInvaderHighScores.py",
-        success: function(response, responseStatus) {
-          that.personalHighScore = response[0].personal;
-          that.dailyHighScore = response[0].daily.score;
-        },
-        error: function(jqXHR, textStatus, errorThrown) {
-          console.log("Error, status = " + textStatus + " error: " + errorThrown);
-        }
-      });
-      this.personalHighScore = that.personalHighScore;
-      this.dailyHighScore = that.dailyHighScore;
+  postHighScores:function() {
+    if (this.currentScore <= 0) { return; }
+    var that=this;
+    var d = { score: this.currentScore, gameOver: true };
+    $.ajax({type: "POST",
+      data: JSON.stringify(d),
+      headers: {"Accept": "application/json", "Authorization": keycloak.token},
+      url: "setInvaderHighScores",
+      success: function(response, responseStatus) {
+        that.personalHighScore = response.personal;
+        that.dailyHighScore = response.daily.score;
+      },
+      error: function(jqXHR, textStatus, errorThrown) {
+        console.log("Error, status = " + textStatus + " error: " + errorThrown);
+      }
+    });
+  },
+//-------------------------------------------------------------------------------------------------------------------------------
+  endCurrentGame:function() {
+    // right button: end the game, or start a new one once it has ended
+    if (this.invaderStatus == 'ended' || this.invaderStatus == 'gameover') {
+      this.startNewGame();
+      return;
     }
-    if (restart){
-      this.invaderStatus = "finished";
-      $('#invGameOver').remove();
-      invadersMusic.pause();
-      initInvaders();
+    if (this.invaderStatus != 'started' && this.invaderStatus != 'paused') { return; }
+    this.invaderStatus = 'ended';
+    // neutralise every onscreen word's timer so none can time out, but leave
+    // them looking normal - they were not marked wrong
+    for (var i=0;i<this.invadersAlphas.length;i++) {
+      this.invadersAlphas[i].timeout = Infinity;
     }
+    this.postHighScores();
+    invadersMusic.pause();
+    // freeze the board behind the end text for review
+    var ctx = document.getElementById('invadersCanvas').getContext('2d');
+    ctx.drawImage(invaderBgImg, 0, 0, this.INVH, this.INVW);
+    this.drawAlphas(ctx);
+    this.drawEndText(ctx, "ENDED");
+    $('#rightButton').html("New Game");
+    $('#leftButton').html("Pause");
+  },
+//-------------------------------------------------------------------------------------------------------------------------------
+  startNewGame:function() {
+    this.invadersAlphas = [];
+    this.explosions = [];
+    this.currentScore = 0;
+    this.gettingWord = false;
+    $('#rightButton').html("End");
+    $('#leftButton').html("Pause");
+    this.init();
+    this.plotPrescreen();
+    this.invaderStatus = "finished";
+    if (localStorage.musicEnabled == "true") {invadersMusic.pause();invadersMusic.play(); }
+    $('#answerBox').focus();
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   setCanvasDimensions:function(){
@@ -423,63 +483,19 @@ Invader.prototype = {
     document.getElementById('invadersCanvas').width=this.INVW;
   },
 //-------------------------------------------------------------------------------------------------------------------------------
-  displayWord:function(alphaObj, words, state) {
-    var data = new Array();
-    var table = document.getElementById("invWords"+alphaObj.alphagram);
-    $(table).empty();
-    if (alphaObj.answers.length===0){state='SOLVED';}
-    var tabState;
-    switch (state) {
-      case 'CURRENT':
-        tabState= 'invCurDiv';
-        data = alphaObj.words.filter(function(val) {return alphaObj.answers.indexOf(val) == -1;})
-        data = data.sort();
-        $('.nav-pills a[href="#invCurDiv"]').tab('show');
-        break;
-      case 'SOLVED' :
-        tabState= 'invSolvedDiv';
-        data = alphaObj.words.sort();
-        $('.nav-pills a[href="#invSolvedDiv"]').tab('show');
-        break;
-      case 'WRONG':
-        tabState= 'invMissedDiv';
-        data = words.sort();
-        $('.nav-pills a[href="#invMissedDiv"]').tab('show');
-        break;
-    }
-    $("#invAlphaDiv"+alphaObj.alphagram).prependTo($("#"+tabState));
-    $("#invAlphaDiv"+alphaObj.alphagram).css('visibility','visible');
-    for (var x=0;x<data.length;x++) {
-      var datas = getTableLineData(data[x], eval("alphaObj.wordAuxInfo." + data[x]));
-
-      var row = table.insertRow(-1);
-      var cells = [ ];
-      var cellClassList = [" wordTableLeftHook", " wordTableInnerLeft", " wordTableWord", " wordTableInnerRight", " wordLexiconSymbol", " wordTableRightHook", " wordTableDefinition"];
-      for(var i=0;i<cellClassList.length;i++) {
-        cells[i] = row.insertCell(i);
-        cells[i].className += cellClassList[i];
-        cells[i].innerHTML = datas[i];
-      }
-    }
-    clearTimeout(this.clearAnswersTimer);
-    this.clearAnswersTimer = setTimeout(function () {
-      $('.nav-pills a[href="#invCurDiv"]').tab('show');
-    }, 3500);
-  },
-//-------------------------------------------------------------------------------------------------------------------------------
-  markAsCorrect:function(alphaObj) {
+  markAsCorrect:function(question) {
+    // the Question object has already submitted itself when its last answer was found;
+    // here we just account for the kill and stop tracking it in the Quiz
     this.currentScore++;
-    // mark as correct in cardbox
     if (this.currentScore > this.personalHighScore) {this.personalHighScore = this.currentScore; }
     if (this.currentScore > this.dailyHighScore) {this.dailyHighScore = this.currentScore; }
-    var d = {question: alphaObj.alphagram, correct: true, cardbox: alphaObj.cardbox, incrementQ: true};
-    slothSubmitQuestion(d);
+    this.q.closeQuestion(question.alpha);
   },
 //-------------------------------------------------------------------------------------------------------------------------------
-  markAsIncorrect:function(alphaObj) {
-    var  d = {question: alphaObj.alphagram, correct: false, cardbox: alphaObj.cardbox, incrementQ: true};
-    slothSubmitQuestion(d);
-    this.displayWord(alphaObj, alphaObj.words.sort(function (a, b) {return b[2] - a[2];}), 'WRONG');
+  markAsIncorrect:function(question) {
+    question.markWrong();
+    this.answerArea.displayWord(question, question.answers, 'WRONG');
+    this.q.closeQuestion(question.alpha);
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   explosion:function(options) {
@@ -518,8 +534,8 @@ Invader.prototype = {
     if (!document.getElementById("invadersCanvas"))  {
     // we have navigated away from the screen mid-game
       invadersMusic.pause();
-      if (this.invaderStatus == 'finished' || this.invaderStatus == 'gameover') {
-      } else { this.endGame(false, false);  } // only post the chat if we nav away midgame
+      if (this.invaderStatus == 'finished' || this.invaderStatus == 'gameover' || this.invaderStatus == 'ended') {
+      } else { this.postHighScores();  } // only post the chat if we nav away midgame
       this.invaderStatus='finished';
     }
     else {
@@ -533,67 +549,55 @@ Invader.prototype = {
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   init:function() {
-                var d = { cardbox: localStorage.cardboxCurrent };
-    $.ajax({
-      type: "POST",
-      data: JSON.stringify(d),
-      headers: {"Accept": "application/json", "Authorization": keycloak.token},
-      url: "newQuiz",
-      success: function(response,responseStatus){
-        gUpdateCardboxScores (response, 0);
-      },
-      error: function(jqXHR, textStatus, errorThrown) {
-        console.log("Error, status = " + textStatus + " error: " + errorThrown);
-      }
-    });
+    // Quiz(submitStrict, isCardbox, blankQuiz, quizid)
+    // submitStrict=false so completing every answer always counts as correct,
+    // matching the original Invaders behaviour (wrong guesses don't fail the question)
+    $('#invCurDiv').empty();
+    $('#invSolvedDiv').empty();
+    $('#invMissedDiv').empty();
+    this.noMoreWords = false;
+    this.q = new Quiz(false, this.quizid==-1, false, this.quizid);
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   generateDOM:function() {
     gCreateElemArray([
       ['a','div','quizContentDark invWrapper','invadersWrapper','content_pan_1_c',''],
       ['a1','canvas','invCanvas','invadersCanvas','a',''],
-      ['ax','div','','colorStrip','a',''],
-      ['a2','div','invAnswerBoxRow','answerBoxRow','a',''],
-      ['a2a','div','invButtonBoxPause','buttonBox1','a2',''],
-      ['a2a1','button','btn btn-default invButton','pauseButton','a2a','Pause'],
-      ['a2b','div','invAnswerBoxField','answerBoxField','a2',''],
-      ['a2b1','input','quizAnswerBox invAnswerBox','invAnswerBox','a2b',''],
-      ['a2c','div','invButtonBoxReset','buttonBox2','a2',''],
-      ['a2c1','button','btn btn-default invButton','resetButton','a2c','Reset'],
-      ['a3','ul','nav nav-pills well sm-well metalBTwo nav-justified invTabs','invTabs','a',''],
-      ['a3a','li','active','invCurTab','a3','<a data-toggle="tab" href="#invCurDiv">Current</a>'],
-      ['a3b','li','','invSolvedTab','a3','<a data-toggle="tab" href="#invSolvedDiv">Solved</a>'],
-      ['a3c','li','','invMissedTab','a3','<a data-toggle="tab" href="#invMissedDiv">Missed</a>'],
-      ['a4','div','tab-content well well-sm quizContent pre-scrollable invWordDiv','invWordDiv','a',''],
-      ['a4a','div','tab-pane fade in active','invCurDiv','a4',''],
-      ['a4b','div','tab-pane fade','invSolvedDiv','a4',''],
-      ['a4c','div','tab-pane fade','invMissedDiv','a4','']
+      ['ax','div','','colorStrip','a','']
       ]);
+    this.answerArea.addDOM('invadersWrapper');
+    this.answerArea.setButtonText("Pause", "End");
     let x = xerafin.config.colorAnswers.slice(0);
     x.shift();
     let colorTest= new ColorStrip({'width':'80%','colors':x});
     $('#colorStrip').append(colorTest.output());
   },
 //-------------------------------------------------------------------------------------------------------------------------------
-  main:function() {
+  main:function(quizinfo) {
     if (this.invLoad) {clearTimeout(this.invLoad);}
     if ($('#'+this.targetDiv).width()>100){
+      if (quizinfo) {
+        this.quizid = quizinfo.quizid;
+        this.quizname = quizinfo.quizname;
+      }
       this.init();
       this.setDimensions();
       this.getLetterDimensions();
       this.setCanvasDimensions();
       this.getHighScores();
       this.plotPrescreen();
-      $('#pauseButton').html('Pause');
-      $('#invAnswerBox').focus();
+      $('#leftButton').html('Pause');
+      $('#rightButton').html('End');
+      $('#answerBox').focus();
     }
     else {
-      this.invLoad=setTimeout(Invader.prototype.main.bind(this),250);
+      this.invLoad=setTimeout(Invader.prototype.main.bind(this, quizinfo),250);
     }
   }
 //-------------------------------------------------------------------------------------------------------------------------------
 }
 function Invader(){
+  this.answerArea = new AnswerArea(this);
   this.canvasIndent = 20;
   this.clearAnswersTimer = -1;
   this.colorList = xerafin.config.colorAnswers;
@@ -605,13 +609,23 @@ function Invader(){
   this.invadersAlphas = [];
   this.invaderStatus = "finished";
   this.nextAlphaTimer = -1;
+  this.noMoreWords = false;
   this.personalHighScore = 0;
+  this.quizid = -1;
+  this.quizname = "Cardbox";
   this.targetDiv = "content_pan_1_c";
   this.wordFreq = 8000;
   this.maxWidth = 380;
 }
 
-function initInvaders() {
+function initInvaders(quizinfo) {
+  if (typeof quizinfo === 'undefined' || quizinfo === null ||
+      typeof quizinfo.quizid === 'undefined' || quizinfo.quizid === null) {
+    quizinfo = {
+      'quizid': xerafin.storage.data.overview.currentQuiz,
+      'quizname': xerafin.storage.data.overview.currentQuizName
+    };
+  }
   if (!document.getElementById("pan_1_c")) {
     panelData = {
       "contentClass" : "panelContentDefault",
@@ -625,14 +639,21 @@ function initInvaders() {
     generatePanel(1,panelData,"leftArea");
     stopScrollTimer();
   }
-  if (typeof invader=='undefined'){var invader=new Invader();}
-  else {
-    if (invader.invaderStatus=='finished'){
-      invader=null;
-      delete invader;
-      var invader=new Invader();
+  // If an Invaders game is already underway, keep it running when the same quiz
+  // is requested. A different quiz prompts to abort (mirrors Wall of Words).
+  if (typeof invader !== 'undefined' && document.getElementById('invadersCanvas') &&
+      (invader.invaderStatus == 'started' || invader.invaderStatus == 'paused')) {
+    if (Number(invader.quizid) === Number(quizinfo.quizid)) {
+      $('#answerBox').focus();
+      return;
     }
+    if (!confirm("A new quiz has been sent to Cardbox Invaders.  Abort current game?")) {
+      return;
+    }
+    invader.invaderStatus = 'finished'; // stop the old animation loop before replacing it
   }
+  if (typeof invader!=='undefined' && invader.invTimeout) {clearTimeout(invader.invTimeout);}
+  invader = new Invader();
   if (!document.getElementById('invadersCanvas')){
     explosionSound=createNewAudio("explosionSound",{src:'explosion_sm.wav'},"content_pan_1_c");
     laserSound=createNewAudio("laserSound",{src:'audio/laserShot.mp3'},"content_pan_1_c");
@@ -641,32 +662,11 @@ function initInvaders() {
     explosionImg = new Image();
     explosionImg.src = "images/explosion_sprite.png";
     invader.generateDOM();
-    invader.detectWindowClose();
-    invader.initEvents();
   }
+  invader.detectWindowClose();
+  invader.initEvents();
   if (localStorage.musicEnabled == "true") {invadersMusic.pause();invadersMusic.play(); }
-  $('#invAnswerBox').prop('disabled', false);
-  invader.main();
+  $('#answerBox').prop('disabled', false);
+  invader.main(quizinfo);
   //console.log("panel container"+document.getElementById('content_pan_1_c').offsetWidth);
-
-  //  }
-  //}
-}
-
-function slothSubmitQuestion(d) {
-  $.ajax({
-    type: "POST",
-    data: JSON.stringify(d),
-    headers: {"Accept": "application/json", "Authorization": keycloak.token},
-    url: "submitQuestion",
-    success: function(response) {
-      if (d.incrementQ){
-        gUpdateCardboxScores (response);
-        gCheckMilestones(response.qAnswered);
-      }
-    },
-    error: function(jqXHR, textStatus, errorThrown) {
-      console.log("Error getting bingo, status = " + textStatus + " error: " + errorThrown);
-        }
-  });
 }

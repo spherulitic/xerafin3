@@ -65,7 +65,6 @@ XScripts.prototype = {
             self.data = JSON.parse(response);
             if (self.logged) {
               self.files = self.data.scripts;
-              self.nav = self.data.nav;
             }
             else {self.files = self.data.preload;}
 

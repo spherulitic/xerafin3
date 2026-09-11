@@ -104,12 +104,12 @@ Config.prototype = {
   let self=this;
     this.activeApps = [
       ['Basic Quiz', 'initBQ','images/icons/question-png-icon-1.png'],
-      //['Cardbox Invaders','initInvaders','images/cardboxInvaders2.png'],
-      ['Wall of Words','initWordWall','images/icons/xeraWall.png']
+      ['Wall of Words','initWordWall','images/icons/xeraWall.png'],
+      ['Cardbox Invaders','initInvaders','images/cardboxInvaders2.png']
     ];
     this.colorAnswers = [
-      'black','#dddddd','hsl(0,75%,50%)','hsl(25,75%,50%)','hsl(50,75%,50%)','hsl(75,75%,50%)','hsl(100,75%,50%)','hsl(150,75%,50%)',
-      'hsl(175,75%,50%)','hsl(200,75%,50%)','hsl(225,75%,50%)','hsl(250,75%,50%)','hsl(275,75%,50%)','hsl(300,75%,50%)'
+      "black", "azure", "plum", "palegreen", "yellowgreen", "khaki", "salmon",
+      "hotpink", "crimson", "magenta", "chocolate", "peachpuff", "mistyrose", "floralwhite"
     ];
     this.colorAnswersOld = [
       "black", "azure", "mediumorchid", "palegreen", "yellowgreen", "khaki", "salmon", "hotpink",

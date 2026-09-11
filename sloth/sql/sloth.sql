@@ -26,3 +26,17 @@ CREATE TABLE sloth_active (
     INDEX idx_token (token),
     INDEX idx_user_alpha (userid, alphagram)
 );
+
+-- Cardbox Invaders high scores
+CREATE TABLE invaders_personal (
+    userid VARCHAR(50) NOT NULL,
+    score INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (userid)
+);
+
+CREATE TABLE invaders_daily (
+    userid VARCHAR(50) NOT NULL,
+    dateStamp DATE NOT NULL,
+    score INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (userid, dateStamp)
+);
