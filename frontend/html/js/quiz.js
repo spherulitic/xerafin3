@@ -194,8 +194,10 @@ class Quiz {
           isCardbox: self.isCardbox,
           lock: true
         };
+        let requestedCardbox;
         if (self.isCardbox && getBool(localStorage.cardboxSent)) {
-          d.cardbox = localStorage.cardboxCurrent;
+          requestedCardbox = localStorage.cardboxCurrent;
+          d.cardbox = requestedCardbox;
         }
       fetchWithAuth("getQuestions", {method:"POST",body:JSON.stringify(d)})
         .then(response => {if (!response.ok) {throw new Error(`HTTP ${response.status}`);}
@@ -208,12 +210,27 @@ class Quiz {
                 for (let i=0;i<questionArray.length;i++) {
                   this.createQuestion(questionArray[i]);
                 }
-                if(this.isCardbox && this.questions.length > 0 && Number(localStorage.cardboxCurrent)!==this.questions[this.questions.length-1].cardbox) {
-                  localStorage.cardboxSent='false';
-                  localStorage.cardboxCurrent=this.questions[this.questions.length-1].cardbox;
-                  if ($('#pan_4').length>0){
-                    cardboxHighlightAction(this.questions[this.questions.length-1].cardbox, false);
-                    showCardboxStats();
+                if(this.isCardbox && this.questions.length > 0) {
+                  let lastCardbox = this.questions[this.questions.length-1].cardbox;
+                  if (typeof requestedCardbox === 'undefined') {
+                    // default order: keep the indicator in sync, but only if the user
+                    // hasn't selected a cardbox while this request was in flight
+                    if (!getBool(localStorage.cardboxSent) && Number(localStorage.cardboxCurrent)!==lastCardbox) {
+                      localStorage.cardboxCurrent=lastCardbox;
+                      if ($('#pan_4').length>0){
+                        cardboxHighlightAction(lastCardbox, false);
+                        showCardboxStats();
+                      }
+                    }
+                  }
+                  else if (Number(requestedCardbox)!==lastCardbox) {
+                    // requested cardbox exhausted -> fall back to the default order
+                    localStorage.cardboxSent='false';
+                    localStorage.cardboxCurrent=lastCardbox;
+                    if ($('#pan_4').length>0){
+                      cardboxHighlightAction(lastCardbox, false);
+                      showCardboxStats();
+                    }
                   }
                 }
                 this.initialized = true;

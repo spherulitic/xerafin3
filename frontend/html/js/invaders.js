@@ -593,6 +593,14 @@ function initInvaders() {
     generatePanel(1,panelData,"leftArea");
     stopScrollTimer();
   }
+  // If an Invaders game is already underway, keep it running. The Quiz reads
+  // the selected cardbox from localStorage on each loadQuestions call, so a
+  // mid-game cardbox change is picked up automatically.
+  if (typeof invader !== 'undefined' && document.getElementById('invadersCanvas') &&
+      (invader.invaderStatus == 'started' || invader.invaderStatus == 'paused')) {
+    $('#answerBox').focus();
+    return;
+  }
   if (typeof invader!=='undefined' && invader.invTimeout) {clearTimeout(invader.invTimeout);}
   invader = new Invader();
   if (!document.getElementById('invadersCanvas')){
