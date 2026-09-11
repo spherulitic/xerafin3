@@ -189,7 +189,8 @@ def getQuestions():
         word_info = xu.check401(requests.post(f'{lex_service}/getWordInfo', headers=g.headers, json=word_json)).json()
         inner_hooks = xu.check401(requests.post(f'{lex_service}/getDots', headers=g.headers, json=word_json)).json()
      # [ front hooks, back hooks, definition, [inner hooks], lexicon symbols ]
-        template["words"][word] = [ word_info["front_hooks"], word_info["back_hooks"], word_info["definition"], inner_hooks, word_info.get("lexicon_symbols") ]
+        template["words"][word] = [ word_info.get("front_hooks", ""), word_info.get("back_hooks", ""),
+          word_info.get("definition") or "", inner_hooks, word_info.get("lexicon_symbols") ]
       result["questions"].append(template)
 
     return jsonify(result)

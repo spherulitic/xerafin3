@@ -427,6 +427,11 @@ def getQuestions():
     app.logger.error(f"Error getting dots: {str(e)}")
     dots_batch = {word: {} for word in all_words}
 
+  # Track words that come back without usable word info so we can log one
+  # summary per request instead of crashing (see the tuple build below).
+  missing_info_count = 0
+  missing_info_sample = [ ]
+
   for alpha in questions.keys():
 
     template = { "alpha": alpha, "answers": questions[alpha], "words": {} }
@@ -442,11 +447,22 @@ def getQuestions():
       word_info = word_info_batch.get(word, {})
       dots = dots_batch.get(word, [])
 
+      if 'front_hooks' not in word_info or 'back_hooks' not in word_info or 'definition' not in word_info:
+        missing_info_count += 1
+        if len(missing_info_sample) < 5:
+          missing_info_sample.append(word)
 #     [ front hooks, back hooks, definition, [dots], lexicon symbols ]
-      template["words"][word] = [ word_info["front_hooks"], word_info["back_hooks"],
-                      word_info["definition"], dots, word_info.get("lexicon_symbols")]
+#     A word can lack word info when its Mongo doc is partial/legacy or when the
+#     lexicon batch fell back to empty dicts. Default the fields to strings (the
+#     frontend .match()es the definition) so one bad word can't 500 the request.
+      template["words"][word] = [ word_info.get("front_hooks", ""), word_info.get("back_hooks", ""),
+                      word_info.get("definition") or "", dots, word_info.get("lexicon_symbols")]
     result["questions"].append(template)
 
+  if missing_info_count:
+    app.logger.warning(
+      f"getQuestions: {missing_info_count} answer word(s) had no usable word info from lexicon "
+      f"(e.g. {', '.join(missing_info_sample)}); serving with empty hooks/definition. user={g.uuid}")
   return jsonify(result)
 
 @app.route("/newQuiz", methods=["GET", "POST"])
