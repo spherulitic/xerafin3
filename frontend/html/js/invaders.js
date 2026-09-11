@@ -203,7 +203,7 @@ Invader.prototype = {
          this.invaderStatus = "gameover";
          this.postHighScores();
          invadersMusic.pause();
-         this.showGameOverOverlay("GAME OVER");
+         this.drawEndText(ctx, "GAME OVER");
          $('#rightButton').html("New Game");
          return;
        }
@@ -258,6 +258,17 @@ Invader.prototype = {
     ctx.font = (this.alphaSize-4)+"px courier";
     ctx.fillText("Click Resume to continue", this.INVW/2, this.INVH/2 + (2*this.alphaSize));
     this.drawSoundIcon();
+  },
+//-------------------------------------------------------------------------------------------------------------------------------
+  drawEndText:function(ctx, text) {
+    // big solid green letters straight over the frozen board, no box
+    ctx.textAlign = "center";
+    ctx.font = "bold " + Math.round(this.alphaSize*2) + "px courier";
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = "black";
+    ctx.strokeText(text, this.INVW/2, this.INVH/2);
+    ctx.fillStyle = "rgba(140,176,48,1)";
+    ctx.fillText(text, this.INVW/2, this.INVH/2);
   },
 //-------------------------------------------------------------------------------------------------------------------------------
   playLaserSound:function() {
@@ -398,15 +409,6 @@ Invader.prototype = {
     });
   },
 //-------------------------------------------------------------------------------------------------------------------------------
-  showGameOverOverlay:function(text) {
-    $('#invGameOver').remove();
-    var invGameOver=document.createElement('div');
-    invGameOver.id="invGameOver";
-    invGameOver.className+=" invGameOver";
-    invGameOver.innerHTML=text;
-    $('#invadersWrapper').prepend(invGameOver);
-  },
-//-------------------------------------------------------------------------------------------------------------------------------
   endCurrentGame:function() {
     // right button: end the game, or start a new one once it has ended
     if (this.invaderStatus == 'ended' || this.invaderStatus == 'gameover') {
@@ -415,18 +417,18 @@ Invader.prototype = {
     }
     if (this.invaderStatus != 'started' && this.invaderStatus != 'paused') { return; }
     this.invaderStatus = 'ended';
-    // neutralise every onscreen word so none can time out or be marked wrong
+    // neutralise every onscreen word's timer so none can time out, but leave
+    // them looking normal - they were not marked wrong
     for (var i=0;i<this.invadersAlphas.length;i++) {
       this.invadersAlphas[i].timeout = Infinity;
-      this.invadersAlphas[i].active = false;
     }
     this.postHighScores();
     invadersMusic.pause();
-    // freeze the board behind the overlay for review
+    // freeze the board behind the end text for review
     var ctx = document.getElementById('invadersCanvas').getContext('2d');
     ctx.drawImage(invaderBgImg, 0, 0, this.INVH, this.INVW);
     this.drawAlphas(ctx);
-    this.showGameOverOverlay("ENDED");
+    this.drawEndText(ctx, "ENDED");
     $('#rightButton').html("New Game");
     $('#leftButton').html("Pause");
   },
@@ -436,7 +438,6 @@ Invader.prototype = {
     this.explosions = [];
     this.currentScore = 0;
     this.gettingWord = false;
-    $('#invGameOver').remove();
     $('#rightButton').html("End");
     $('#leftButton').html("Pause");
     this.init();

@@ -1049,8 +1049,6 @@ color:rgba(213,213,200,1);box-shadow:0px 0px 3px #444,0px 0px 3px #444;vertical-
 }
 .invWordDiv {min-height:120px!important;max-height:120px!important;text-align:left!important;font-size:0.8em;margin-top:5px!important;}
 .invAlphaDiv {padding:3px;border-bottom:1px solid #999;}
-.invGameOver {width:80%;text-align:center;height:40px;background-color:rgba(140,176,48,1);padding:5px;
-	position:relative;left:10%;top:150px;color:#222;border:1px solid black;font-size:1.5em;font-family:'Lato',sans serif;}
 .btnPrefs {margin:5px;}
 .prefPar {padding:5px;padding-bottom:10px;margin-bottom:10px;font-family: 'Montserrat', sans-serif;width:100%;font-size:0.85em;border-bottom:1px solid #888;text-align:center;}
 .prefHead {text-align:center;font-family: 'Montserrat', sans-serif;font-variant:small-caps;font-size:1.35em;padding-bottom:0px;margin-bottom:0px;}
