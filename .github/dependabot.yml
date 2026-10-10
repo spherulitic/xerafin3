@@ -1,0 +1,17 @@
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/chat"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "go"
+      - "chat"
+
+  - package-ecosystem: "docker"
+    directory: "/chat"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "go"
+      - "chat"

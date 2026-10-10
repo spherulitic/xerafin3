@@ -1,7 +1,7 @@
 // Go module definition for the Xerafin chat service
 module github.com/xerafin/chat
 
-go 1.22
+go 1.27
 
 require (
 	github.com/go-sql-driver/mysql v1.7.1
