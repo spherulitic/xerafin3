@@ -7,6 +7,11 @@ updates:
     labels:
       - "go"
       - "chat"
+    groups:
+      go-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
 
   - package-ecosystem: "docker"
     directory: "/chat"
@@ -15,3 +20,67 @@ updates:
     labels:
       - "go"
       - "chat"
+    groups:
+      docker-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "pip"
+    directories:
+      - "/quiz"
+      - "/cardbox"
+      - "/stats"
+      - "/lexicon"
+      - "/login"
+      - "/sloth"
+      - "/cron"
+      - "/migration"
+      - "/lexicon-loader"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "python"
+      - "dependencies"
+    groups:
+      python-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "docker"
+    directories:
+      - "/frontend"
+      - "/keycloak"
+      - "/quiz"
+      - "/cardbox"
+      - "/stats"
+      - "/lexicon"
+      - "/login"
+      - "/sloth"
+      - "/cron"
+      - "/migration"
+      - "/lexicon-loader"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "docker"
+      - "dependencies"
+    groups:
+      docker-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "github-actions"
+      - "dependencies"
+    groups:
+      actions-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
