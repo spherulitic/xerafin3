@@ -3,6 +3,6 @@ Flask>=2.0.2
 pyjwt[crypto]
 mysqlclient==2.3.0
 dawg2==0.13.3
-requests>=2.25.1
+requests>=2.34.2
 pre-commit
 pymongo
