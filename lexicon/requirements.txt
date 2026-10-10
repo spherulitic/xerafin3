@@ -1,8 +1,8 @@
 gunicorn==22.0.0
 Flask>=2.0.2
 pyjwt[crypto]
-mysqlclient==2.1.0
-dawg2>=0.13.3
+mysqlclient==2.3.0
+dawg2==0.13.3
 requests>=2.25.1
 pre-commit
 pymongo
