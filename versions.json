@@ -2,7 +2,7 @@
   "chat": "1.1.5",
   "keycloak": "1.0.1",
   "cron": "1.0.7",
-  "frontend": "1.0.20",
+  "frontend": "1.0.21",
   "lexicon": "1.0.8",
   "lexicon-loader": "1.0.3",
   "login": "1.0.11",
