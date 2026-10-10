@@ -5,7 +5,7 @@
 # CGO_ENABLED=0 ensures a fully static binary with no shared
 # library dependencies — required for FROM scratch
 # ──────────────────────────────────────────────────────────────
-FROM golang:1.22-bullseye AS builder
+FROM golang:1.27-trixie AS builder
 
 WORKDIR /app
 
