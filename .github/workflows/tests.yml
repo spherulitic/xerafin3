@@ -1,0 +1,49 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      services: ${{ steps.list.outputs.services }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+      - name: Find services with a tests/ directory
+        id: list
+        run: |
+          SERVICES=$(git ls-files | grep -oE '^[^/]+/tests/' | cut -d/ -f1 | sort -u | tr '\n' ' ')
+          echo "Services with tests: $SERVICES"
+          JSON=$(echo "$SERVICES" | xargs -n1 | jq -R . | jq -s -c .)
+          echo "services=$JSON" >> "$GITHUB_OUTPUT"
+
+  test:
+    needs: detect
+    if: needs.detect.outputs.services != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect.outputs.services) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # Build the real service image so tests run against the exact runtime
+      # (python, mysqlclient, etc.) that ships. tests/ is in .dockerignore, so
+      # mount the working tree over /app to run the current tests.
+      - name: Build ${{ matrix.service }} image
+        run: docker build -t x-${{ matrix.service }}:test ${{ matrix.service }}
+
+      - name: Run ${{ matrix.service }} tests
+        run: |
+          docker run --rm --user root \
+            -e PYTHONDONTWRITEBYTECODE=1 \
+            -v "$PWD/${{ matrix.service }}:/app" \
+            x-${{ matrix.service }}:test \
+            sh -c "pip install -q -r requirements-test.txt && python -m pytest tests -q -p no:cacheprovider"
