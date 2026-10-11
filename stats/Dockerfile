@@ -14,4 +14,4 @@ COPY . .
 
 USER appuser
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--worker-class", "gthread", "--workers", "1", "--threads", "8", "--timeout", "60", "stats:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--no-control-socket", "--worker-class", "gthread", "--workers", "1", "--threads", "8", "--timeout", "60", "stats:app"]

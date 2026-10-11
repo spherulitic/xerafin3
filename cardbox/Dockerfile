@@ -15,4 +15,4 @@ RUN mkdir /app/temp-data && chown -R appuser:appuser /app/temp-data
 
 USER appuser
 
-CMD [ "gunicorn", "--bind", "0.0.0.0:5000", "--worker-class", "gthread", "--workers", "1", "--threads", "8", "--timeout", "60", "cardbox:app" ]
+CMD [ "gunicorn", "--bind", "0.0.0.0:5000", "--no-control-socket", "--worker-class", "gthread", "--workers", "1", "--threads", "8", "--timeout", "60", "cardbox:app" ]
