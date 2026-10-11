@@ -317,7 +317,9 @@ Wordwall.prototype = {
         this.answerArea.displayWord(question, question.answers, 'WRONG');
         this.score.incorrect++;
         question.markWrong();
-        question.unanswered = [ ]; }
+        question.unanswered = [ ];
+        $('#answerBox').val("");
+        document.getElementById('answerBox').focus(); }
      } else {if (this.timer.eventOver(e) == "Pause" && this.grid.questions.length == this.QUIZ_SIZE) {
                  this.paused = !this.paused;
      document.getElementById('answerBox').focus(); }
@@ -856,6 +858,8 @@ function Wordwall() {
                self.score.incorrect++;
          self.grid.questions[i] = null; // and let the grid refill itself
                  }}
+       $('#answerBox').val("");
+       document.getElementById('answerBox').focus();
        } else {
        // mark everything wrong and refresh
        var wrongList = self.grid.questions.filter(q => q);
@@ -867,6 +871,8 @@ function Wordwall() {
          }
          self.score.total = self.score.total + self.q.refreshQuestions(self.QUIZ_SIZE);
          self.grid.getWords();
+         $('#answerBox').val("");
+         document.getElementById('answerBox').focus();
          break; }
        this.enabled = false;
        break;
