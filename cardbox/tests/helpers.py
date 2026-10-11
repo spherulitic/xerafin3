@@ -118,12 +118,14 @@ def gen_rows(n, base, cleared_until, seed=0):
         -10 * day, -day, -1, 0, 1, 60, 3600, day,
         cleared_until - base - 1, cleared_until - base, cleared_until - base + 1,
         10 * day, 26 * day, 60 * day, 86 * day, 100 * day, 430 * day, 10 * day * 100,
+        None,
     ]
     rows = []
     for i in range(n):
         cb = rnd.choice(_CARD_BOXES)
         diff = rnd.choice(_DIFFICULTIES)
-        ns = base + rnd.choice(offsets)
+        offset = rnd.choice(offsets)
+        ns = None if offset is None else base + offset
         rows.append((f"Q{i:06d}", diff, cb, ns))
     return rows
 
