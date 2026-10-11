@@ -333,6 +333,8 @@ class Question {
     this.cardbox = response.cardbox;
 // for toggling -- we need to save this
     this.origCardbox = response.cardbox;
+// server-computed: word is in cardbox and due (drives highlight + reschedule)
+    this.cardboxEligible = response.cardboxEligible;
     this.nextScheduled = response.nextScheduled;
     this.correct = response.correct;
     this.incorrect = response.incorrect;
@@ -389,46 +391,19 @@ class Question {
   }
 
   // wrappers for submitQuestion()
-  // submitQuestion(correct, cardboxNumber, isCardbox)
+  // submitQuestion(correct[, setCardbox])
 
   markCorrect() {
     if (this.readyToSubmit) {
-    // for all quizzes, if it's eligible to advance and is correct, update in cardbox
-      if (this.difficulty != null && this.difficulty != 4) {
-        //IF NOT is SUBMITTED FLAG
-
-        //appendDebugLog("1C FIRED");
-        this.submitQuestion(true, this.origCardbox, true);
-        // the toggle situation -- if it's not eligible to advance and has been changed
-        // from incorrect to correct, put it back in the original cardbox
-      }
-      else {
-        if ((!this.firstSubmit)) {
-          //appendDebugLog("2C FIRED");
-          this.submitQuestion(true, this.origCardbox-1, true);
-        }
-      }
-      // separately, if it is not a cardbox quiz, update the non-cardbox quiz
-      if (this.quizid > -1) {
-        //appendDebugLog("3C FIRED");
-        this.submitQuestion(true, (this.firstSubmit ? -1 : this.origCardbox-1), false);
-      }
+      // the server decides the cardbox action from servedCardbox/cardboxEligible
+      this.submitQuestion(true);
     }
     else { setTimeout(this.markCorrect, 30); }
   }
 
   markWrong() {
     if (this.readyToSubmit) {
-    // need to check for undefined and not "falsy" because cardbox = 0 is a thing!
-    // mark wrong for all wrong answers, not just those which are due (difficulty != 4)
-      if (this.origCardbox != undefined ) {
-        //appendDebugLog("1W FIRED");
-        this.submitQuestion(false, this.origCardbox, true);
-      }
-      if (this.quizid > -1) {
-        //appendDebugLog("2W FIRED");
-        this.submitQuestion(false, -1, false);
-      }
+      this.submitQuestion(false);
     }
     else {
       setTimeout(this.markWrong, 30);
@@ -437,7 +412,7 @@ class Question {
 
   moveToCardbox(cardbox) {
     let self = this;
-    if (this.readyToSubmit) { this.submitQuestion(true, cardbox-1); }
+    if (this.readyToSubmit) { this.submitQuestion(true, cardbox); }
     else { setTimeout(function() { self.moveToCardbox(cardbox); } , 30); }
   }
 
@@ -450,34 +425,36 @@ class Question {
     }
   }
 
-  async submitQuestion(correct, cardbox, isCardbox) {
+  async submitQuestion(correct, setCardbox = null) {
     // if there wasn't a success when data was sent, then the previous submission doesn't count.
     if (this.hasHTTPError){this.submitted = false;}
-    if (isNaN(cardbox)){cardbox = -1;}
     if (this.submitErrorTimeout){clearTimeout(this.submitErrorTimeout);}
     this.readyToSubmit = false;
     this.complete = correct;
     let d = {
       question: this.alpha,
       correct: correct,
-      cardbox: cardbox, // current cardbox
-      quizid: isCardbox ? -1 : this.quizid,
+      quizid: this.quizid,
+      servedCardbox: (typeof this.origCardbox === 'undefined' ? null : this.origCardbox),
+      cardboxEligible: this.cardboxEligible,
       incrementQ: this.firstSubmit && !this.submitted
     };
+    // explicit cardbox target (moveToCardbox); server schedules exactly there
+    if (setCardbox !== null) { d.setCardbox = setCardbox; }
 
     this.submitted = true;
     fetchWithAuth("submitQuestion", {method:"POST",body:JSON.stringify(d)})
       .then(response => {if(!response.ok) {throw new Error(`HTTP ${response.status}`);}
               return response.json(); })
       .then(responseData => { this.hasHTTPError = false;
-              this.processSubmissionResult(responseData, correct, isCardbox);
+              this.processSubmissionResult(responseData, correct);
             })
       .catch (error => { console.error("Submit question failed: ", error);
-                this.retrySubmit(error.message.includes('HTTP') ? error.message.split(' ')[1] : 0, correct, cardbox, isCardbox);
+                this.retrySubmit(error.message.includes('HTTP') ? error.message.split(' ')[1] : 0, correct, setCardbox);
               });
    }
 
-processSubmissionResult(response, correct, isCardbox) {
+processSubmissionResult(response, correct) {
     if (this.firstSubmit) {
         this.onFirstSubmit(response.qAnswered, correct);
     } else {
@@ -497,10 +474,12 @@ processSubmissionResult(response, correct, isCardbox) {
     this.cardbox = auxData.cardbox ?? -1;
 
     // Update overview if needed
+    const isCardbox = (this.quizid === -1);
     if (overview.data.activeList) {
-        if (isCardbox) {
+        if (isCardbox || response.cardboxUpdated) {
             overview.fetchCardboxSummary();
-        } else {
+        }
+        if (!isCardbox) {
             overview.updateOverview();
         }
     }
@@ -529,13 +508,13 @@ updateLocalStorage(correct) {
     }
 }
 
-retrySubmit(code, correct, cardbox, isCardbox) {
+retrySubmit(code, correct, setCardbox) {
     this.hasHTTPError = true;
     appendDebugLog(`Question Submit -> Http Error Code: ${code}`);
 
     const delay = Number(code) === 0 ? 1000 : 10000;
     this.submitErrorTimeout = setTimeout(
-        () => this.submitQuestion(correct, cardbox, isCardbox),
+        () => this.submitQuestion(correct, setCardbox),
         delay
     );
 }

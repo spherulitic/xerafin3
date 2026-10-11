@@ -84,8 +84,8 @@ AnswerArea.prototype = {
   break;
       case 'SOLVED':
         tabState = 'invSolvedDiv';
-         if (question.quizid > -1 && typeof question.cardbox != 'undefined' && question.difficulty != 4) {
-           // if updating cardbox in non-cardbox quiz
+         if (question.quizid > -1 && question.cardboxEligible) {
+           // if updating cardbox in non-cardbox quiz (server-decided flag)
            $("#invWords"+question.alpha).addClass('highlightRow'); }
          data = question.answers.sort();
         $('.nav-pills a[href="#invSolvedDiv"]').tab('show');

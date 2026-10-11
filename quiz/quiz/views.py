@@ -9,6 +9,7 @@ import requests
 import jwt
 import xerafinUtil.xerafinUtil as xu
 from quiz import app
+from quiz.cardbox_logic import choose_cardbox_action
 
 dictConfig({
     'version': 1,
@@ -180,6 +181,9 @@ def getQuestions():
       template["nextScheduled"] = auxInfo.get("nextScheduled")
       template["cardbox"] = auxInfo.get("cardbox")
       template["difficulty"] = auxInfo.get("difficulty")
+      # Server-decided highlight/eligibility flag: word is in the cardbox and due
+      template["cardboxEligible"] = (auxInfo.get("cardbox") is not None
+                                     and auxInfo.get("difficulty") != 4)
       template["words"] = { }
       if lock:
         checkOut(alpha, quizid, lock)
@@ -195,28 +199,54 @@ def getQuestions():
 
     return jsonify(result)
 
+def _cardbox_op(alpha, target, correct):
+  '''Reschedule alpha exactly in `target` (correct) or demote it (wrong).
+     Returns (auxInfo, score) from the cardbox service. '''
+  data = {"alpha": alpha}
+  if correct:
+    url = 'http://cardbox:5000/correct'
+    data['cardbox'] = target
+  else:
+    url = 'http://cardbox:5000/wrong'
+  resp = xu.check401(requests.post(url, headers=g.headers, json=data)).json()
+  return resp['auxInfo'], resp['score']
+
+def _cardbox_score():
+  '''Current cardbox score. '''
+  url = 'http://cardbox:5000/getCardboxScore'
+  return xu.check401(requests.get(url, headers=g.headers)).json()['score']
+
+def _cardbox_aux(alpha):
+  '''Aux info for a single alphagram. '''
+  url = 'http://cardbox:5000/getAuxInfo'
+  return xu.check401(requests.post(url, headers=g.headers, json={"alpha": alpha})).json()
+
+def _already_answered(alpha, quizid):
+  '''True if this question has already been answered in this quiz. '''
+  g.con.execute("select completed from quiz_user_detail "
+    "where alphagram = %s and user_id = %s and quiz_id = %s",
+    (alpha, g.uuid, quizid))
+  row = g.con.fetchone()
+  return bool(row and row[0])
+
+
 @app.route('/submitQuestion', methods=["GET", "POST"])
 def submitQuestion():
 
-  error = {"status": "success"}
   result = { }
   params = request.get_json(force=True) # returns a dict
 
   # quiz -1 is cardbox only
-  quizid = params.get("quizid", -1)
-  currentCardbox = params.get('cardbox', None) # None means "not in cardbox"
+  quizid = int(params.get("quizid", -1))
   alpha = params.get("question")
   correct = params.get('correct') # boolean
   increment = params.get("incrementQ") # boolean
 
-  # increment means - add one to the question total
-  # correct means - put in currentCardbox + 1
-  # wrong means - put in cardbox 0
-  # to reschedule in current CB, need to pass in cardbox-1
-
-  # NB if the question is a non-cardbox quiz which is ready to be
-  # rescheduled in cardbox, the front end will hit submitQuestion() twice
-  # This is crazy but a problem for another day - see issue #92
+  # cardbox reschedule inputs
+  servedCardbox = params.get('servedCardbox', None)      # cardbox when served
+  cardboxEligible = params.get('cardboxEligible', None)  # in cardbox and due
+  setCardbox = params.get('setCardbox', None)            # explicit direct schedule
+  legacyCardbox = params.get('cardbox', None)            # legacy target / -2 sentinel
 
   if increment:
     # call the stats service to increment leaderboard
@@ -234,30 +264,51 @@ def submitQuestion():
     if milestone:
       submitMilestoneChat(result["qAnswered"])
 
-  # this is for new Sloth, no quiz, increment only, skip reschedule
-  if currentCardbox == -2:
+  result['cardboxUpdated'] = False
+
+  if setCardbox is not None:
+    # explicit direct schedule (alpha stats dropdown, moveToCardbox)
+    target = int(setCardbox)
+    result['aux'], result['score'] = _cardbox_op(alpha, target, target > 0)
+    result['cardboxUpdated'] = True
+  elif legacyCardbox == -2:
+    # legacy sloth: increment only, no reschedule
     pass
-  elif quizid == -1:
-    data = {"alpha": alpha}
-  # send cardbox quiz results to the cardbox service to update
-    if correct:
-      url = 'http://cardbox:5000/correct'
-      data['cardbox'] = currentCardbox + 1
+  elif cardboxEligible is not None:
+    # server decides the cardbox action (issue #92): one submit does both the
+    # quiz update and any cardbox reschedule
+    previously_answered = _already_answered(alpha, quizid) if quizid > -1 else False
+    action = choose_cardbox_action(correct, cardboxEligible,
+                                   previously_answered, servedCardbox is not None)
+    if action == "advance":
+      result['aux'], result['score'] = _cardbox_op(alpha, servedCardbox + 1, True)
+      result['cardboxUpdated'] = True
+    elif action == "restore":
+      result['aux'], result['score'] = _cardbox_op(alpha, servedCardbox, True)
+      result['cardboxUpdated'] = True
+    elif action == "demote":
+      result['aux'], result['score'] = _cardbox_op(alpha, 0, False)
+      result['cardboxUpdated'] = True
     else:
-      url = 'http://cardbox:5000/wrong'
-    resp = xu.check401(requests.post(url, headers=g.headers, json=data)).json()
-    result['aux'] = resp['auxInfo']
-    result['score'] = resp['score']
-  else: # non-cardbox quiz
+      result['score'] = _cardbox_score()
+      result['aux'] = _cardbox_aux(alpha)
+    if quizid > -1:
+      if correct:
+        mark_correct(alpha, quizid)
+      else:
+        mark_wrong(alpha, quizid)
+  elif legacyCardbox is not None and quizid == -1:
+    # legacy cardbox quiz / sloth advance: front sends current cardbox, server +1
+    result['aux'], result['score'] = _cardbox_op(alpha, legacyCardbox + 1, correct)
+    result['cardboxUpdated'] = True
+  else:
+    # legacy non-cardbox quiz: update quiz detail, no cardbox reschedule
     if correct:
       mark_correct(alpha, quizid)
     else:
       mark_wrong(alpha, quizid)
-    url = 'http://cardbox:5000/getCardboxScore'
-    resp = xu.check401(requests.get(url, headers=g.headers)).json()
-    result['score'] = resp['score']
-    url = 'http://cardbox:5000/getAuxInfo'
-    result['aux'] = xu.check401(requests.post(url, headers=g.headers, json={"alpha": alpha})).json()
+    result['score'] = _cardbox_score()
+    result['aux'] = _cardbox_aux(alpha)
 
   return jsonify(result)
 

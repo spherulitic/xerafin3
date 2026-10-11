@@ -61,7 +61,7 @@ function getCardboxNumberDropdown(alpha, auxIn) {
   periodList.onchange = function() {
     const d = { question: alpha,
               correct: (periodList.value>0),
-              cardbox:periodList.value-1,
+              setCardbox: Number(periodList.value),
               incrementQ: false };
     fetchWithAuth("submitQuestion", {
         method: "POST",

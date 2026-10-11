@@ -441,6 +441,9 @@ def getQuestions():
     template["nextScheduled"] = auxInfo.get("nextScheduled")
     template["cardbox"] = auxInfo.get("cardbox")
     template["difficulty"] = auxInfo.get("difficulty")
+    # Server-decided highlight/eligibility flag: word is in the cardbox and due
+    template["cardboxEligible"] = (auxInfo.get("cardbox") is not None
+                                   and auxInfo.get("difficulty") != 4)
     if lock:
       checkOut(alpha, True)
     for word in template["answers"]:
