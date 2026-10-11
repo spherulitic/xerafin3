@@ -957,16 +957,18 @@ def futureSweep():
   # with no cardbox, and the per-cardbox sweep never re-marked them.
   g.cur.execute("update questions set difficulty = 0 " +
                 "where cardbox is null and difficulty in (4, 50)")
-  # Group cardboxes by their lookahead window (schedule-derived, no table
-  # scan) and only write rows whose state actually changes.
-  for lookahead, clause, cparams in _cardbox_groups():
-    threshold = now + lookahead * 86400
-    # un-sweep: future-flagged words that have come back into their window
-    g.cur.execute(f"update questions set difficulty = 0 where {clause} " +
-                  "and next_scheduled <= ? and difficulty in (4, 50)", (*cparams, threshold))
-    # sweep: eligible words that are now past their lookahead window
-    g.cur.execute(f"update questions set difficulty = 4 where {clause} " +
-                  "and next_scheduled > ? and difficulty in (0, -1, 50)", (*cparams, threshold))
+  # Apply the per-cardbox lookahead window directly in the WHERE clause (the
+  # same CASE the read path uses) instead of looping an UPDATE pair over every
+  # lookahead group. Equivalent to the old per-group loop, but collapses ~2
+  # statements per group into one un-sweep and one sweep, and (unlike a blind
+  # reset) only writes rows whose state actually changes.
+  lookahead = _lookahead_seconds_case()
+  # un-sweep: future-flagged words that have come back into their window
+  g.cur.execute("update questions set difficulty = 0 where cardbox is not null "
+                f"and difficulty in (4, 50) and next_scheduled <= ? + ({lookahead})", (now,))
+  # sweep: eligible words that are now past their lookahead window
+  g.cur.execute("update questions set difficulty = 4 where cardbox is not null "
+                f"and difficulty in (0, -1, 50) and next_scheduled > ? + ({lookahead})", (now,))
   g.con.commit()
   duration = time.time() - t_start
   if duration > 1.0:
@@ -999,20 +1001,27 @@ def closetSweep():
       4 rows re-swept). This version computes the same final state while only
       writing rows that actually change:
 
-      - 2/3/4/50 below the closet are reset to 0 (exactly as before);
+      - backlog (2) and locked (3) rows below the closet are reset to 0;
+      - future (4/50) rows below the closet are left for futureSweep, which
+        owns the lookahead window (in-window -> 0, out-of-window -> 4). Only a
+        future row with no next_scheduled (which futureSweep can't evaluate) is
+        reset here, matching the legacy result;
       - already open (0) or locked (1/5) rows are left alone;
       - released (-1) rows below the closet are left at -1 only when the release
         step would put them straight back at -1, i.e. `next_scheduled` is before
         `max(now, cleared_until)`. A -1 row with `next_scheduled` at/after that
-        cutoff is reset to 0 exactly as the legacy code left it.
+        cutoff - or with no next_scheduled at all, which the release step can
+        never release - is reset to 0 exactly as the legacy code left it.
   '''
 
   now = int(time.time())
   g.cur.execute("select * from cleared_until")
   clearedUntil = max(g.cur.fetchone()[0], now)
   g.cur.execute("update questions set difficulty = 0 where " +
-    "cardbox < ? and (difficulty in (2, 3, 4, 50) " +
-    "or (difficulty = -1 and next_scheduled >= ?))", (g.closet, clearedUntil))
+    "cardbox < ? and (difficulty in (2, 3) " +
+    "or (difficulty in (4, 50) and next_scheduled is null) " +
+    "or (difficulty = -1 and (next_scheduled is null or next_scheduled >= ?)))",
+    (g.closet, clearedUntil))
   g.cur.execute("update questions set difficulty = 2 " +
     "where cardbox >= ? and difficulty not in (1, 5, 2) and next_scheduled < ?", (g.closet, now))
 
