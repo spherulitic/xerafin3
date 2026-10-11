@@ -651,10 +651,16 @@ def newQuiz():
   isCardbox = params.get("isCardbox", True)
   quizid = params.get("quizid", -1)
 
+  cbxScore = None
   if isCardbox:
     result["quizName"] = "Cardbox Quiz"
     url = 'http://cardbox:5000/newQuiz'
-    xu.check401(requests.get(url, headers=g.headers))
+    try:
+      response = xu.check401(requests.get(url, headers=g.headers, timeout=60))
+      response.raise_for_status()
+      cbxScore = response.json().get("score", 0)
+    except (requests.RequestException, ValueError):
+      cbxScore = 0
   else:
     # Get quiz name - use parameterized query
     g.con.execute(
@@ -697,19 +703,22 @@ def newQuiz():
 
         g.con.execute(query, args)
 
-  # Get cardbox score
-  url = 'http://cardbox:5000/getCardboxScore'
-  try:
-    response = xu.check401(requests.get(url, headers=g.headers))
-    response.raise_for_status()
-    cbxResponse = response.json()
-    cbxScore = cbxResponse.get("score", 0)
-  except (requests.RequestException, ValueError):
-    cbxScore = 0
+  # Non-cardbox quizzes don't go through cardbox/newQuiz, so fetch the score
+  # separately. Cardbox quizzes already got it from the newQuiz response.
+  if cbxScore is None:
+    url = 'http://cardbox:5000/getCardboxScore'
+    try:
+      response = xu.check401(requests.get(url, headers=g.headers, timeout=10))
+      response.raise_for_status()
+      cbxScore = response.json().get("score", 0)
+    except (requests.RequestException, ValueError):
+      cbxScore = 0
 
-  # Get stats
+  # Get stats, passing the score we already have so stats doesn't make its own
+  # round trip to cardbox to compute startScore.
   url = 'http://stats:5000/getUserStatsToday'
-  statsResponse = xu.check401(requests.get(url, headers=g.headers)).json()
+  statsResponse = xu.check401(
+    requests.get(url, headers=g.headers, params={"startScore": cbxScore}, timeout=10)).json()
 
   result["qAnswered"] = statsResponse["questionsAnswered"]
   result["startScore"] = statsResponse["startScore"]
