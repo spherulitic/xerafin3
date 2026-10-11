@@ -1,4 +1,6 @@
 *.pyc
+__pycache__/
+.pytest_cache/
 frontend/localhost*
 frontend/ssl
 lex_upd/prob

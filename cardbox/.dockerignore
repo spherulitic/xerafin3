@@ -1,0 +1,6 @@
+# Keep the production image lean: tests and test-only deps never ship.
+tests/
+requirements-test.txt
+.pytest_cache/
+__pycache__/
+*.pyc

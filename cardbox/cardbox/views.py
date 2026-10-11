@@ -980,21 +980,41 @@ def dbClean():
       - Nothing with a difficult that's not in cardbox
   '''
 
-  g.cur.execute('''delete from next_added where question in
-                (select question from questions where next_scheduled is not null)''')
+  # Correlated EXISTS instead of IN (subquery): next_added is small, so this
+  # probes questions through its unique index instead of materializing every
+  # scheduled question. Same result, no large transient scan.
+  g.cur.execute('''delete from next_added where exists
+                (select 1 from questions where questions.question = next_added.question
+                 and questions.next_scheduled is not null)''')
   g.cur.execute("update questions set difficulty = null where cardbox is null")
 
 
 def closetSweep():
   ''' Puts backlog items in backlog status
       Note this will unlock anything locked with difficulty 3
+
+      On a large cardbox the old blanket reset (`difficulty not in (1,5)`)
+      rewrote ~every row to 0, and the following futureSweep + newQuiz release
+      step immediately moved almost all of them back (-1 rows were re-released,
+      4 rows re-swept). This version computes the same final state while only
+      writing rows that actually change:
+
+      - 2/3/4/50 below the closet are reset to 0 (exactly as before);
+      - already open (0) or locked (1/5) rows are left alone;
+      - released (-1) rows below the closet are left at -1 only when the release
+        step would put them straight back at -1, i.e. `next_scheduled` is before
+        `max(now, cleared_until)`. A -1 row with `next_scheduled` at/after that
+        cutoff is reset to 0 exactly as the legacy code left it.
   '''
 
   now = int(time.time())
+  g.cur.execute("select * from cleared_until")
+  clearedUntil = max(g.cur.fetchone()[0], now)
   g.cur.execute("update questions set difficulty = 0 where " +
-    "cardbox < ? and difficulty not in (1, 5)", (g.closet,))
+    "cardbox < ? and (difficulty in (2, 3, 4, 50) " +
+    "or (difficulty = -1 and next_scheduled >= ?))", (g.closet, clearedUntil))
   g.cur.execute("update questions set difficulty = 2 " +
-    "where cardbox >= ? and difficulty not in (1, 5) and next_scheduled < ?", (g.closet, now))
+    "where cardbox >= ? and difficulty not in (1, 5, 2) and next_scheduled < ?", (g.closet, now))
 
 
 #def getLexicon(userid):
