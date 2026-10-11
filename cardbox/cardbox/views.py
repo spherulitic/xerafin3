@@ -483,6 +483,9 @@ def newQuiz():
   g.cur.execute("select * from cleared_until")
   clearedUntil = g.cur.fetchone()[0]
   g.cur.execute("update questions set difficulty = -1 where difficulty = 0 and next_scheduled < ?", (max(now, clearedUntil),))
+  # Return the score here so callers (quiz/newQuiz) don't need a second
+  # round trip to /getCardboxScore while this request still holds the DB open.
+  result["score"] = getCardboxScore()
   return jsonify(result)
 
 

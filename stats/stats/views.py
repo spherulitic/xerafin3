@@ -164,7 +164,7 @@ def increment():
                     where userid = '{g.uuid}' and dateStamp = curdate()''')
   if g.con.rowcount == 0:
     url = 'http://cardbox:5000/getCardboxScore'
-    resp = xu.check401(requests.get(url, headers=g.headers)).json()
+    resp = xu.check401(requests.get(url, headers=g.headers, timeout=10)).json()
     startScore = resp["score"]
     questionsAnswered = 1
     g.con.execute(f'''insert into leaderboard (userid, dateStamp, questionsAnswered, startScore)
@@ -203,7 +203,8 @@ def reset_start_score():
 @app.route("/getUserStatsToday", methods=['GET', 'POST'])
 def getUserStatsTodayView():
   ''' Returns questionsAnswered and startScore for the requesting user '''
-  return jsonify(getUserStatsToday())
+  startScore = request.args.get('startScore', type=int)
+  return jsonify(getUserStatsToday(startScore))
 
 from datetime import datetime, timedelta
 import math
@@ -423,8 +424,12 @@ def periodicSummary():
     traceback.print_exc()
     return jsonify({"error": str(e)}), 500
 
-def getUserStatsToday():
-  ''' Fetches questionsAnswered and startScore for the requesting user '''
+def getUserStatsToday(startScore=None):
+  ''' Fetches questionsAnswered and startScore for the requesting user.
+
+      startScore is the caller's already-known cardbox score. When supplied and
+      there is no leaderboard row for today, use it instead of making a
+      round trip to cardbox (quiz/newQuiz already has the score in hand). '''
   g.con.execute(f'''select questionsAnswered, startScore from leaderboard
                   where userid = '{g.uuid}' and datestamp = curdate()''')
   row = g.con.fetchone()
@@ -433,9 +438,10 @@ def getUserStatsToday():
     startScore = row[1]
   else:
     questionsAnswered = 0
-    url = 'http://cardbox:5000/getCardboxScore'
-    resp = xu.check401(requests.get(url, headers=g.headers)).json()
-    startScore = resp["score"]
+    if startScore is None:
+      url = 'http://cardbox:5000/getCardboxScore'
+      resp = xu.check401(requests.get(url, headers=g.headers, timeout=10)).json()
+      startScore = resp["score"]
 
   return {'questionsAnswered': questionsAnswered, 'startScore': startScore}
 
