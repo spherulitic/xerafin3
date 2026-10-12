@@ -14,4 +14,4 @@ COPY . .
 
 USER appuser
 
-CMD [ "gunicorn", "--bind", "0.0.0.0:5000", "login:app"]
+CMD [ "gunicorn", "--bind", "0.0.0.0:5000", "--no-control-socket", "login:app"]
