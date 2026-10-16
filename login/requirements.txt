@@ -7,5 +7,5 @@ pre-commit
 requests>=2.34.2
 python-keycloak>=5.8.1
 python-jose
-Pillow>=10.0.0
+Pillow>=12.3.0
 urllib3
