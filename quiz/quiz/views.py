@@ -221,6 +221,28 @@ def _cardbox_aux(alpha):
   url = 'http://cardbox:5000/getAuxInfo'
   return xu.check401(requests.post(url, headers=g.headers, json={"alpha": alpha})).json()
 
+def _increment_stats():
+  '''Bumps today's leaderboard entry via stats; one retry on 5xx or timeout.
+
+     Returns {'qAnswered', 'startScore'}. Raises DownstreamError for a 401 so
+     the client can refresh its token, and requests.RequestException (or
+     ValueError for a non-JSON body) for anything else.
+  '''
+  url = 'http://stats:5000/increment'
+  for attempt in (0, 1):
+    try:
+      resp = xu.check401(requests.get(url, headers=g.headers, timeout=5))
+    except requests.RequestException:
+      if attempt == 0:
+        continue
+      raise
+    if resp.status_code >= 500 and attempt == 0:
+      continue
+    resp.raise_for_status()     # an HTML error page must not reach .json()
+    data = resp.json()
+    return {'qAnswered': int(data["questionsAnswered"]),
+            'startScore': data["startScore"]}
+
 def _already_answered(alpha, quizid):
   '''True if this question has already been answered in this quiz. '''
   g.con.execute("select completed from quiz_user_detail "
@@ -249,20 +271,25 @@ def submitQuestion():
   legacyCardbox = params.get('cardbox', None)            # legacy target / -2 sentinel
 
   if increment:
-    # call the stats service to increment leaderboard
-    url = 'http://stats:5000/increment'
-    resp = xu.check401(requests.get(url, headers=g.headers)).json()
-    result["qAnswered"] = int(resp["questionsAnswered"])
-    result["startScore"] = resp["startScore"]
+    # Bump the leaderboard. Best effort: a stats failure must not discard the
+    # quiz/cardbox work below (issue #726).
+    try:
+      result.update(_increment_stats())
+    except xu.DownstreamError:
+      raise                     # 401 still needs the client-side token refresh
+    except (requests.RequestException, ValueError, KeyError) as e:
+      app.logger.warning(f'stats /increment failed: {e}')
 
     # MILESTONE CHATS
     # Every 50 up to 500, every 100 up to 1000, every 200 after that
 
-    milestone = ((result["qAnswered"] < 501 and result["qAnswered"]%50==0) or
-                (result["qAnswered"] < 1001 and result["qAnswered"]%100==0) or
-                (result["qAnswered"]%200==0) or (result["qAnswered"]%500==0))
-    if milestone:
-      submitMilestoneChat(result["qAnswered"])
+    qAnswered = result.get("qAnswered")
+    if qAnswered is not None:
+      milestone = ((qAnswered < 501 and qAnswered%50==0) or
+                  (qAnswered < 1001 and qAnswered%100==0) or
+                  (qAnswered%200==0) or (qAnswered%500==0))
+      if milestone:
+        submitMilestoneChat(qAnswered)
 
   result['cardboxUpdated'] = False
 
