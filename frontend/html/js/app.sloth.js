@@ -61,15 +61,17 @@ SlothQuiz.prototype = {
       }
     }
   },
-  end: function(){
-    let self=this;
-    Object.entries(this.questions).forEach(function([i,v]){
-      let x=true;
+  end: async function(){
+    // Submit serially: firing every question at once saturated the browser's
+    // connections and put six concurrent /increment calls on the same
+    // first-of-day leaderboard row (issue #725).
+    for (const [, v] of Object.entries(this.questions)) {
       v.setEndState();
-      if ((v.endState===3) || (v.endState===4)) {x=false;}
-      else {v.submitQuestion(x);}
-    });
-
+      // 3 = incomplete and in cardbox, 4 = incomplete and not in cardbox:
+      // nothing was answered, so there is nothing to submit.
+      if ((v.endState===3) || (v.endState===4)) {continue;}
+      await v.submitQuestion(true);
+    }
   },
   init: function(){
     let self=this;
@@ -159,7 +161,7 @@ SlothQuestion.prototype = {
       'cardbox': x,
       'incrementQ': i
     };
-    fetchWithAuth("submitQuestion", { method: "POST", body: JSON.stringify(d) })
+    return fetchWithAuth("submitQuestion", { method: "POST", body: JSON.stringify(d) })
     .then(response => { if (!response.ok) {throw new Error(`HTTP ${response.status}`);}
                         return response.json();
     })
