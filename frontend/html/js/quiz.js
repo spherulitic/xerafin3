@@ -287,30 +287,8 @@ class Quiz {
   }
 
   skipQuestion(alpha) {
-    // reschedules to the future in cardbox
-    //
-  let self = this;
-    if (self.cardbox == undefined) self.closeQuestion(alpha);
-    else {
-    let d = {question: alpha,
-             quizid: this.quizid,
-             user: userid};
-
-
-         $.ajax({
-               type: "POST",
-               headers: {"Accept": "application/json", "Authorization": keycloak.token},
-               url: "delayQuestion.py",
-               data: JSON.stringify(d),
-               success: function(response, responseStatus) {
-                 self.closeQuestion(alpha);
-               },
-               error: function(jqXHR, textStatus, errorThrown) {
-                   appendDebugLog("Error: status = " + textStatus + " error thrown = " + errorThrown);
-               }
-         });
-     } // end if
-  } // end skipquestion
+    this.closeQuestion(alpha);
+  }
 
   stash(alpha) {
   let self = this;
