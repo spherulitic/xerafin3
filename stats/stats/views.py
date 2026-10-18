@@ -2,6 +2,7 @@ from math import ceil
 from logging.config import dictConfig
 from datetime import datetime, timedelta
 from functools import lru_cache
+import MySQLdb as mysql
 from MySQLdb.cursors import DictCursor
 import json
 import urllib
@@ -154,23 +155,56 @@ def getAllTimeStats():
   response = jsonify(result)
   return response
 
+DEADLOCK_ERRNO = 1213
+LOCK_WAIT_TIMEOUT_ERRNO = 1205
+INCREMENT_ATTEMPTS = 3
+
+def _cardbox_start_score():
+  ''' Score the user started the day with, per the cardbox service. '''
+  url = 'http://cardbox:5000/getCardboxScore'
+  resp = xu.check401(requests.get(url, headers=g.headers, timeout=10))
+  resp.raise_for_status()
+  return resp.json()["score"]
+
+def _increment_leaderboard():
+  ''' Creates or bumps today's leaderboard row in a single statement.
+
+      An update that matches no row takes a gap lock under REPEATABLE READ, so
+      the old update-then-insert pair deadlocked as soon as two first-of-day
+      requests for the same user ran at once (issue #725). ON DUPLICATE KEY
+      UPDATE takes an exclusive lock on the conflicting row instead, so
+      concurrent increments queue up rather than deadlock.
+  '''
+  # Only pay for the cardbox round trip when this request will create the row.
+  # A plain select is a consistent read: it takes no locks, and no lock is held
+  # across the HTTP call below.
+  g.con.execute('''select 1 from leaderboard
+                   where userid = %s and dateStamp = curdate()''', (g.uuid,))
+  startScore = 0 if g.con.fetchone() else _cardbox_start_score()
+
+  command = '''insert into leaderboard (userid, dateStamp, questionsAnswered, startScore)
+               values (%s, curdate(), 1, %s)
+               on duplicate key update questionsAnswered = questionsAnswered + 1'''
+
+  for attempt in range(INCREMENT_ATTEMPTS):
+    try:
+      g.con.execute(command, (g.uuid, startScore))
+      return
+    except mysql.OperationalError as e:
+      # 1213 rolls the whole transaction back, so retrying cannot double-count:
+      # this upsert is the only write in the transaction.
+      if e.args[0] not in (DEADLOCK_ERRNO, LOCK_WAIT_TIMEOUT_ERRNO) \
+         or attempt == INCREMENT_ATTEMPTS - 1:
+        raise
+      time.sleep(0.02 * (attempt + 1))
+
 @app.route("/increment", methods=['GET', 'POST'])
 def increment():
   ''' Increments the total questions solved today for the requesting user
        in the daily leaderboard
       Returns [qAnswered, startScore]
   '''
-  g.con.execute(f'''update leaderboard set questionsAnswered = questionsAnswered + 1
-                    where userid = '{g.uuid}' and dateStamp = curdate()''')
-  if g.con.rowcount == 0:
-    url = 'http://cardbox:5000/getCardboxScore'
-    resp = xu.check401(requests.get(url, headers=g.headers, timeout=10)).json()
-    startScore = resp["score"]
-    questionsAnswered = 1
-    g.con.execute(f'''insert into leaderboard (userid, dateStamp, questionsAnswered, startScore)
-                      values ('{g.uuid}', curdate(), {questionsAnswered}, {startScore})''')
-    return jsonify({'questionsAnswered': questionsAnswered, 'startScore': startScore})
-
+  _increment_leaderboard()
   return (getUserStatsToday())
 
 @app.route("/resetStartScore", methods=['GET', 'POST'])
