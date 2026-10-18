@@ -142,24 +142,6 @@ function stopScrollTimer() {
         clearInterval(scrollTimer);
 }
 
-function prepareNewWords() {
-            var d = { userid: userid };
-            $.ajax({
-                type: "POST",
-                headers: {"Accept": "application/json", "Authorization": keycloak.token},
-                url: "prepareNewWords.py",
-                data: JSON.stringify(d),
-                success: function(response, responseStatus) {
-                    console.log("Next Added table prepared.");
-                    console.log(response);
-                },
-                error: function(jqXHR, textStatus, errorThrown) {
-                    console.log("Error preparing Next Added");
-                }
-            });
-
-}
-
 function getTableLineData(word, auxWordData) {
 // auxWordData is the list [ front hooks, back hooks, definition, [frontDot, backDot], lexiconSymbol ]
    if(document.getElementById('blankQuizCheck') && document.getElementById('blankQuizCheck').checked ) {
