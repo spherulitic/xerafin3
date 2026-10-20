@@ -1372,7 +1372,7 @@ class Metaranks():
       self.pageTotal = ceil(self.userCount / self.pageSize)
       if self.pageTotal == 0:
         self.pageTotal = 1
-      self.page = min(self.pageNumber-1,self.pageTotal)
+      self.page = min(self.pageNumber-1, self.pageTotal - 1)
       self.offset = self.pageSize * self.page
 
   def getRankingsData(self):
@@ -1897,7 +1897,7 @@ class Rankings():
       self.pageTotal = ceil(self.userCount / self.pageSize)
       if self.pageTotal == 0:
         self.pageTotal = 1
-      self.page = min(self.pageNumber-1, self.pageTotal)
+      self.page = min(self.pageNumber-1, self.pageTotal - 1)
       self.offset = self.pageSize * self.page
 
   def getRankingsData(self):
@@ -1937,7 +1937,7 @@ class Rankings():
         rowDict['isMe'] = True
         if self.userRank:
           rowDict['rank'] = self.userRank
-        if rowDict['rank'] < self.rankData[0]['rank']:
+        if not self.rankData or rowDict['rank'] < self.rankData[0]['rank']:
           self.rankData.insert(0, rowDict)
         else:
           self.rankData.append(rowDict)
@@ -1981,9 +1981,9 @@ class SlothRankings():
       self.pageSize = 10
     self.pageNumber = data.get('pageNumber', 1)
     try:
-      self.pageNumber = min(int(self.pageNumber), 1)
-    except ValueError:
-      self.pageSize = 1
+      self.pageNumber = max(int(self.pageNumber), 1)
+    except (TypeError, ValueError):
+      self.pageNumber = 1
     self.displayType = data.get('displayType', 0)
     try:
       self.displayType = int(self.displayType)
@@ -2093,7 +2093,7 @@ class SlothRankings():
       self.pageTotal = ceil(self.userCount / self.pageSize)
       if self.pageTotal == 0:
         self.pageTotal = 1
-      self.page = min(self.pageNumber-1, self.pageTotal)
+      self.page = min(self.pageNumber-1, self.pageTotal - 1)
       self.offset = self.pageSize * self.page
 
   def getRankingsData(self):
@@ -2105,7 +2105,7 @@ class SlothRankings():
                     GROUP BY userid
                     ORDER BY total DESC
                     LIMIT {self.offset},{self.pageSize}'''
-    result = self.runQuery
+    result = self.runQuery()
     self.rankData = [ ]
     user_info_list = getUserData([row[1] for row in result])
     user_info_dict = {user["userid"]: user for user in user_info_list}
@@ -2137,7 +2137,7 @@ class SlothRankings():
         rowDict['isMe'] = True
         if self.userRank:
           rowDict['rank'] = self.userRank
-        if rowDict['rank'] < self.rankData[0]['rank']:
+        if not self.rankData or rowDict['rank'] < self.rankData[0]['rank']:
           self.rankData.insert(0, rowDict)
         else:
           self.rankData.append(rowDict)
