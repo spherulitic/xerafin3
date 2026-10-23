@@ -160,26 +160,44 @@ def uploadProfileImage():
   if file.filename == '':
     return jsonify({'error': 'Empty filename'}), 400
 
-  # Determine extension from original filename
-  ext = os.path.splitext(file.filename)[1].lower()
-  if ext not in ('.png', '.jpg', '.jpeg', '.gif'):
-    ext = '.png'
+  # The client's filename is not evidence of the format: PILImage.open() sniffs the
+  # CONTENT, so a JPEG 2000 / EPS / TIFF file named "photo.png" would otherwise reach
+  # that decoder. Allowlist what we are willing to decode, and derive the extension from
+  # the format we actually detected rather than from the name we were given. (#752)
+  ALLOWED_FORMATS = {'PNG': '.png', 'JPEG': '.jpg', 'GIF': '.gif'}
+  MAX_PIXELS = 50_000_000  # a 128x128 thumbnail can never need a 50 MP source
 
-  # Build filename: <user_uuid>.<ext>
-  filename = f'{g.uuid}{ext}'
+  try:
+    img = PILImage.open(file)
+    detected = (img.format or '').upper()
+  except PILImage.DecompressionBombError:
+    return jsonify({'error': 'Image dimensions too large'}), 413
+  except Exception:
+    return jsonify({'error': 'Not a readable image'}), 415
+
+  if detected not in ALLOWED_FORMATS:
+    return jsonify({'error': f'Unsupported image format: {detected or "unknown"}'}), 415
+
+  if img.width * img.height > MAX_PIXELS:
+    return jsonify({'error': 'Image dimensions too large'}), 413
+
+  # Build filename: <user_uuid>.<ext>, using the extension of the detected format
+  filename = f'{g.uuid}{ALLOWED_FORMATS[detected]}'
   upload_dir = '/app/user-photos'
   os.makedirs(upload_dir, exist_ok=True)
   save_path = os.path.join(upload_dir, filename)
 
-  # Open, resize to 128x128 keeping aspect ratio, pad with black center
-  img = PILImage.open(file)
-  img = img.convert('RGB')
-  img.thumbnail((128, 128), PILImage.LANCZOS)
-  canvas = PILImage.new('RGB', (128, 128), (0, 0, 0))
-  x_offset = (128 - img.width) // 2
-  y_offset = (128 - img.height) // 2
-  canvas.paste(img, (x_offset, y_offset))
-  canvas.save(save_path)
+  # Resize to 128x128 keeping aspect ratio, pad with black centre
+  try:
+    img = img.convert('RGB')
+    img.thumbnail((128, 128), PILImage.LANCZOS)
+    canvas = PILImage.new('RGB', (128, 128), (0, 0, 0))
+    x_offset = (128 - img.width) // 2
+    y_offset = (128 - img.height) // 2
+    canvas.paste(img, (x_offset, y_offset))
+    canvas.save(save_path)
+  except Exception:
+    return jsonify({'error': 'Could not process image'}), 422
 
   # Update Keycloak attribute via setCardboxPrefs
   photo_value = f'images/users/{filename}'
