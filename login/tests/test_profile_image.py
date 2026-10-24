@@ -7,14 +7,7 @@ from PIL import Image
 import login.profile_image as profile_image
 from login.profile_image import ImageTooLarge, UnsupportedImage, renderProfilePng
 
-
-ACCEPTED_FORMATS = ('PNG', 'JPEG', 'GIF', 'WEBP', 'BMP', 'TIFF', 'AVIF')
-
-
-def encode(fmt, size=(300, 200), mode='RGB', **save_kwargs):
-    buf = io.BytesIO()
-    Image.new(mode, size).save(buf, fmt, **save_kwargs)
-    return buf.getvalue()
+from helpers import ACCEPTED_FORMATS, encode, encode_mpo
 
 
 @pytest.mark.parametrize('fmt', ACCEPTED_FORMATS)
@@ -27,11 +20,7 @@ def test_accepted_format_becomes_128_png(fmt):
 
 
 def test_mpo_is_treated_as_jpeg_family():
-    first = Image.new('RGB', (300, 200))
-    second = Image.new('RGB', (300, 200))
-    buf = io.BytesIO()
-    first.save(buf, 'MPO', save_all=True, append_images=[second])
-    png = renderProfilePng(io.BytesIO(buf.getvalue()))
+    png = renderProfilePng(io.BytesIO(encode_mpo()))
     out = Image.open(io.BytesIO(png))
     assert out.format == 'PNG'
     assert out.size == (128, 128)

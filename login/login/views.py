@@ -30,6 +30,7 @@ dictConfig({
 
 DEFAULT_LEXICON = 'csw'
 LATEST_LEXICON_VERSION = '24'
+USER_PHOTO_DIR = '/app/user-photos'
 
 @lru_cache(maxsize=1)
 def get_public_key():
@@ -170,13 +171,13 @@ def uploadProfileImage():
 
   # Always write PNG. The thumbnail is regenerated here, so the input format
   # never needs to be echoed to disk (or to a format browsers cannot display).
-  upload_dir = '/app/user-photos'
-  os.makedirs(upload_dir, exist_ok=True)
+  upload_dir = USER_PHOTO_DIR
   filename = f'{g.uuid}.png'
   save_path = os.path.join(upload_dir, filename)
   tmp_path = os.path.join(upload_dir, f'.{g.uuid}.{os.urandom(8).hex()}.png')
 
   try:
+    os.makedirs(upload_dir, exist_ok=True)
     with open(tmp_path, 'wb') as tmp:
       tmp.write(png_bytes)
     os.chmod(tmp_path, 0o644)  # nginx serves this volume as a different user
@@ -187,7 +188,7 @@ def uploadProfileImage():
   finally:
     try:
       os.unlink(tmp_path)
-    except FileNotFoundError:
+    except OSError:
       pass
 
   # Update Keycloak attribute via setCardboxPrefs
