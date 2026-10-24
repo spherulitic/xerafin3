@@ -149,9 +149,9 @@ def setCardboxPrefs(params=None):
 
 @app.route('/uploadProfileImage', methods=['POST'])
 def uploadProfileImage():
-  ''' Accept a photo upload, resize to 128x128 padded on black, save to disk,
+  ''' Accept a photo upload, resize to 128x128 padded on black, save it as a PNG,
       and update Keycloak attribute. '''
-  from PIL import Image as PILImage
+  from login.profile_image import ProfileImageError, renderProfilePng
 
   if 'file' not in request.files:
     return jsonify({'error': 'No file provided'}), 400
@@ -160,44 +160,35 @@ def uploadProfileImage():
   if file.filename == '':
     return jsonify({'error': 'Empty filename'}), 400
 
-  # The client's filename is not evidence of the format: PILImage.open() sniffs the
-  # CONTENT, so a JPEG 2000 / EPS / TIFF file named "photo.png" would otherwise reach
-  # that decoder. Allowlist what we are willing to decode, and derive the extension from
-  # the format we actually detected rather than from the name we were given. (#752)
-  ALLOWED_FORMATS = {'PNG': '.png', 'JPEG': '.jpg', 'GIF': '.gif'}
-  MAX_PIXELS = 50_000_000  # a 128x128 thumbnail can never need a 50 MP source
-
   try:
-    img = PILImage.open(file)
-    detected = (img.format or '').upper()
-  except PILImage.DecompressionBombError:
-    return jsonify({'error': 'Image dimensions too large'}), 413
+    png_bytes = renderProfilePng(file)
+  except ProfileImageError as e:
+    return jsonify({'error': e.message}), e.status
   except Exception:
-    return jsonify({'error': 'Not a readable image'}), 415
+    app.logger.exception('Unexpected failure processing profile image')
+    return jsonify({'error': 'Could not process image'}), 500
 
-  if detected not in ALLOWED_FORMATS:
-    return jsonify({'error': f'Unsupported image format: {detected or "unknown"}'}), 415
-
-  if img.width * img.height > MAX_PIXELS:
-    return jsonify({'error': 'Image dimensions too large'}), 413
-
-  # Build filename: <user_uuid>.<ext>, using the extension of the detected format
-  filename = f'{g.uuid}{ALLOWED_FORMATS[detected]}'
+  # Always write PNG. The thumbnail is regenerated here, so the input format
+  # never needs to be echoed to disk (or to a format browsers cannot display).
   upload_dir = '/app/user-photos'
   os.makedirs(upload_dir, exist_ok=True)
+  filename = f'{g.uuid}.png'
   save_path = os.path.join(upload_dir, filename)
+  tmp_path = os.path.join(upload_dir, f'.{g.uuid}.{os.urandom(8).hex()}.png')
 
-  # Resize to 128x128 keeping aspect ratio, pad with black centre
   try:
-    img = img.convert('RGB')
-    img.thumbnail((128, 128), PILImage.LANCZOS)
-    canvas = PILImage.new('RGB', (128, 128), (0, 0, 0))
-    x_offset = (128 - img.width) // 2
-    y_offset = (128 - img.height) // 2
-    canvas.paste(img, (x_offset, y_offset))
-    canvas.save(save_path)
-  except Exception:
-    return jsonify({'error': 'Could not process image'}), 422
+    with open(tmp_path, 'wb') as tmp:
+      tmp.write(png_bytes)
+    os.chmod(tmp_path, 0o644)  # nginx serves this volume as a different user
+    os.replace(tmp_path, save_path)
+  except OSError:
+    app.logger.exception('Failed to save profile image')
+    return jsonify({'error': 'Could not save image'}), 500
+  finally:
+    try:
+      os.unlink(tmp_path)
+    except FileNotFoundError:
+      pass
 
   # Update Keycloak attribute via setCardboxPrefs
   photo_value = f'images/users/{filename}'
