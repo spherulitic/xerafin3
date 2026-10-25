@@ -4,4 +4,4 @@ pyjwt[crypto]
 mysqlclient==2.3.0
 requests>=2.34.2
 pre-commit
-python-dateutil>=2.8.2
+python-dateutil>=2.9.0.post0
