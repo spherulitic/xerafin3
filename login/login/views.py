@@ -30,6 +30,7 @@ dictConfig({
 
 DEFAULT_LEXICON = 'csw'
 LATEST_LEXICON_VERSION = '24'
+USER_PHOTO_DIR = '/app/user-photos'
 
 @lru_cache(maxsize=1)
 def get_public_key():
@@ -149,9 +150,9 @@ def setCardboxPrefs(params=None):
 
 @app.route('/uploadProfileImage', methods=['POST'])
 def uploadProfileImage():
-  ''' Accept a photo upload, resize to 128x128 padded on black, save to disk,
+  ''' Accept a photo upload, resize to 128x128 padded on black, save it as a PNG,
       and update Keycloak attribute. '''
-  from PIL import Image as PILImage
+  from login.profile_image import ProfileImageError, renderProfilePng
 
   if 'file' not in request.files:
     return jsonify({'error': 'No file provided'}), 400
@@ -160,26 +161,35 @@ def uploadProfileImage():
   if file.filename == '':
     return jsonify({'error': 'Empty filename'}), 400
 
-  # Determine extension from original filename
-  ext = os.path.splitext(file.filename)[1].lower()
-  if ext not in ('.png', '.jpg', '.jpeg', '.gif'):
-    ext = '.png'
+  try:
+    png_bytes = renderProfilePng(file)
+  except ProfileImageError as e:
+    return jsonify({'error': e.message}), e.status
+  except Exception:
+    app.logger.exception('Unexpected failure processing profile image')
+    return jsonify({'error': 'Could not process image'}), 500
 
-  # Build filename: <user_uuid>.<ext>
-  filename = f'{g.uuid}{ext}'
-  upload_dir = '/app/user-photos'
-  os.makedirs(upload_dir, exist_ok=True)
+  # Always write PNG. The thumbnail is regenerated here, so the input format
+  # never needs to be echoed to disk (or to a format browsers cannot display).
+  upload_dir = USER_PHOTO_DIR
+  filename = f'{g.uuid}.png'
   save_path = os.path.join(upload_dir, filename)
+  tmp_path = os.path.join(upload_dir, f'.{g.uuid}.{os.urandom(8).hex()}.png')
 
-  # Open, resize to 128x128 keeping aspect ratio, pad with black center
-  img = PILImage.open(file)
-  img = img.convert('RGB')
-  img.thumbnail((128, 128), PILImage.LANCZOS)
-  canvas = PILImage.new('RGB', (128, 128), (0, 0, 0))
-  x_offset = (128 - img.width) // 2
-  y_offset = (128 - img.height) // 2
-  canvas.paste(img, (x_offset, y_offset))
-  canvas.save(save_path)
+  try:
+    os.makedirs(upload_dir, exist_ok=True)
+    with open(tmp_path, 'wb') as tmp:
+      tmp.write(png_bytes)
+    os.chmod(tmp_path, 0o644)  # nginx serves this volume as a different user
+    os.replace(tmp_path, save_path)
+  except OSError:
+    app.logger.exception('Failed to save profile image')
+    return jsonify({'error': 'Could not save image'}), 500
+  finally:
+    try:
+      os.unlink(tmp_path)
+    except OSError:
+      pass
 
   # Update Keycloak attribute via setCardboxPrefs
   photo_value = f'images/users/{filename}'
