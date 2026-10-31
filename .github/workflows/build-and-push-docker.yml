@@ -24,11 +24,15 @@ jobs:
       pull-requests: write
     outputs:
       new_versions_json: ${{ steps.set-versions.outputs.json }}
+      changed: ${{ steps.changed.outputs.containers }}
+      config_changed: ${{ steps.changed.outputs.config }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
-          fetch-depth: 2
+          # Full history so the change detection can diff github.event.before
+          # against github.sha for multi-commit pushes.
+          fetch-depth: 0
 
       - name: Log in to DockerHub
         uses: docker/login-action@v4
@@ -37,27 +41,57 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Detect changed containers
-        run:     |
+        id: changed
+        run: |
+          set -euo pipefail
+          ALL_CONTAINERS="chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox"
           CHANGED_CONTAINERS=""
+          CONFIG_CHANGED="false"
+
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
             echo "Force rebuild all containers requested"
-            CHANGED_CONTAINERS="chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox"
+            CHANGED_CONTAINERS="$ALL_CONTAINERS"
+            CONFIG_CHANGED="true"
           else
-            CHANGED_FILES=$(git diff --name-only HEAD^1 HEAD)
-            echo "Changed files: $CHANGED_FILES"
-            for container in chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox; do
-              if echo "$CHANGED_FILES" | grep -q "^$container/"; then
+            if [[ "${{ github.event_name }}" == "push" ]]; then
+              BEFORE="${{ github.event.before }}"
+              if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
+                CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+              else
+                CHANGED_FILES=$(git diff --name-only "$BEFORE" "${{ github.sha }}") \
+                  || CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+              fi
+            else
+              CHANGED_FILES=$(git diff --name-only HEAD^1 HEAD)
+            fi
+
+            echo "Changed files:"
+            echo "$CHANGED_FILES"
+
+            for container in $ALL_CONTAINERS; do
+              if grep -q "^$container/" <<< "$CHANGED_FILES"; then
                 CHANGED_CONTAINERS="$CHANGED_CONTAINERS $container"
               fi
             done
+            CHANGED_CONTAINERS="${CHANGED_CONTAINERS# }"
+
+            # Unit-file-only changes still need a deploy (daemon-reload), even
+            # though no image is rebuilt.
+            if grep -qE '^(deploy/|lexicon-db/|\.github/workflows/build-and-push-docker\.yml|\.github/scripts/)' <<< "$CHANGED_FILES"; then
+              CONFIG_CHANGED="true"
+            fi
           fi
-           CHANGED_CONTAINERS="${CHANGED_CONTAINERS# }"
-           echo "CHANGED_CONTAINERS=$CHANGED_CONTAINERS" >> $GITHUB_ENV
-           echo "Changed Containers: $CHANGED_CONTAINERS"
+
+          echo "CHANGED_CONTAINERS=$CHANGED_CONTAINERS" >> "$GITHUB_ENV"
+          echo "containers=$CHANGED_CONTAINERS" >> "$GITHUB_OUTPUT"
+          echo "config=$CONFIG_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "Changed Containers: $CHANGED_CONTAINERS"
+          echo "Config changed: $CONFIG_CHANGED"
 
       - name: Increment version tags for changed containers
         if: env.CHANGED_CONTAINERS != ''
         run: |
+          set -euo pipefail
           for container in $CHANGED_CONTAINERS; do
             echo "Incrementing version for $container"
             CURRENT_VERSION=$(jq -r ".\"$container\"" versions.json)
@@ -66,6 +100,7 @@ jobs:
             mv versions.json.tmp versions.json
             echo "Updated $container to version $NEW_VERSION"
           done
+
       - name: Create pull request for versions.json
         if: env.CHANGED_CONTAINERS != ''
         run: |
@@ -84,11 +119,12 @@ jobs:
             --head "$BRANCH_NAME"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Create version output
         id: set-versions
         run: |
           NEW_VERSIONS_JSON=$(jq -c '.' versions.json)
-          echo "json=$NEW_VERSIONS_JSON" >> $GITHUB_OUTPUT
+          echo "json=$NEW_VERSIONS_JSON" >> "$GITHUB_OUTPUT"
 
       - name: Build and Push Services
         if: env.CHANGED_CONTAINERS != ''
@@ -106,7 +142,6 @@ jobs:
             ["stats"]="x-stats"
             ["sloth"]="x-sloth"
             ["cardbox"]="x-cardbox"
-            ["cron"]="x-cron"
           )
           for dir in $CHANGED_CONTAINERS; do
             echo
@@ -119,13 +154,20 @@ jobs:
             if [ "$dir" = "keycloak" ]; then
               docker build --pull -f $dir/Dockerfile.prod -t spherulitic/$image_name:$VERSION $dir
             else
-              docker build --pull --build-arg NGINX_ENV=prod  --build-arg KEYCLOAK_URL=https://auth.xerafin.net -t spherulitic/$image_name:$VERSION $dir
+              docker build --pull --build-arg NGINX_ENV=prod --build-arg KEYCLOAK_URL=https://auth.xerafin.net -t spherulitic/$image_name:$VERSION $dir
             fi
             docker push spherulitic/$image_name:$VERSION
           done
   deploy-to-droplet:
     runs-on: ubuntu-latest
     needs: build-and-push
+    # Deploy when an image changed, or when a quadlet/workflow change needs to
+    # be applied. Docs-only and lint-only pushes no longer touch prod (#473).
+    if: needs.build-and-push.outputs.changed != '' || needs.build-and-push.outputs.config_changed == 'true'
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    timeout-minutes: 60
     env:
       CHAT_MYSQL_PWD: ${{ secrets.CHAT_MYSQL_PWD }}
       CHAT_MYSQL_USER: ${{ vars.CHAT_MYSQL_USER }}
@@ -238,31 +280,24 @@ jobs:
           target: "/var/lib/xerafin/"
           strip_components: 1
 
-      - name: Reload systemd and restart all services
+      - name: Copy deploy script
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.HOST_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: ".github/scripts/prod-deploy.sh"
+          target: "/home/spherulitic/.config/xerafin3/"
+          strip_components: 2
+
+      - name: Deploy changed units
         uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.HOST_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            # Pull prod images from dockerhub repo
-            find ~/.config/containers/systemd/ -name '*.container' -exec sed -i 's|Image=x-|Image=docker.io/spherulitic/x-|' {} \;
-
-            # Fixing a nonstandard dev configuration
-            find ~/.config/containers/systemd/ -name '*.container' -exec sed -i 's|--runtime=/home/linuxbrew/.linuxbrew/bin/crun|--runtime=/usr/bin/crun|g' {} \;
-
-            # Fix path to certs for keycloak
-            sed -i 's|Volume=/home/spherulitic/xerafin3/frontend/ssl/dev|Volume=/etc/letsencrypt/archive/x3.xerafin.net|' ~/.config/containers/systemd/keycloak.container
-
-            # Fix path to certs for frontend (dev dir -> prod Let's Encrypt files)
-            sed -i 's|Volume=/home/spherulitic/xerafin3/frontend/ssl/dev:/etc/nginx/ssl:ro|Volume=/etc/letsencrypt/live/x3.xerafin.net/fullchain.pem:/etc/nginx/ssl/fullchain.pem:ro\nVolume=/etc/letsencrypt/live/x3.xerafin.net/privkey.pem:/etc/nginx/ssl/privkey.pem:ro|' ~/.config/containers/systemd/frontend.container
-
-            # Reload systemd to pick up unit file changes
-            systemctl --user daemon-reload
-
-            # Restart all services
-            systemctl --user restart xerafin.target
-
-            # Quick status check
-            echo "Service status"
-            systemctl --user --no-pager status xerafin.target --all
+          envs: CHANGED,CONFIG_CHANGED
+          script: bash "$HOME/.config/xerafin3/prod-deploy.sh"
+        env:
+          CHANGED: ${{ needs.build-and-push.outputs.changed }}
+          CONFIG_CHANGED: ${{ needs.build-and-push.outputs.config_changed }}
