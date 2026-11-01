@@ -2,7 +2,7 @@
 Description=Xerafin Cron Service
 After=keycloak.service
 After=xerafin-network.service
-Requires=keycloak.service
+Wants=keycloak.service
 Requires=xerafin-network.service
 PartOf=xerafin.target
 
