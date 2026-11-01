@@ -1,7 +1,7 @@
 [Unit]
 Description=Xerafin Stats Service
 After=keycloak.service
-Requires=keycloak.service
+Wants=keycloak.service
 After=xerafin-network.service
 Requires=xerafin-network.service
 PartOf=xerafin.target
