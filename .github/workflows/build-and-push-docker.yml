@@ -82,11 +82,53 @@ jobs:
             fi
           fi
 
+          if [ -n "$CHANGED_CONTAINERS" ] || [ "$CONFIG_CHANGED" = "true" ]; then
+            DEPLOY_NEEDED="true"
+          else
+            DEPLOY_NEEDED="false"
+          fi
+
           echo "CHANGED_CONTAINERS=$CHANGED_CONTAINERS" >> "$GITHUB_ENV"
+          echo "DEPLOY_NEEDED=$DEPLOY_NEEDED" >> "$GITHUB_ENV"
           echo "containers=$CHANGED_CONTAINERS" >> "$GITHUB_OUTPUT"
           echo "config=$CONFIG_CHANGED" >> "$GITHUB_OUTPUT"
           echo "Changed Containers: $CHANGED_CONTAINERS"
           echo "Config changed: $CONFIG_CHANGED"
+          echo "Deploy needed: $DEPLOY_NEEDED"
+
+      # The deploy job pins every quadlet from versions.json on the checked-out
+      # commit. While a version-bump PR is open, main lags the deployed tags,
+      # so refusing to start is safer than repointing units at older images.
+      # Merge or close the PR, then re-run the failed jobs.
+      - name: Refuse to deploy with an open version-bump PR
+        if: env.DEPLOY_NEEDED == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          open_prs=$(gh pr list --repo "${{ github.repository }}" --state open \
+            --json number,title,headRefName,url \
+            --jq '.[] | select(.headRefName | startswith("version-update-")) | "#\(.number) \(.title) \(.url)"')
+          if [ -n "$open_prs" ]; then
+            echo "::error::Open version-bump PR(s) must be merged or closed before the next deploy:"
+            printf '%s\n' "$open_prs"
+            echo "Merge or close them, then re-run the failed jobs for this run."
+            exit 1
+          fi
+          echo "No open version-bump PRs."
+
+      # A re-run checks out the original commit, whose versions.json predates
+      # the version-bump PR that was just merged. Take the current baseline
+      # from main so unchanged containers keep their deployed tags.
+      - name: Sync versions.json from main
+        if: env.DEPLOY_NEEDED == 'true'
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git show origin/main:versions.json > versions.json.sync
+          mv versions.json.sync versions.json
+          echo "Baseline versions:"
+          jq -c . versions.json
 
       - name: Increment version tags for changed containers
         if: env.CHANGED_CONTAINERS != ''
