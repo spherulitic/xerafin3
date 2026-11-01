@@ -7,14 +7,20 @@ After=cardbox.service
 After=login.service
 After=quiz.service
 After=chat.service
-Requires=keycloak.service
-Requires=stats.service
-Requires=sloth.service
-Requires=cardbox.service
-Requires=login.service
-Requires=quiz.service
-Requires=chat.service
+After=lexicon.service
+# Wants+After preserves boot activation/order without propagating stop or
+# restart: restarting a backend must not take nginx down.
+Wants=keycloak.service
+Wants=stats.service
+Wants=sloth.service
+Wants=cardbox.service
+Wants=login.service
+Wants=quiz.service
+Wants=chat.service
+Wants=lexicon.service
 PartOf=xerafin.target
+# Keep retrying: a transient start failure must not leave the site dead.
+StartLimitIntervalSec=0
 
 After=xerafin-network.service
 Requires=xerafin-network.service
@@ -42,6 +48,9 @@ PodmanArgs=--runtime=/home/linuxbrew/.linuxbrew/bin/crun
 
 [Service]
 Restart=always
+RestartSec=5
+# Headroom for an image pull or a slow nginx start.
+TimeoutStartSec=300
 
 [Install]
 WantedBy=xerafin.target
