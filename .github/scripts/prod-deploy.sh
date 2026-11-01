@@ -20,6 +20,10 @@ set -euo pipefail
 CHANGED="${CHANGED:-}"
 CONFIG_CHANGED="${CONFIG_CHANGED:-false}"
 DRY_RUN="${DRY_RUN:-0}"
+# Units whose image may be updated without running them. Data loaders follow
+# their database's lifecycle, not their own image tag.
+# Use ${VAR-default} (not :-) so an empty override explicitly disables this.
+PULL_ONLY_UNITS="${PULL_ONLY_UNITS-lexicon-loader}"
 UNIT_DIR="$HOME/.config/containers/systemd"
 SITE_HOST="x3.xerafin.net"
 AUTH_HOST="auth.xerafin.net"
@@ -49,6 +53,13 @@ fail() {
     journalctl --user -u "$unit" -n 80 --no-pager 2>&1 >&2 || true
   done
   exit 1
+}
+
+is_pull_only() {
+  case " $PULL_ONLY_UNITS " in
+    *" $1 "*) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 wait_active() {
@@ -145,11 +156,18 @@ done
 # ---------------------------------------------------------------------------
 ORDERED_UNITS=()
 for c in "${CHANGED_UNITS[@]}"; do
+  if is_pull_only "$c"; then
+    echo "Pull-only: $c (image updated, not restarted)"
+    continue
+  fi
   if [ "$c" != "frontend" ]; then
     ORDERED_UNITS+=("$c")
   fi
 done
 for c in "${CHANGED_UNITS[@]}"; do
+  if is_pull_only "$c"; then
+    continue
+  fi
   if [ "$c" = "frontend" ]; then
     ORDERED_UNITS+=("$c")
   fi
@@ -163,6 +181,15 @@ for c in "${ORDERED_UNITS[@]}"; do
   echo "Restarting $unit"
   run systemctl --user restart "$unit" || fail "restart failed for $unit"
 done
+
+if [ "${#ORDERED_UNITS[@]}" -eq 0 ]; then
+  echo "No units to restart; images pulled only."
+  if [ "$DRY_RUN" != "1" ]; then
+    probe_http "$SITE_HOST" "/" "200" || fail "site probe failed after pull-only deploy"
+  fi
+  echo "Deploy OK (pull-only)"
+  exit 0
+fi
 
 if [ "$DRY_RUN" = "1" ]; then
   echo "[dry-run] skipping health checks"
