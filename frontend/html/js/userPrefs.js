@@ -318,7 +318,7 @@ function showUserPrefs(response, responseStatus) {
 
    // file upload box here
     $('#profileFile').prop('type','file');
-    $('#profileFile').prop('accept','image/*');
+    $('#profileFile').prop('accept','image/png,image/jpeg,image/gif,image/webp,image/bmp,image/tiff,image/avif');
     $('#profileButton').on('click', function(){uploadProfileImage();});
   }
 } // end showUserPrefs
@@ -336,7 +336,13 @@ function uploadProfileImage() {
   })
   .then(function(response) {
     if (!response.ok) {
-      throw new Error('Upload failed');
+      return response.json()
+        .catch(function() {
+          return {error: response.status === 413 ? 'Image is too large' : 'Upload failed'};
+        })
+        .then(function(body) {
+          throw new Error(body.error || 'Upload failed');
+        });
     }
     return response.json();
   })
@@ -348,7 +354,7 @@ function uploadProfileImage() {
   .catch(function(error) {
     $('#profileButton').prop('disabled', false);
     $('#profileButton').val('Error');
-    gFloatingAlert("profileAlert",3000,"Profile Image", "Upload failed.",500);
+    gFloatingAlert("profileAlert",3000,"Profile Image", error.message || "Upload failed.",500);
     console.log("Profile image upload error: " + error);
   });
 }

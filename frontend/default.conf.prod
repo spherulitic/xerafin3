@@ -45,8 +45,12 @@ server {
     # Security header for Keycloak domain too
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
+    # Dynamic Keycloak upstream (resolved by nginx.conf's resolver)
+    set $svc_keycloak keycloak:8080;
+    proxy_connect_timeout 5s;
+
     location / {
-        proxy_pass http://keycloak:8080;
+        proxy_pass http://$svc_keycloak$request_uri;
 
         # ABSOLUTELY CRITICAL for Keycloak
         proxy_set_header Host               $http_host;       # or $host

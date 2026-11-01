@@ -1,7 +1,7 @@
 [Unit]
 Description=Xerafin Lexicon Service
 After=keycloak.service
-Requires=keycloak.service
+Wants=keycloak.service
 After=xerafin-network.service
 Requires=xerafin-network.service
 After=lexicon-db.service
