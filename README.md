@@ -14,6 +14,8 @@ Like Zyzzyva, Xerafin implements a Leitner spaced-repetition cardbox method to a
 * User statistics and metrics to track progress
 * Interface that is optimized for both laptop and mobile using Bootstrap
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/spherulitic/xerafin3)
+
 XERAFIN 3.0
 
 Xerafin 3.0 is a major rewrite of the Xerafin back end. The architecture consists of:
