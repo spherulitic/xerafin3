@@ -167,6 +167,7 @@ class Quiz {
     this.isCardbox = isCardbox;
     this.quizid = quizid;
     this.blankQuiz = blankQuiz;
+    this.rescheduled = getBool(localStorage.cardboxRescheduled);
   this.hasHTTPError = false;
     this.eof = false;
    }
@@ -192,6 +193,7 @@ class Quiz {
         let d = { numQuestions: numQ,
           quizid: self.quizid,
           isCardbox: self.isCardbox,
+          rescheduled: self.rescheduled,
           lock: true
         };
         let requestedCardbox;
