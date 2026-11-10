@@ -1,3 +1,6 @@
+var cardboxStatsLatest = null;
+var rescheduleStatsError = false;
+
 function showCardboxStats (value) {
   if (typeof cardboxTimeout!=='undefined'){clearTimeout(cardboxTimeout);}
   if (value!==2) {cardboxTimeout = setTimeout(function(){showCardboxStats()}, 300000);}
@@ -110,6 +113,7 @@ function cardboxHighlightAction(row, state){
 
 function displayCardboxDue (response, responseStatus) {
   let stats=response[0];
+  cardboxStatsLatest=stats;
   let cardboxTotal=0;
   let dueTotal=0;
   let dueValue=0;
@@ -147,6 +151,12 @@ function displayCardboxDue (response, responseStatus) {
   $('#cardboxUpdateTimeBox').html(gReturnUpdateTime());
   $('#cardboxTable').css('visibility','visible');
   displayCardboxQueue(stats.queueLength);
+  // Keep the reschedule pane's counts in sync if it is currently open.
+  if (document.getElementById('reschedulePreview')) {
+    rescheduleStatsError = false;
+    renderRescheduleCardboxSelectors();
+    updateReschedulePreview();
+  }
 }
 function displayCardboxQueue(value){
   $('#addQueue').html('Number of Alphagrams In Add Queue: '+value);
@@ -354,11 +364,12 @@ function manageCardboxExchange(value){
     case 3:manageUploadList();break;
     case 4:manageListOfShame();break;
     case 5:manageListOfTriumph();break;
+    case 6:manageReschedule();break;
     default:break;
   }
 }
 function manageCardbox(){
-  var opt=[['Settings',1],['Database File',2],['Add Custom Word List',3],['List of Shame',4],['List of Triumph',5]];
+  var opt=[['Settings',1],['Database File',2],['Add Custom Word List',3],['List of Shame',4],['List of Triumph',5],['Reschedule',6]];
   $('#manageContent').html("");
   gCreateElemArray([
       ['a0','div','manageCardboxDrop steelRowed','manageDropdown','manageContent',''],
@@ -509,6 +520,179 @@ function submitTriumphList(text) {
   }).catch(function(error) {
      console.log("Error: " + error);
      alert("Error updating words.");
+  });
+}
+
+function manageReschedule(){
+  gCreateElemArray([
+      ['a0','div','prefContent','rescheduleDiv','manageParams',''],
+      ['a1','div','prefHead','rescheduleHead','a0','Reschedule Overdue Words'],
+      ['a2','div','prefPar','rescheduleRangePar','a0',''],
+      ['a2a','span','','rescheduleRangeS1','a2','Take overdue words from cardbox '],
+      ['a2b','span','','rescheduleMinWrap','a2',''],
+      ['a2c','span','','rescheduleRangeS2','a2',' through '],
+      ['a2d','span','','rescheduleMaxWrap','a2',''],
+      ['a2e','span','','rescheduleRangeS3','a2','.'],
+      ['a3','div','prefPar','rescheduleRatePar','a0',''],
+      ['a3a','span','','rescheduleRateS1','a3','Make '],
+      ['a3b','input','prefInput','rescheduleWordsInput','a3',''],
+      ['a3c','span','','rescheduleRateS2','a3',' words come due per day.'],
+      ['a4','div','redRowed','rescheduleWarning','a0','Rescheduled dates are permanent. This cannot be undone.'],
+      ['a5','div','prefPar italNote','reschedulePreview','a0','Loading overdue words...'],
+      ['a6','div','','rescheduleBtnWrap','a0',''],
+      ['a6a','button','btn btn-default btnPrefs','rescheduleButton','a6','Reschedule']
+  ]);
+  $('#rescheduleWarning').css({'border-radius':'5px','border':'1px solid black','padding':'5px','margin':'5px','text-align':'center'});
+  $('#rescheduleWordsInput').prop('type','number');
+  $('#rescheduleWordsInput').attr({'min':1,'step':1,'placeholder':'words/day'});
+  gSetInputSize('rescheduleWordsInput',6,6);
+  $('#rescheduleMinWrap, #rescheduleMaxWrap').css('margin','0 2px');
+  renderRescheduleCardboxSelectors();
+  updateReschedulePreview();
+  loadRescheduleStats();
+  // Delegate on the wrappers: the selects are rebuilt after the stats load.
+  $('#rescheduleMinWrap, #rescheduleMaxWrap').on('change','select',updateReschedulePreview);
+  $('#rescheduleWordsInput').on('input change',updateReschedulePreview);
+  $('#rescheduleButton').on('click',submitReschedule);
+}
+
+function rescheduleCardboxList(){
+  var highest = 20;
+  if (cardboxStatsLatest && cardboxStatsLatest.totalCards) {
+    var boxes = Object.keys(cardboxStatsLatest.totalCards).map(function(cb){
+      return parseInt(cb,10);
+    }).filter(function(cb){return !isNaN(cb);});
+    if (boxes.length > 0) {highest = Math.max.apply(null, boxes);}
+  }
+  var result = [];
+  for (var cb=0; cb<=highest; cb++) {result.push(cb);}
+  return result;
+}
+
+function renderRescheduleCardboxSelectors(){
+  if (!document.getElementById('rescheduleMinWrap')) {return;}
+  var prevMin = $('#rescheduleMin').val();
+  var prevMax = $('#rescheduleMax').val();
+  $('#rescheduleMin, #rescheduleMax').remove();
+  var boxes = rescheduleCardboxList();
+  var minOptions = [];
+  var maxOptions = [['and up','']];
+  boxes.forEach(function(cb){
+    minOptions.push([String(cb), cb]);
+    maxOptions.push([String(cb), cb]);
+  });
+  gGenerateListBox('rescheduleMin', minOptions, 'rescheduleMinWrap', '');
+  gGenerateListBox('rescheduleMax', maxOptions, 'rescheduleMaxWrap', '');
+  var minValue = (typeof prevMin !== 'undefined' && prevMin !== null && prevMin !== '') ? prevMin : 0;
+  if ($('#rescheduleMin option[value="' + minValue + '"]').length === 0) {minValue = 0;}
+  $('#rescheduleMin').val(String(minValue));
+  var maxValue = (typeof prevMax !== 'undefined' && prevMax !== null) ? prevMax : '';
+  if (maxValue !== '' && $('#rescheduleMax option[value="' + maxValue + '"]').length === 0) {maxValue = '';}
+  $('#rescheduleMax').val(String(maxValue));
+}
+
+function rescheduleSelection(){
+  var min = parseInt($('#rescheduleMin').val(),10);
+  if (isNaN(min)) {min = 0;}
+  var maxRaw = $('#rescheduleMax').val();
+  var max = (maxRaw === '' || maxRaw === null || typeof maxRaw === 'undefined') ? null : parseInt(maxRaw,10);
+  if (max !== null && isNaN(max)) {max = null;}
+  var rate = Number($('#rescheduleWordsInput').val());
+  var overdue = (cardboxStatsLatest && cardboxStatsLatest.dueByCardbox && cardboxStatsLatest.dueByCardbox.overdue) || {};
+  var count = 0;
+  Object.keys(overdue).forEach(function(cb){
+    var box = parseInt(cb,10);
+    if (!isNaN(box) && box >= min && (max === null || box <= max)) {
+      count += Number(overdue[cb]) || 0;
+    }
+  });
+  var validRate = isFinite(rate) && rate >= 1 && Math.floor(rate) === rate;
+  var validRange = (max === null || max >= min);
+  var valid = validRate && validRange && count > 0;
+  return {min:min, max:max, rate:rate, count:count, validRate:validRate,
+          validRange:validRange, valid:valid,
+          days:(validRate && count > 0) ? Math.ceil(count/rate) : 0};
+}
+
+function updateReschedulePreview(){
+  if (!document.getElementById('reschedulePreview')) {return;}
+  var sel = rescheduleSelection();
+  var text;
+  if (!sel.validRange) {
+    text = 'Choose an upper cardbox at or above the lower cardbox.';
+  } else if (rescheduleStatsError) {
+    text = 'Unable to load overdue words. Try again later.';
+  } else if (cardboxStatsLatest === null) {
+    text = 'Loading overdue words...';
+  } else if (sel.count === 0) {
+    text = 'No overdue words in the selected cardboxes.';
+  } else if (!sel.validRate) {
+    text = sel.count + ' overdue words selected. Enter a whole number of words per day.';
+  } else {
+    text = sel.count + ' overdue words selected. At ' + sel.rate + ' per day, these will be spread over about ' +
+           sel.days + ' day' + (sel.days === 1 ? '' : 's') + '.';
+  }
+  $('#reschedulePreview').html(text);
+  $('#rescheduleButton').prop('disabled', !sel.valid);
+}
+
+function loadRescheduleStats(){
+  rescheduleStatsError = false;
+  keycloak.updateToken(30).then(function(){
+    $.ajax({type:"POST",
+      url:"getCardboxStats",
+      data:JSON.stringify({due:true}),
+      headers:{"Accept":"application/json","Authorization":keycloak.token},
+      success:function(response){
+        cardboxStatsLatest = response[0];
+        renderRescheduleCardboxSelectors();
+        updateReschedulePreview();
+      },
+      error:function(jqXHR, textStatus, errorThrown){
+        rescheduleStatsError = true;
+        updateReschedulePreview();
+        console.log('Error loading cardbox stats for reschedule: ' + textStatus + ' ' + errorThrown);
+      }
+    });
+  }).catch(function(){
+    rescheduleStatsError = true;
+    updateReschedulePreview();
+    console.log('Failed to refresh token for reschedule stats');
+  });
+}
+
+function submitReschedule(){
+  var sel = rescheduleSelection();
+  if (!sel.valid) {
+    updateReschedulePreview();
+    return;
+  }
+  var rangeText = (sel.max === null) ? ('cardbox ' + sel.min + ' and up') : ('cardboxes ' + sel.min + ' through ' + sel.max);
+  var message = 'Reschedule ' + sel.count + ' overdue words from ' + rangeText + ' at ' + sel.rate + ' per day?\n\n' +
+                'These words will be spread over about ' + sel.days + ' day' + (sel.days === 1 ? '' : 's') +
+                '. Rescheduled dates are permanent and cannot be undone.';
+  if (!window.confirm(message)) {return;}
+  var payload = {wordsPerDay:sel.rate, minCardbox:sel.min};
+  if (sel.max !== null) {payload.maxCardbox = sel.max;}
+  $('#rescheduleButton').prop('disabled', true).val('Rescheduling...');
+  fetchWithAuth('rescheduleOverdue', {
+    method: 'POST',
+    body: JSON.stringify(payload)
+  }).then(function(response){
+    return response.json().catch(function(){return {};}).then(function(data){
+      return {ok:response.ok, data:data};
+    });
+  }).then(function(result){
+    if (!result.ok) {
+      throw new Error(result.data && result.data.error ? result.data.error : 'Request failed');
+    }
+    gFloatingAlert('cardboxUploadAlert', 5000, 'Reschedule Overdue',
+                   'Rescheduled ' + result.data.rescheduled + ' words.', 500);
+    $('#rescheduleButton').prop('disabled', false).val('Reschedule');
+    showCardboxStats(1);
+  }).catch(function(error){
+    $('#rescheduleButton').prop('disabled', false).val('Reschedule');
+    alert('Error rescheduling words: ' + error.message);
   });
 }
 

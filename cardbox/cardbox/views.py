@@ -695,11 +695,20 @@ def rescheduleOverdueView():
       Required: wordsPerDay - how many overdue words should come due per day.
       All rescheduled words get difficulty = 5. '''
   params = request.get_json(force=True)
-  words_per_day = params.get("wordsPerDay")
-  if words_per_day is None:
-    return jsonify({"error": "wordsPerDay is required"}), 400
-  min_cb = params.get("minCardbox", 0)
-  max_cb = params.get("maxCardbox")
+  try:
+    words_per_day = int(params.get("wordsPerDay"))
+  except (TypeError, ValueError):
+    return jsonify({"error": "wordsPerDay must be a positive integer"}), 400
+  if words_per_day < 1:
+    return jsonify({"error": "wordsPerDay must be a positive integer"}), 400
+  try:
+    min_cb = int(params.get("minCardbox", 0))
+    max_raw = params.get("maxCardbox")
+    max_cb = None if max_raw in (None, "") else int(max_raw)
+  except (TypeError, ValueError):
+    return jsonify({"error": "minCardbox and maxCardbox must be integers"}), 400
+  if max_cb is not None and max_cb < min_cb:
+    return jsonify({"error": "maxCardbox must be at least minCardbox"}), 400
   count = rescheduleOverdue(words_per_day, min_cb, max_cb)
   return jsonify({"rescheduled": count})
 
