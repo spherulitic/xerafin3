@@ -373,12 +373,15 @@ def getQuestions():
 
   params = request.get_json(force=True) # returns dict
   numQuestions = params.get("numQuestions", 1)
+  # An absent cardbox means "default ordering"; an explicit 0 means "give me
+  # cardbox 0 first". They used to be indistinguishable.
+  cardbox_requested = "cardbox" in params
   cardbox = int(params.get("cardbox", 0))
   lock = params.get("lock", False)
 
   # xerafinLib.getQuestions returns something like { "ALPHAGRAM": [WORD, WORD, WORD] }
   # FYI - the None here is to filter on question length, which is currently disabled
-  questions = getQuestionsFromCardbox(numQuestions, cardbox, None)
+  questions = getQuestionsFromCardbox(numQuestions, cardbox, None, cardbox_requested)
 
   # This is only used for non-cardbox quizzes
   result["eof"] = False
@@ -745,13 +748,14 @@ def addManyToCardbox():
 def getNextBingo():
   '''return the next word 7 letters or longer that's due'''
   params = request.get_json(force=True) # returns dict
+  cardbox_requested = 'cardbox' in params
   try:
     cardbox = int(params.get('cardbox', 0))
   except (ValueError, TypeError):
     cardbox = 0
 
   result = { }
-  result["alpha"] = _get_bingo_from_cardbox(cardbox)
+  result["alpha"] = _get_bingo_from_cardbox(cardbox, cardbox_requested)
   checkOut(result["alpha"], True)
 
   return jsonify({"result": result, "error": {"status": "success"}})
@@ -1036,7 +1040,7 @@ def closetSweep():
 #    version = con.fetchone()[0]
 #  return f"{lexicon}{version}"
 
-def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None) : # pylint: disable=unused-argument
+def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None, cardbox_requested=True) : # pylint: disable=unused-argument
   """
   Returns a dict with a quiz of numNeeded questions in the format
     { "Alphagram" -> [ Word, Word, Word ] }
@@ -1045,8 +1049,8 @@ def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None) : # pylint
   # pylint: disable=too-many-arguments,too-many-locals
   quiz = {}
 
-  # Cardbox doesn't filter, it only prioritizes one cardbox over others
-  # If you specifically ask for a cardbox in the backlog, ignore backlogging
+  # Cardbox doesn't filter, it only prioritizes one cardbox over others.
+  # If you specifically ask for a cardbox in the backlog, ignore backlogging.
   if cardbox >= g.closet:
     diffToGet = (-1, 2, 5)
     dFormat = "?,?,?"
@@ -1054,15 +1058,28 @@ def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None) : # pylint
     diffToGet = (-1, 5)
     dFormat = "?,?"
 
+  # An explicit cardbox is served first, which is how working ahead in a chosen
+  # box works (including its always-eligible difficulty 5 words). With no
+  # cardbox requested, use the default queue order: earliest next_scheduled
+  # across all eligible cardboxes, so due words come before future rescheduled
+  # ones instead of cardbox 0 always winning.
+  if cardbox_requested:
+    orderClause = ("order by case cardbox when ? then -1 else cardbox end, "
+                   "next_scheduled, question limit ?")
+    queryParams = diffToGet + (cardbox, numNeeded)
+  else:
+    orderClause = "order by next_scheduled, question limit ?"
+    queryParams = diffToGet + (numNeeded,)
+
   with _time_query('getQuestionsFromCardbox.query', f'cardbox={cardbox}, numNeeded={numNeeded}'):
     getCardsQry = ("select question from questions " +
       f"where difficulty in ({dFormat}) and next_scheduled is not null " +
-       "order by case cardbox when ? then -1 else cardbox end, next_scheduled limit ?")
-    g.cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
+      orderClause)
+    g.cur.execute(getCardsQry, queryParams)
     result = g.cur.fetchall()
     if len(result) < numNeeded:
       makeWordsAvailable(numNeeded-len(result))
-      g.cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
+      g.cur.execute(getCardsQry, queryParams)
       result = g.cur.fetchall()
   allQuestions = [x[0] for x in result]
   for alpha in allQuestions:
@@ -1261,7 +1278,7 @@ def checkOut (alpha, lock) :
 
   g.cur.execute("update questions set difficulty = ? where question = ?", (difficulty, alpha))
 
-def _get_bingo_from_cardbox(cardbox=0):
+def _get_bingo_from_cardbox(cardbox=0, cardbox_requested=True):
     """
     Returns a list of alphagrams that are due, length 7 or greater
     Uses the authenticated user's database connection via g.cur
@@ -1269,6 +1286,17 @@ def _get_bingo_from_cardbox(cardbox=0):
     try:
         # Use the existing cursor from g (already connected to user's DB)
         cur = g.cur
+
+        # An explicit cardbox is served first (working ahead in that box). With
+        # no cardbox requested, order by next_scheduled so due/backlog words are
+        # served before always-eligible future difficulty 5 words.
+        if cardbox_requested:
+            orderClause = ("ORDER BY CASE cardbox WHEN ? THEN -2 "
+                           "ELSE difficulty END, cardbox, next_scheduled, question")
+            queryParams = (int(time.time()), cardbox)
+        else:
+            orderClause = "ORDER BY next_scheduled, cardbox, question"
+            queryParams = (int(time.time()),)
 
         # First query: get due questions from cardbox
         with _time_query('get_bingo.cardbox', f'cardbox={cardbox}'):
@@ -1279,11 +1307,9 @@ def _get_bingo_from_cardbox(cardbox=0):
                 AND (difficulty IN (-1, 2, 5)
                      OR (difficulty IN (0, 4, 50)
                          AND next_scheduled <= ? + ({_lookahead_seconds_case()})))
-                ORDER BY CASE cardbox WHEN ? THEN -2
-                         ELSE difficulty END,
-                         cardbox, next_scheduled
+                {orderClause}
                 LIMIT 1
-            """, (int(time.time()), cardbox))
+            """, queryParams)
 
             result = cur.fetchone()
             if result is not None:
