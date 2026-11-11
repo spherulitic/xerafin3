@@ -7,7 +7,8 @@
 # 2 : In the backlog
 # 3 : Locked
 # 4 : In the future, not eligible to be completed now
-# 5 : Rescheduled (always eligible, never overwritten by closetSweep/futureSweep)
+# 5 : Rescheduled (normal queue gated by cleared_until; Rescheduled mode bypasses)
+# 6 : Rescheduled and locked while being quizzed (unlocks back to 5 at newQuiz)
 '''
 
 import json
@@ -138,6 +139,10 @@ def _effective_difficulty(difficulty, cardbox, next_scheduled, now):
   ''' Effective difficulty for a cardbox row: applies the lookahead window to
       the time-derived states (0/4/50) so callers see the same value a fresh
       futureSweep would have produced. Action-derived states pass through. '''
+  # Difficulty 6 is an internal lock on a rescheduled word; report it as 5 so
+  # clients never need to know about the transient state.
+  if difficulty == 6:
+    return 5
   if difficulty in (0, 4, 50) and cardbox is not None and next_scheduled is not None:
     if next_scheduled > now + getLookaheadDays(cardbox, g.schedVersion) * 86400:
       return 4
@@ -929,10 +934,14 @@ def getTotalByCardbox():
   return result
 
 def getRescheduledByCardbox():
-  ''' Returns a dict: {cardbox: count of difficulty 5 questions} '''
+  ''' Returns a dict: {cardbox: count of rescheduled questions}
+
+      Includes difficulty 6 (rescheduled and currently locked in a quiz) so the
+      Rescheduled count does not drop while those words are being answered.
+  '''
   result = { }
   command = """select cardbox, count(*) from questions
-               where difficulty = 5 and cardbox is not null
+               where difficulty in (5, 6) and cardbox is not null
                group by cardbox"""
   g.cur.execute(command)
   for row in g.cur.fetchall():
@@ -1010,7 +1019,8 @@ def dbClean():
 
 def closetSweep():
   ''' Puts backlog items in backlog status
-      Note this will unlock anything locked with difficulty 3
+      Note this will unlock anything locked with difficulty 3, and return
+      locked rescheduled words (difficulty 6) to rescheduled (5).
 
       On a large cardbox the old blanket reset (`difficulty not in (1,5)`)
       rewrote ~every row to 0, and the following futureSweep + newQuiz release
@@ -1018,6 +1028,7 @@ def closetSweep():
       4 rows re-swept). This version computes the same final state while only
       writing rows that actually change:
 
+      - locked rescheduled (6) rows are returned to 5 before the other resets;
       - backlog (2) and locked (3) rows below the closet are reset to 0;
       - future (4/50) rows below the closet are left for futureSweep, which
         owns the lookahead window (in-window -> 0, out-of-window -> 4). Only a
@@ -1034,6 +1045,7 @@ def closetSweep():
   now = int(time.time())
   g.cur.execute("select * from cleared_until")
   clearedUntil = max(g.cur.fetchone()[0], now)
+  g.cur.execute("update questions set difficulty = 5 where difficulty = 6")
   g.cur.execute("update questions set difficulty = 0 where " +
     "cardbox < ? and (difficulty in (2, 3) " +
     "or (difficulty in (4, 50) and next_scheduled is null) " +
@@ -1308,16 +1320,17 @@ def getAuxInfo (alpha):
 
 def checkOut (alpha, lock) :
   """
-  if LOCK is true, set difficulty = 3 (locked)
-  if LOCK is false, set difficulty = 0
+  if LOCK is true, rescheduled questions (5/6) become 6; everything else 3.
+  if LOCK is false, 6 returns to 5 and 3 returns to 0; other states unchanged.
   locks are cleared by closetSweep() and newQuiz()
   """
   if lock:
-    difficulty = 3
+    g.cur.execute("update questions set difficulty = case " +
+      "when difficulty in (5, 6) then 6 else 3 end where question = ?", (alpha,))
   else:
-    difficulty = 0
-
-  g.cur.execute("update questions set difficulty = ? where question = ?", (difficulty, alpha))
+    g.cur.execute("update questions set difficulty = case " +
+      "when difficulty = 6 then 5 when difficulty = 3 then 0 " +
+      "else difficulty end where question = ?", (alpha,))
 
 def _get_bingo_from_cardbox(cardbox=0, cardbox_requested=True):
     """
