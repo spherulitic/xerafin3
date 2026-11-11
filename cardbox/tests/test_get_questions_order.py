@@ -47,21 +47,21 @@ def questions(con, cardbox, num_needed, cardbox_requested,
 
 # --- Normal mode: ordering ----------------------------------------------------
 
-def test_default_serves_past_due_before_rescheduled_within_cutoff(clock, release_calls):
+def test_default_orders_by_cardbox_then_due_date(clock):
     clock.now = BASE
     rows = [
-        ("RESCHED0", 5, 0, BASE + DAY),
-        ("DUE1", -1, 1, BASE - 3600),
+        ("CB2", -1, 2, BASE - 3600),
+        ("CB12", -1, 12, BASE - 7200),
     ]
-    con = helpers.make_db(rows, cleared_until=BASE + 2 * DAY)
+    con = helpers.make_db(rows, cleared_until=BASE)
 
     quiz = questions(con, 0, 2, False)
 
-    assert list(quiz) == ["DUE1", "RESCHED0"]
-    assert release_calls == []
+    # Cardbox 2 comes first even though cardbox 12 is more overdue.
+    assert list(quiz) == ["CB2", "CB12"]
 
 
-def test_default_orders_due_words_by_time_not_cardbox(clock):
+def test_default_orders_due_words_by_cardbox_then_time(clock):
     clock.now = BASE
     rows = [
         ("DUE_CB0", -1, 0, BASE - 60),
@@ -71,7 +71,7 @@ def test_default_orders_due_words_by_time_not_cardbox(clock):
 
     quiz = questions(con, 0, 2, False)
 
-    assert list(quiz) == ["DUE_CB2", "DUE_CB0"]
+    assert list(quiz) == ["DUE_CB0", "DUE_CB2"]
 
 
 def test_default_treats_rescheduled_within_cutoff_as_due(clock):
@@ -196,8 +196,8 @@ def test_default_keeps_closet_0_backlog_eligibility(clock):
 
     # Same eligibility as the old cardbox=0 path (0 >= closet) ...
     assert set(quiz) == {"BACKLOG20", "DUE1", "FUTURE5"}
-    # ... and default ordering still puts past-scheduled words first.
-    assert list(quiz) == ["DUE1", "BACKLOG20", "FUTURE5"]
+    # ... and default ordering is lowest cardbox first.
+    assert list(quiz) == ["FUTURE5", "DUE1", "BACKLOG20"]
 
 
 # --- Rescheduled mode --------------------------------------------------------
@@ -364,18 +364,19 @@ def test_bingo_default_excludes_rescheduled_beyond_cleared_until(clock):
     assert result == "DUEWORD1"
 
 
-def test_bingo_default_serves_due_before_rescheduled_within_cutoff(clock):
+def test_bingo_default_orders_by_cardbox_then_due_date(clock):
     clock.now = BASE
     rows = [
-        ("RESCHED0", 5, 0, BASE + DAY),
-        ("DUEWORD1", -1, 1, BASE - 3600),
+        ("CB12WORD", -1, 12, BASE - 7200),
+        ("CB2WORDX", -1, 2, BASE - 3600),
     ]
-    con = helpers.make_db(rows, cleared_until=BASE + 2 * DAY)
+    con = helpers.make_db(rows, cleared_until=BASE)
 
     with helpers.request_for(con):
         result = views._get_bingo_from_cardbox(0, False)  # pylint: disable=protected-access
 
-    assert result == "DUEWORD1"
+    # Cardbox 2 comes first even though cardbox 12 is more overdue.
+    assert result == "CB2WORDX"
 
 
 def test_bingo_explicit_cardbox_0_jumps_ahead_within_cutoff(clock):

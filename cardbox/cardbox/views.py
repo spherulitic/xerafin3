@@ -1101,15 +1101,14 @@ def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None, cardbox_re
   cleared_until = max(g.cur.fetchone()[0], now)
 
   # An explicit cardbox is served first, which is how working ahead in a chosen
-  # box works. With no cardbox requested, use the default queue order: earliest
-  # next_scheduled across all eligible cardboxes, so due words come before
-  # rescheduled ones instead of cardbox 0 always winning.
+  # box works. With no cardbox requested, use the default queue order: lowest
+  # cardbox first, then earliest next_scheduled within each cardbox.
   if cardbox_requested:
     orderClause = ("order by case cardbox when ? then -1 else cardbox end, "
                    "next_scheduled, question limit ?")
     queryParams = diffToGet + (cleared_until, cardbox, numNeeded)
   else:
-    orderClause = "order by next_scheduled, question limit ?"
+    orderClause = "order by cardbox, next_scheduled, question limit ?"
     queryParams = diffToGet + (cleared_until, numNeeded)
 
   with _time_query('getQuestionsFromCardbox.query', f'cardbox={cardbox}, numNeeded={numNeeded}'):
@@ -1330,8 +1329,7 @@ def _get_bingo_from_cardbox(cardbox=0, cardbox_requested=True):
         cur = g.cur
 
         # An explicit cardbox is served first (working ahead in that box). With
-        # no cardbox requested, order by next_scheduled so due/backlog words are
-        # served before rescheduled ones.
+        # no cardbox requested, order by cardbox, then next_scheduled.
         now = int(time.time())
         cur.execute("select * from cleared_until")
         cleared_until = max(cur.fetchone()[0], now)
@@ -1340,7 +1338,7 @@ def _get_bingo_from_cardbox(cardbox=0, cardbox_requested=True):
                            "ELSE difficulty END, cardbox, next_scheduled, question")
             queryParams = (cleared_until, now, cardbox)
         else:
-            orderClause = "ORDER BY next_scheduled, cardbox, question"
+            orderClause = "ORDER BY cardbox, next_scheduled, question"
             queryParams = (cleared_until, now)
 
         # First query: get due questions from cardbox. Difficulty 5 is only
