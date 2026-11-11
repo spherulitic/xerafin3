@@ -167,7 +167,6 @@ class Quiz {
     this.isCardbox = isCardbox;
     this.quizid = quizid;
     this.blankQuiz = blankQuiz;
-    this.rescheduled = getBool(localStorage.cardboxRescheduled);
   this.hasHTTPError = false;
     this.eof = false;
    }
@@ -193,9 +192,13 @@ class Quiz {
         let d = { numQuestions: numQ,
           quizid: self.quizid,
           isCardbox: self.isCardbox,
-          rescheduled: self.rescheduled,
           lock: true
         };
+        // Read at request time so changing the Questions Due dropdown also
+        // changes the mode for the next batch in an active quiz.
+        if (getBool(localStorage.cardboxRescheduled)) {
+          d.rescheduled = true;
+        }
         let requestedCardbox;
         if (self.isCardbox && getBool(localStorage.cardboxSent)) {
           requestedCardbox = localStorage.cardboxCurrent;
