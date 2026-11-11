@@ -194,6 +194,11 @@ class Quiz {
           isCardbox: self.isCardbox,
           lock: true
         };
+        // Read at request time so changing the Questions Due dropdown also
+        // changes the mode for the next batch in an active quiz.
+        if (getBool(localStorage.cardboxRescheduled)) {
+          d.rescheduled = true;
+        }
         let requestedCardbox;
         if (self.isCardbox && getBool(localStorage.cardboxSent)) {
           requestedCardbox = localStorage.cardboxCurrent;

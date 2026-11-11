@@ -86,6 +86,7 @@ def run_old(con, now, closet=10, sched_version=0):
                     "(select question from questions where next_scheduled is not null)")
         con.execute("update questions set difficulty = null where cardbox is null")
         # closetSweep()
+        con.execute("update questions set difficulty = 5 where difficulty = 6")
         con.execute("update questions set difficulty = 0 where cardbox < ? "
                     "and difficulty not in (1, 5)", (closet,))
         con.execute("update questions set difficulty = 2 where cardbox >= ? "
@@ -107,7 +108,7 @@ def difficulty_map(con):
 # --- Generators ----------------------------------------------------------------
 
 _CARD_BOXES = [None, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 20]
-_DIFFICULTIES = [-1, 0, 1, 2, 3, 4, 5, 50, None]
+_DIFFICULTIES = [-1, 0, 1, 2, 3, 4, 5, 6, 50, None]
 
 
 def gen_rows(n, base, cleared_until, seed=0):

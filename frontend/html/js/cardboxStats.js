@@ -1,3 +1,7 @@
+// Rescheduled mode is a per-session choice; start each page load in the normal
+// queue and let the Questions Due dropdown turn it on.
+localStorage.cardboxRescheduled = 'false';
+
 function showCardboxStats (value) {
   if (typeof cardboxTimeout!=='undefined'){clearTimeout(cardboxTimeout);}
   if (value!==2) {cardboxTimeout = setTimeout(function(){showCardboxStats()}, 300000);}
@@ -80,11 +84,13 @@ function createCardboxStatsPanel() {
   var periodTemp = document.createElement('div');
   periodTemp.id = "periodTemp";
   gGenerateTable(['Cardbox','','Total', periodTemp], 'dueRegion', 'statTable cardboxTable', 'cardboxTable','cardboxTableBody');
-  gGenerateListBox ("periodDue",[["Due Now","dueNow"],["Next 24 Hrs","dueToday"], ["Next 7 Days","dueThisWeek"], ["Overdue","overdue"]], "periodTemp");
+  gGenerateListBox ("periodDue",[["Due Now","dueNow"],["Next 24 Hrs","dueToday"], ["Next 7 Days","dueThisWeek"], ["Overdue","overdue"], ["Rescheduled","rescheduled"]], "periodTemp");
   if (typeof cardboxStatsPanel=='undefined'){cardboxStatsPanel="dueNow";}
   else {$('#periodDue').val(cardboxStatsPanel)};
+  localStorage.cardboxRescheduled = (cardboxStatsPanel === 'rescheduled') ? 'true' : 'false';
   $("#periodDue").change(function() {
     cardboxStatsPanel = $ ( this ).val();
+    localStorage.cardboxRescheduled = (cardboxStatsPanel === 'rescheduled') ? 'true' : 'false';
     showCardboxStats(1);
   });
   gGenerateTable(['Length','','Alphagrams','In Cardbox','%'], 'coverageContent', 'statTable', 'coverageTable','coverageBody');
@@ -119,14 +125,15 @@ function displayCardboxDue (response, responseStatus) {
   document.getElementById('cardboxTableBody').innerHTML="";
   let arrayOfCardboxes = Object.keys(stats.totalCards).sort(function(a,b) {
       return parseInt(a) - parseInt(b); });
+  let dueByCardbox = stats.dueByCardbox[cardboxStatsPanel] || {};
   if (arrayOfCardboxes.length>0){
     arrayOfCardboxes.forEach(function(cardbox) {
-      if (cardbox in eval('stats.dueByCardbox.'+cardboxStatsPanel)){
-      dueValue = eval('stats.dueByCardbox.'+cardboxStatsPanel+'["' + cardbox + '"]');}
+      if (cardbox in dueByCardbox){
+      dueValue = dueByCardbox[cardbox];}
       else {dueValue = "";}
       gGenerateTableRow (
       ['cardboxNum'+cardbox,null,"cardboxTotal"+cardbox, "cardboxDue"+cardbox],
-      [cardbox, "", eval('stats.totalCards["' + cardbox + '"]'), dueValue],
+      [cardbox, "", stats.totalCards[cardbox], dueValue],
       "cardboxTableBody", "cardboxDueRow"+cardbox);
       cardboxTotal+= Number($('#cardboxTotal'+cardbox).html());
       dueTotal+=Number($('#cardboxDue'+cardbox).html());

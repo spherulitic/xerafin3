@@ -25,7 +25,8 @@ from xerafinUtil import xerafinUtil as xs
 # 2 : In the backlog
 # 3 : Locked
 # 4 : In the future, not eligible to be completed now
-# 5 : Rescheduled (always eligible, never overwritten by closetSweep/futureSweep)
+# 5 : Rescheduled (normal queue gated by cleared_until; Rescheduled mode bypasses)
+# 6 : Rescheduled and locked while being quizzed (unlocks back to 5 at newQuiz)
 
 CARDBOX_DB_PATH = "cardbox-data"
 
@@ -750,19 +751,20 @@ def getDots (word, userid) :
 
 def checkOut (alpha, userid, lock, isCardbox=True, quizid=-1) :
   """
-  if LOCK is true, set difficulty = 3 (locked)
-  if LOCK is false, set difficulty = 0
+  if LOCK is true, rescheduled questions (5/6) become 6; everything else 3.
+  if LOCK is false, 6 returns to 5 and 3 returns to 0; other states unchanged.
   locks are cleared by closetSweep() and newQuiz()
   """
   if isCardbox:
-    if lock:
-      difficulty = 3
-    else:
-      difficulty = 0
-
     with getDBCon(userid) as con:
       cur = con.cursor()
-      cur.execute("update questions set difficulty = ? where question = ?", (difficulty, alpha))
+      if lock:
+        cur.execute("update questions set difficulty = case " +
+          "when difficulty in (5, 6) then 6 else 3 end where question = ?", (alpha,))
+      else:
+        cur.execute("update questions set difficulty = case " +
+          "when difficulty = 6 then 5 when difficulty = 3 then 0 " +
+          "else difficulty end where question = ?", (alpha,))
   else:
     with xs.getMysqlCon().cursor() as con:
       con.execute("update quiz_user_detail set locked = %s " +

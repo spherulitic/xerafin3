@@ -7,7 +7,8 @@
 # 2 : In the backlog
 # 3 : Locked
 # 4 : In the future, not eligible to be completed now
-# 5 : Rescheduled (always eligible, never overwritten by closetSweep/futureSweep)
+# 5 : Rescheduled (normal queue gated by cleared_until; Rescheduled mode bypasses)
+# 6 : Rescheduled and locked while being quizzed (unlocks back to 5 at newQuiz)
 '''
 
 import json
@@ -138,6 +139,10 @@ def _effective_difficulty(difficulty, cardbox, next_scheduled, now):
   ''' Effective difficulty for a cardbox row: applies the lookahead window to
       the time-derived states (0/4/50) so callers see the same value a fresh
       futureSweep would have produced. Action-derived states pass through. '''
+  # Difficulty 6 is an internal lock on a rescheduled word; report it as 5 so
+  # clients never need to know about the transient state.
+  if difficulty == 6:
+    return 5
   if difficulty in (0, 4, 50) and cardbox is not None and next_scheduled is not None:
     if next_scheduled > now + getLookaheadDays(cardbox, g.schedVersion) * 86400:
       return 4
@@ -373,12 +378,17 @@ def getQuestions():
 
   params = request.get_json(force=True) # returns dict
   numQuestions = params.get("numQuestions", 1)
+  # An absent cardbox means "default ordering"; an explicit 0 means "give me
+  # cardbox 0 first". They used to be indistinguishable.
+  cardbox_requested = "cardbox" in params
   cardbox = int(params.get("cardbox", 0))
+  rescheduled = bool(params.get("rescheduled", False))
   lock = params.get("lock", False)
 
   # xerafinLib.getQuestions returns something like { "ALPHAGRAM": [WORD, WORD, WORD] }
   # FYI - the None here is to filter on question length, which is currently disabled
-  questions = getQuestionsFromCardbox(numQuestions, cardbox, None)
+  questions = getQuestionsFromCardbox(numQuestions, cardbox, None,
+                                      cardbox_requested, rescheduled)
 
   # This is only used for non-cardbox quizzes
   result["eof"] = False
@@ -520,7 +530,7 @@ def getCardboxStats():
     dueToday = getDueInRange(now, now+DAY)
     dueThisWeek = getDueInRange(now, now+(DAY*7))
     dueByCardbox = {"dueNow": dueNow, "overdue": overdue, "dueToday": dueToday,
-                    "dueThisWeek": dueThisWeek}
+                    "dueThisWeek": dueThisWeek, "rescheduled": getRescheduledByCardbox()}
     totalCards = getTotalByCardbox()
     result["totalCards"] = totalCards
     result["score"] = getCardboxScore()
@@ -745,13 +755,14 @@ def addManyToCardbox():
 def getNextBingo():
   '''return the next word 7 letters or longer that's due'''
   params = request.get_json(force=True) # returns dict
+  cardbox_requested = 'cardbox' in params
   try:
     cardbox = int(params.get('cardbox', 0))
   except (ValueError, TypeError):
     cardbox = 0
 
   result = { }
-  result["alpha"] = _get_bingo_from_cardbox(cardbox)
+  result["alpha"] = _get_bingo_from_cardbox(cardbox, cardbox_requested)
   checkOut(result["alpha"], True)
 
   return jsonify({"result": result, "error": {"status": "success"}})
@@ -922,6 +933,21 @@ def getTotalByCardbox():
     result[row[0]] = row[1]
   return result
 
+def getRescheduledByCardbox():
+  ''' Returns a dict: {cardbox: count of rescheduled questions}
+
+      Includes difficulty 6 (rescheduled and currently locked in a quiz) so the
+      Rescheduled count does not drop while those words are being answered.
+  '''
+  result = { }
+  command = """select cardbox, count(*) from questions
+               where difficulty in (5, 6) and cardbox is not null
+               group by cardbox"""
+  g.cur.execute(command)
+  for row in g.cur.fetchall():
+    result[row[0]] = row[1]
+  return result
+
 def getNextAddedCount():
   ''' Returns number of items in next_added
   '''
@@ -993,7 +1019,8 @@ def dbClean():
 
 def closetSweep():
   ''' Puts backlog items in backlog status
-      Note this will unlock anything locked with difficulty 3
+      Note this will unlock anything locked with difficulty 3, and return
+      locked rescheduled words (difficulty 6) to rescheduled (5).
 
       On a large cardbox the old blanket reset (`difficulty not in (1,5)`)
       rewrote ~every row to 0, and the following futureSweep + newQuiz release
@@ -1001,6 +1028,7 @@ def closetSweep():
       4 rows re-swept). This version computes the same final state while only
       writing rows that actually change:
 
+      - locked rescheduled (6) rows are returned to 5 before the other resets;
       - backlog (2) and locked (3) rows below the closet are reset to 0;
       - future (4/50) rows below the closet are left for futureSweep, which
         owns the lookahead window (in-window -> 0, out-of-window -> 4). Only a
@@ -1017,6 +1045,7 @@ def closetSweep():
   now = int(time.time())
   g.cur.execute("select * from cleared_until")
   clearedUntil = max(g.cur.fetchone()[0], now)
+  g.cur.execute("update questions set difficulty = 5 where difficulty = 6")
   g.cur.execute("update questions set difficulty = 0 where " +
     "cardbox < ? and (difficulty in (2, 3) " +
     "or (difficulty in (4, 50) and next_scheduled is null) " +
@@ -1036,7 +1065,7 @@ def closetSweep():
 #    version = con.fetchone()[0]
 #  return f"{lexicon}{version}"
 
-def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None) : # pylint: disable=unused-argument
+def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None, cardbox_requested=True, rescheduled=False) : # pylint: disable=unused-argument
   """
   Returns a dict with a quiz of numNeeded questions in the format
     { "Alphagram" -> [ Word, Word, Word ] }
@@ -1045,8 +1074,31 @@ def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None) : # pylint
   # pylint: disable=too-many-arguments,too-many-locals
   quiz = {}
 
-  # Cardbox doesn't filter, it only prioritizes one cardbox over others
-  # If you specifically ask for a cardbox in the backlog, ignore backlogging
+  if rescheduled:
+    # Rescheduled mode: only difficulty 5 rows, regardless of next_scheduled.
+    # A requested cardbox is served first; otherwise start at the lowest
+    # cardbox. Other boxes fill the quiz if there are not enough in the first.
+    if cardbox_requested:
+      orderClause = ("order by case cardbox when ? then -1 else cardbox end, "
+                     "next_scheduled, question limit ?")
+      queryParams = (cardbox, numNeeded)
+    else:
+      orderClause = "order by cardbox, next_scheduled, question limit ?"
+      queryParams = (numNeeded,)
+    getCardsQry = ("select question from questions " +
+      "where difficulty = 5 and cardbox is not null " +
+      "and next_scheduled is not null " + orderClause)
+    with _time_query('getQuestionsFromCardbox.query',
+                     f'cardbox={cardbox}, numNeeded={numNeeded}, rescheduled=True'):
+      g.cur.execute(getCardsQry, queryParams)
+      result = g.cur.fetchall()
+    allQuestions = [x[0] for x in result]
+    for alpha in allQuestions:
+      quiz[alpha] = getAnagrams(alpha)
+    return quiz
+
+  # Cardbox doesn't filter, it only prioritizes one cardbox over others.
+  # If you specifically ask for a cardbox in the backlog, ignore backlogging.
   if cardbox >= g.closet:
     diffToGet = (-1, 2, 5)
     dFormat = "?,?,?"
@@ -1054,15 +1106,33 @@ def getQuestionsFromCardbox (numNeeded, cardbox, questionLength=None) : # pylint
     diffToGet = (-1, 5)
     dFormat = "?,?"
 
+  # Difficulty 5 rows are only normally available through cleared_until. Beyond
+  # that they are reachable through the Rescheduled mode instead.
+  now = int(time.time())
+  g.cur.execute("select * from cleared_until")
+  cleared_until = max(g.cur.fetchone()[0], now)
+
+  # An explicit cardbox is served first, which is how working ahead in a chosen
+  # box works. With no cardbox requested, use the default queue order: lowest
+  # cardbox first, then earliest next_scheduled within each cardbox.
+  if cardbox_requested:
+    orderClause = ("order by case cardbox when ? then -1 else cardbox end, "
+                   "next_scheduled, question limit ?")
+    queryParams = diffToGet + (cleared_until, cardbox, numNeeded)
+  else:
+    orderClause = "order by cardbox, next_scheduled, question limit ?"
+    queryParams = diffToGet + (cleared_until, numNeeded)
+
   with _time_query('getQuestionsFromCardbox.query', f'cardbox={cardbox}, numNeeded={numNeeded}'):
     getCardsQry = ("select question from questions " +
       f"where difficulty in ({dFormat}) and next_scheduled is not null " +
-       "order by case cardbox when ? then -1 else cardbox end, next_scheduled limit ?")
-    g.cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
+      "and (difficulty != 5 or next_scheduled <= ?) " +
+      orderClause)
+    g.cur.execute(getCardsQry, queryParams)
     result = g.cur.fetchall()
     if len(result) < numNeeded:
       makeWordsAvailable(numNeeded-len(result))
-      g.cur.execute(getCardsQry, diffToGet+(cardbox,numNeeded))
+      g.cur.execute(getCardsQry, queryParams)
       result = g.cur.fetchall()
   allQuestions = [x[0] for x in result]
   for alpha in allQuestions:
@@ -1250,18 +1320,19 @@ def getAuxInfo (alpha):
 
 def checkOut (alpha, lock) :
   """
-  if LOCK is true, set difficulty = 3 (locked)
-  if LOCK is false, set difficulty = 0
+  if LOCK is true, rescheduled questions (5/6) become 6; everything else 3.
+  if LOCK is false, 6 returns to 5 and 3 returns to 0; other states unchanged.
   locks are cleared by closetSweep() and newQuiz()
   """
   if lock:
-    difficulty = 3
+    g.cur.execute("update questions set difficulty = case " +
+      "when difficulty in (5, 6) then 6 else 3 end where question = ?", (alpha,))
   else:
-    difficulty = 0
+    g.cur.execute("update questions set difficulty = case " +
+      "when difficulty = 6 then 5 when difficulty = 3 then 0 " +
+      "else difficulty end where question = ?", (alpha,))
 
-  g.cur.execute("update questions set difficulty = ? where question = ?", (difficulty, alpha))
-
-def _get_bingo_from_cardbox(cardbox=0):
+def _get_bingo_from_cardbox(cardbox=0, cardbox_requested=True):
     """
     Returns a list of alphagrams that are due, length 7 or greater
     Uses the authenticated user's database connection via g.cur
@@ -1270,20 +1341,34 @@ def _get_bingo_from_cardbox(cardbox=0):
         # Use the existing cursor from g (already connected to user's DB)
         cur = g.cur
 
-        # First query: get due questions from cardbox
+        # An explicit cardbox is served first (working ahead in that box). With
+        # no cardbox requested, order by cardbox, then next_scheduled.
+        now = int(time.time())
+        cur.execute("select * from cleared_until")
+        cleared_until = max(cur.fetchone()[0], now)
+        if cardbox_requested:
+            orderClause = ("ORDER BY CASE cardbox WHEN ? THEN -2 "
+                           "ELSE difficulty END, cardbox, next_scheduled, question")
+            queryParams = (cleared_until, now, cardbox)
+        else:
+            orderClause = "ORDER BY cardbox, next_scheduled, question"
+            queryParams = (cleared_until, now)
+
+        # First query: get due questions from cardbox. Difficulty 5 is only
+        # available through cleared_until; the Rescheduled view is the way to
+        # work ahead on it.
         with _time_query('get_bingo.cardbox', f'cardbox={cardbox}'):
             cur.execute(f"""
                 SELECT question FROM questions
                 WHERE cardbox IS NOT NULL
                 AND length(question) >= 7
-                AND (difficulty IN (-1, 2, 5)
+                AND (difficulty IN (-1, 2)
+                     OR (difficulty = 5 AND next_scheduled <= ?)
                      OR (difficulty IN (0, 4, 50)
                          AND next_scheduled <= ? + ({_lookahead_seconds_case()})))
-                ORDER BY CASE cardbox WHEN ? THEN -2
-                         ELSE difficulty END,
-                         cardbox, next_scheduled
+                {orderClause}
                 LIMIT 1
-            """, (int(time.time()), cardbox))
+            """, queryParams)
 
             result = cur.fetchone()
             if result is not None:
