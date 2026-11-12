@@ -348,6 +348,22 @@ def test_get_cardbox_stats_reports_rescheduled_counts(clock):
     assert stats["dueByCardbox"]["rescheduled"] == {"0": 2, "1": 1}
 
 
+@pytest.mark.parametrize("stored,expected", [
+    (BASE + 2 * DAY, BASE + 2 * DAY),
+    (BASE - DAY, BASE),
+    (0, BASE),
+])
+def test_get_cardbox_stats_reports_effective_cleared_until(clock, stored, expected):
+    clock.now = BASE
+    con = helpers.make_db([], cleared_until=stored)
+
+    with json_request(con, "/getCardboxStats", {"due": True}):
+        response = views.getCardboxStats()
+
+    stats = response.get_json()[0]
+    assert stats["clearedUntil"] == expected
+
+
 # --- Sloth: _get_bingo_from_cardbox ------------------------------------------
 
 def test_bingo_default_excludes_rescheduled_beyond_cleared_until(clock):

@@ -67,6 +67,7 @@ function createCardboxStatsPanel() {
       ['a3','div','tab-content','','a2_',''],
       ['a3a','div','tab-pane fade in active','dueContent','a3',''],
       ['a3a1','div','','dueRegion','a3a',''],
+      ['a3a1b','div','','cardboxClearedUntil','a3a',''],
       ['a3a2','div','','addQueue','a3a',''],
       ['a3b','div','tab-pane fade','coverageContent','a3',''],
       ['a3c','div','tab-pane fade','manageContent','a3',''],
@@ -98,7 +99,18 @@ function createCardboxStatsPanel() {
   });
   gGenerateTable(['Length','','Alphagrams','In Cardbox','%'], 'coverageContent', 'statTable', 'coverageTable','coverageBody');
   $('#cardboxTable, #coverageTable').css('visibility','hidden');
-  $('#addQueue').css({'color':'#ddd','background-color':'#000','font-variant':'small-caps','width':'100%','font-size':'0.85em','margin-top':'5px'});
+  $('#cardboxClearedUntil, #addQueue').css({
+    'color':'#ddd',
+    'background-color':'#000',
+    'font-family':"'Montserrat', sans-serif",
+    'font-variant':'small-caps',
+    'font-size':'0.9em',
+    'text-align':'left',
+    'box-sizing':'border-box',
+    'width':'100%',
+    'margin-top':'5px',
+    'padding':'0.1em 0.4em'
+  });
   document.getElementById('cardboxInfoScore').innerHTML=localStorage.qCardboxStartScore;
   document.getElementById('cardboxInfoDiff').innerHTML=localStorage.qCardboxDiff;
   document.getElementById('cardboxInfoQToday').innerHTML=localStorage.qCardboxQAnswered;
@@ -157,6 +169,7 @@ function displayCardboxDue (response, responseStatus) {
   cardboxHighlightAction(localStorage.cardboxCurrent, false);
   $('#cardboxUpdateTimeBox').html(gReturnUpdateTime());
   $('#cardboxTable').css('visibility','visible');
+  displayCardboxClearedUntil(stats.clearedUntil);
   displayCardboxQueue(stats.queueLength);
   // Keep the reschedule pane's counts in sync if it is currently open.
   if (document.getElementById('reschedulePreview')) {
@@ -164,6 +177,14 @@ function displayCardboxDue (response, responseStatus) {
     renderRescheduleCardboxSelectors();
     updateReschedulePreview();
   }
+}
+function displayCardboxClearedUntil(value){
+  if (typeof value === 'undefined' || value === null || !isFinite(Number(value))) {
+    $('#cardboxClearedUntil').html('');
+    return;
+  }
+  var clearedDate = new Date(Number(value) * 1000);
+  $('#cardboxClearedUntil').html('Cardbox Cleared Until: '+gFormatDateForDisplay(clearedDate));
 }
 function displayCardboxQueue(value){
   $('#addQueue').html('Number of Alphagrams In Add Queue: '+value);
