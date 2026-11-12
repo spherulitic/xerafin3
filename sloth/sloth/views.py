@@ -420,7 +420,7 @@ def getAlphaRankings(alpha, lexicon):
         'rank': rank,
         'name': user_data.get('name', 'Unknown User'),
         'photo': user_data.get('photo'),
-        'countryId': g.countryId,
+        'countryId': user_data.get('countryId', 0),
         'time': row['time_taken'],
         'correct': row['correct'],
         'accuracy': row['accuracy'],
