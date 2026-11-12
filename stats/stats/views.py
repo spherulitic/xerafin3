@@ -1462,9 +1462,10 @@ class Metaranks():
             rowDict["isCurrent"] = True
           if self.userRank != -1:
             rowDict["rank"] = self.userRank
-          if rowDict["rank"] < self.rankData[0]["rank"]:
+          if not self.rankData or rowDict["rank"] < self.rankData[0]["rank"]:
             self.rankData.insert(0, rowDict)
-          elif foundCurrent and rowDict["rank"] < self.rankData[1]["rank"]:
+          elif foundCurrent and (len(self.rankData) < 2
+                                 or rowDict["rank"] < self.rankData[1]["rank"]):
             self.rankData.insert(1, rowDict)
           else:
             self.rankData.append(rowDict)
@@ -1481,9 +1482,10 @@ class Metaranks():
           rowDict["isMe"] = True
           rowDict["isCurrent"] = True
           rowDict["rank"] = self.currentRank
-          if rowDict["rank"] < self.rankData[0]["rank"]:
+          if not self.rankData or rowDict["rank"] < self.rankData[0]["rank"]:
             self.rankData.insert(0, rowDict)
-          elif rowDict["rank"] < self.rankData[1]["rank"] and not foundCurrent:
+          elif (not foundCurrent and len(self.rankData) > 1
+                and rowDict["rank"] < self.rankData[1]["rank"]):
             self.rankData.insert(1, rowDict)
           else:
             self.rankData.append(rowDict)
@@ -1844,10 +1846,8 @@ class Rankings():
         self.displayType = 0
     else:
       self.displayType = 0
-    if 'timeframe' in data:
-      if data['timeframe'] in RANKING_PERIODS:
-        self.period = data['timeframe']
-    else:
+    self.period = data.get('timeframe', 'today')
+    if self.period not in RANKING_PERIODS:
       self.period = 'today'
 
     self.countUsers()
@@ -2151,9 +2151,9 @@ class SlothRankings():
                                               "countryId": 0})
       rowDict = { "total": row[0],
                   "userid": row[1],
-                  "name": user_info["name"],
-                  "photo": user_info["photo"],
-                  "countryId": user_info["countryId"]}
+                  "name": user_info.get("name", "Mystery User"),
+                  "photo": user_info.get("photo", "images/unknown_player.gif"),
+                  "countryId": user_info.get("countryId", 0)}
       if rowDict["userid"] == g.uuid:
         rowDict['isMe'] = True
         foundMe = True
