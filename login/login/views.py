@@ -291,6 +291,7 @@ def getUserNamesAndPhotos():
           # Return default values for missing users
           userDict["name"] = 'Unknown User'
           userDict["photo"] = 'images/unknown_player.gif'
+          userDict["countryId"] = 0
           result.append(userDict)
         else:
           # Re-raise unexpected errors
