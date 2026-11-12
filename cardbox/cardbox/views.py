@@ -535,6 +535,7 @@ def getCardboxStats():
     result["totalCards"] = totalCards
     result["score"] = getCardboxScore()
     result["queueLength"] = getNextAddedCount()
+    result["clearedUntil"] = getClearedUntil()
     result["totalDue"] = sum(dueNow.values())
     result["dueByCardbox"] = dueByCardbox
 
@@ -962,6 +963,15 @@ def getNextAddedCount():
   '''
   g.cur.execute("select count(*) from next_added")
   return g.cur.fetchone()[0]
+
+def getClearedUntil():
+  ''' Returns the effective cleared_until cutoff. Values in the past are
+      clamped to now so the UI never reports that the cardbox is cleared
+      until a date that has already passed. '''
+  now = int(time.time())
+  g.cur.execute("select timeStamp from cleared_until")
+  row = g.cur.fetchone()
+  return max(row[0], now) if row and row[0] is not None else now
 
 def getTotalByLength():
 
