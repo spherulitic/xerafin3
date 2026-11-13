@@ -1,6 +1,6 @@
 // Bump on every release so browsers fetch fresh copies of deployed scripts
 // and the script config instead of serving stale caches.
-const XERAFIN_JS_VERSION = '20261010';
+const XERAFIN_JS_VERSION = '20261113';
 
 XScripts.prototype = {
     constructor: XScripts,
@@ -18,7 +18,6 @@ XScripts.prototype = {
       });
     },
     loadGroup: async function(group){
-      console.log("Load Group" + group.group);
       let self = this;
       let f = new Array();
       $.ajaxSetup({cache:true});
@@ -28,7 +27,6 @@ XScripts.prototype = {
       return new Promise(resolve => {
         Promise.all(f).then((values) => {
           $.ajaxSetup({cache:false});
-          console.log(group.group + " script group loaded");
         if (self.logged){xerafin.error.log.add(group.group + " script group loaded",'HTTP');}
           resolve(true);
         });
@@ -44,7 +42,6 @@ XScripts.prototype = {
           }
         }
         else {
-          console.log("All scripts loaded successfully");
           if (self.logged){xerafin.error.log.add("All scripts loaded successfully");}
           return new Promise (resolve => {resolve(true);})
         }

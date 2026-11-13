@@ -37,7 +37,6 @@ SlothStats.prototype = {
 		$(this.stats['tComplete']).html(d.tComplete);
 		$(this.stats['uPerfect']).html(d.uPerfect);
 		$(this.stats['tPerfect']).html(d.tPerfect);
-		console.log(d);
 	},
 	init: function(){
 		this.draw();

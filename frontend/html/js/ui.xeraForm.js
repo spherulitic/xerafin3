@@ -289,7 +289,6 @@ XeraForm.prototype = {
 		$(this.fieldHelpBox).html('');
 		this.clearFeedback();
 		this.buildJSON();
-		//console.log(this.sendData);
 		$.ajax({
 			type: "POST",
 			data: JSON.stringify(this.sendData),
@@ -302,9 +301,7 @@ XeraForm.prototype = {
 			},
 			error: function(jqXHR, textStatus, errorThrown) {
 				alert("PHP Error!");
-				console.log(jqXHR);
-				console.log(textStatus);
-				console.log(errorThrown);
+				console.error("Form submit failed:", jqXHR, textStatus, errorThrown);
 				self.failTimeout = setTimeout(XeraForm.prototype.send.bind(self),1000);
 			}
 		})

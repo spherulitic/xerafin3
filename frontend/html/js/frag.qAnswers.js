@@ -69,7 +69,6 @@ QAnswers.prototype = {
     }
   },
   displayRest: function(type){
-    //console.log(this.rows);
     let that=this;
     Object.keys(this.rows).forEach(function(a){
       if (!RegExp(/_H$/g).test(a)) {
@@ -100,7 +99,6 @@ QAnswers.prototype = {
     Object.keys(this.rows).forEach(function(a){
       if (RegExp(/_H$/g).test(a)){
         let q='?';
-        //console.log('['+a+'] '+a.length+" ");
         let h =a.substr(0,that.hints)+(q.repeat(a.length-2-that.hints));
         $(that.rows[a].output).find('td').filter(':eq(2)').html(h);
         that.rows[a].display= true;
@@ -127,7 +125,6 @@ QAnswers.prototype = {
 
       $(that.rows[a+'_H'].output).find('td').filter(':eq(2)').html(q.repeat(a.length));
     });
-    //console.log(this.answerTable);
     $(this.wrongAnswers).html('');
   },
   init: function(){

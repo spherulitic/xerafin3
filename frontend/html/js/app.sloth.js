@@ -100,7 +100,6 @@ SlothQuestion.prototype = {
     this.unanswered = new Set(this.data.words);
     this.words = new Set(this.data.words);
     this.isComplete = false;
-    //console.log(this.data);
   },
   submitAnswer: function(s){
     if (this.unanswered.has(s)){
@@ -350,7 +349,6 @@ Sloth.prototype = {
   addWord: function(w){
     this.questions.questions[w].addToCardbox();
     slothUI.update("BRD_ADD_WORD",w);
-    //console.log("ADD: "+w);
   },
   stop: function(){
     this.serverWriteComplete();
@@ -444,7 +442,6 @@ serverWriteActive: function() {
       return response.json();
     })
     .then(data => {
-       console.log('Game abort successful:', data.status);
        this.token = null; // clear local token
        this.writeDone = true;
       })

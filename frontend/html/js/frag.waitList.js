@@ -109,7 +109,6 @@ WaitListItem.prototype = {
 function WaitListItem(data={}){
 	this.panel=500;
 	this.data=data.data || {};
-	console.log(this.data);
 	this.init();
 }
 WaitList.prototype = {
@@ -166,7 +165,7 @@ WaitList.prototype = {
 				self.update(response);
 			},
 			error: function(jqXHR, textStatus, errorThrown) {
-				console.log("Error, status = " + textStatus + " error: " + errorThrown);
+				console.error("Error, status = " + textStatus + " error: " + errorThrown);
 				$("#heading_text_pan_500"+self.panel).html('Manage');
 			}
 		});
@@ -184,7 +183,7 @@ WaitList.prototype = {
 				self.fetch();
 			},
 			error: function(jqXHR, textStatus, errorThrown) {
-				console.log("Error, status = " + textStatus + " error: " + errorThrown);
+				console.error("Error, status = " + textStatus + " error: " + errorThrown);
 				$("#heading_text_pan_500"+self.panel).html('Manage');
 			}
 		});
@@ -203,7 +202,7 @@ WaitList.prototype = {
 				self.update(response);
 			},
 			error: function(jqXHR, textStatus, errorThrown) {
-				console.log("Error, status = " + textStatus + " error: " + errorThrown);
+				console.error("Error, status = " + textStatus + " error: " + errorThrown);
 				$("#heading_text_pan_500"+self.panel).html('Manage');
 			}
 		});
@@ -231,7 +230,6 @@ WaitList.prototype = {
 		self.rows = new Array();
 		$(this.itemBox).html('');
 		Object.entries(d).forEach(function([i,v]){
-			console.log(v);
 			self.rows[v.handle] = new WaitListItem({'data':v});
 			//self.addSelectionEvent(self.rows[v.handle].box);
 			self.addEvents(v.handle,self.rows[v.handle]);

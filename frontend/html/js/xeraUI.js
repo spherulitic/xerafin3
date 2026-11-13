@@ -17,12 +17,6 @@ function MyQuizzesContainer(data){
       this.pare = data.pare;
       this.init();
     }
-    else {
-      console.log("MyQuizzesContainer requires a parent to attach to");
-    }
-  }
-  else {
-    console.log("MyQuizzesContainer requires an ID");
   }
 }
 
@@ -700,16 +694,6 @@ XeraOverviewManager.prototype = {
         that.setCbxReady();
       },
     });
-  },
-  debugStates: function(type){
-    console.log(type+' States:');
-    console.log('Current:'+this.data.currentList[type]);
-    console.log('Active:'+this.data.activeList[type]);
-    console.log('Completed:'+this.data.completedList[type]);
-    console.log('Search:'+this.data.searchList[type]);
-    console.log('Write:'+this.data.writeList[type]);
-    console.log('Cardbox:'+this.cbxReady);
-    console.log('----------------------------');
   },
 
   checkInitStates: function(){

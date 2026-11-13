@@ -42,7 +42,6 @@ XeraPanelUI.prototype = {
 		if (typeof this.actionListener[type]!=='undefined'){
 			if (this.actionListener[type].watch){
 				if (this.disableWatch!==true) {
-					//console.log('%c Data Watch ('+type+') Data->','color:white;background:black;font-size:1.2em;font-variant:small-caps;');
 					xerafin.error.log.add('Data Watch ('+type+') Data->','event');
 					xerafin.error.log.add(data,'JSON');
 					xerafin.error.log.add(' ' + this.disableWatch + ' ' ,'comment');

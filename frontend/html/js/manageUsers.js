@@ -150,7 +150,7 @@ ManageUsers.prototype = {
 				this.displaySearchResults();
 			},
 			error: function(jqXHR, textStatus, errorThrown) {
-				console.log("Error, status = " + textStatus + " error: " + errorThrown);
+				console.error("Error, status = " + textStatus + " error: " + errorThrown);
 				$("#heading_text_pan_502"+self.panel).html('Manage');
 			}
 		});
@@ -200,7 +200,7 @@ AdminProfile.prototype = {
 			//displayAdminManageForm(response[0]);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			console.log("Error, status = " + textStatus + " error: " + errorThrown);
+			console.error("Error, status = " + textStatus + " error: " + errorThrown);
 		},
 		complete: function(){
 			$("#heading_text_pan_"+self.panel).html('Manage');

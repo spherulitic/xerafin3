@@ -27,7 +27,7 @@ async function showWordInfo(word) {
       }
 
     } catch (error) {
-      console.log("Error getting word info: " + error.message);
+      console.error("Error getting word info: " + error.message);
       displayWordInfo(null, { error: "Could not retrieve definition. Please try again." });
     }
   } else {

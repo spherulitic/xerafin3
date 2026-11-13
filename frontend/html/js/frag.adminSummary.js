@@ -69,7 +69,7 @@ AdminSummary.prototype = {
 				this.statusWait= setTimeout(AdminSummary.prototype.fetch.bind(self),self.refreshRate);
 			},
 			error: function(jqXHR, textStatus, errorThrown) {
-				console.log("Error, status = " + textStatus + " error: " + errorThrown);
+				console.error("Error, status = " + textStatus + " error: " + errorThrown);
 				$("#heading_text_pan_500"+self.panel).html('Manage');
 				this.statusWait= setTimeout(AdminSummary.prototype.fetch.bind(self),self.refreshRate);
 			}

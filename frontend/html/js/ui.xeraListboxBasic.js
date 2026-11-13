@@ -22,7 +22,6 @@ XeraListboxBasic.prototype = {
 	change: function(){
 		//need to figure out how to call this
 		this.val = $(this.content).val();
-		console.log("CHANGE FIRED IN CHANGE "+this.val);
 	},
 	draw: function(){
 		this.content = document.createElement('select');

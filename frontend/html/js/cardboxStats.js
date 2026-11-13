@@ -29,10 +29,10 @@ function showCardboxStats (value) {
         }
     },
     error: function(jqXHR, textStatus, errorThrown) {
-    console.log("Error getting cardbox stats, status = " + textStatus + " error: " + errorThrown);
+    console.error("Error getting cardbox stats, status = " + textStatus + " error: " + errorThrown);
     }
   });
-  }).catch(function() { console.log('Failed to refresh token'); });
+  }).catch(function() { console.error('Failed to refresh token'); });
 }
 function refreshCardboxInfo() {
   if ($('#dueTab').hasClass('active')){showCardboxStats(1)}
@@ -510,7 +510,7 @@ function submitShameList(text) {
      url: "shameList",
      data: JSON.stringify({questions: shameArr, addToCardbox: addToCardbox}),
      success: callbackEnd,
-     error: function(jqXHR, textStatus, errorThrown) { console.log("Error: " + textStatus); }
+     error: function(jqXHR, textStatus, errorThrown) { console.error("Error: " + textStatus); }
         });
 }
 
@@ -542,11 +542,11 @@ function submitTriumphList(text) {
      if (response.ok) {
        alert("Updating words complete.");
      } else {
-       console.log("Error updating words: " + response.status);
+       console.error("Error updating words: " + response.status);
        alert("Error updating words.");
      }
   }).catch(function(error) {
-     console.log("Error: " + error);
+     console.error("Error: " + error);
      alert("Error updating words.");
   });
 }
@@ -679,13 +679,13 @@ function loadRescheduleStats(){
       error:function(jqXHR, textStatus, errorThrown){
         rescheduleStatsError = true;
         updateReschedulePreview();
-        console.log('Error loading cardbox stats for reschedule: ' + textStatus + ' ' + errorThrown);
+        console.error('Error loading cardbox stats for reschedule: ' + textStatus + ' ' + errorThrown);
       }
     });
   }).catch(function(){
     rescheduleStatsError = true;
     updateReschedulePreview();
-    console.log('Failed to refresh token for reschedule stats');
+    console.error('Failed to refresh token for reschedule stats');
   });
 }
 
@@ -801,7 +801,7 @@ function setPrefs() {
       });
     },
     error: function(jqXHR, textStatus, errorThrown) {
-      console.log("Error setting user prefs. Status: " + textStatus + "  Error: " + errorThrown);
+      console.error("Error setting user prefs. Status: " + textStatus + "  Error: " + errorThrown);
       alert("Error setting user prefs: " + errorThrown);
     }
   });
