@@ -5,9 +5,9 @@
   "frontend": "1.0.29",
   "lexicon": "1.0.12",
   "lexicon-loader": "1.0.5",
-  "login": "1.0.17",
+  "login": "1.0.18",
   "quiz": "1.0.22",
-  "stats": "1.0.19",
+  "stats": "1.0.20",
   "sloth": "1.0.10",
   "cardbox": "1.0.35"
 }
