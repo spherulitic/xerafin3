@@ -3,11 +3,11 @@
   "keycloak": "1.0.1",
   "cron": "1.0.8",
   "frontend": "1.0.29",
-  "lexicon": "1.0.12",
+  "lexicon": "1.0.13",
   "lexicon-loader": "1.0.5",
-  "login": "1.0.18",
-  "quiz": "1.0.22",
-  "stats": "1.0.20",
-  "sloth": "1.0.10",
-  "cardbox": "1.0.35"
+  "login": "1.0.19",
+  "quiz": "1.0.23",
+  "stats": "1.0.21",
+  "sloth": "1.0.11",
+  "cardbox": "1.0.36"
 }
