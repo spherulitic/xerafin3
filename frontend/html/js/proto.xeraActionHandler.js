@@ -27,7 +27,6 @@ XeraActionHandler.prototype = {
 		}
 	},
 	list : function(){
-		console.log(this.actionList);
 		xerafin.error.log.add(this.actionList,'JSON');
 	},
 	remove: function (keyword){
@@ -36,8 +35,6 @@ XeraActionHandler.prototype = {
 	watchOutput : function(keyword,data) {
 		xerafin.error.log.add("Action Watch ("+keyword+") Data->",'action');
 		xerafin.error.log.add(data,'JSON');
-		console.log("%c Action Watch:["+this.name+"]("+keyword+") Data->","color:white;background:"+this.bgColor+";font-size:1.2em;font-variant:small-caps;");
-		console.log(data);
 	},
 	send: function (keyword,data={},receipt=false) {
 		if (this.findHandler(keyword)){

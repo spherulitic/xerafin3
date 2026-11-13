@@ -345,7 +345,7 @@ OverBar.prototype = {
 						setTimeout(this.getListValues(),500);
 					}
 					else {
-						console.log("Error trying to retrieve overBar from "+this.url+ ": "+responseStatus);
+						console.error("Error trying to retrieve overBar from "+this.url+ ": "+responseStatus);
 					}
 				}
 		});

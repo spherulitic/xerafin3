@@ -99,7 +99,7 @@ XeraTabGenerator.prototype = {
 	},
 }
 function XeraTabGenerator(d){
-	this.id = d.id || console.log("Error: XeraTabGenerator Object must have a DOM id");
+	this.id = d.id || console.error("Error: XeraTabGenerator Object must have a DOM id");
 	//temp
 	this.pare = d.pare;
 	var y = {

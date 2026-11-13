@@ -165,9 +165,6 @@ function OverviewGoRegion(data){
 				this.context = data.context
 				this.init();
 			}
-			else {
-				console.log("XeraGoRegion instance requires a context in order to initialize.");
-			}
 
 		}
 		else {appendDebugLog ("XeraGoRegion Error : no parent DOM object defined!");}

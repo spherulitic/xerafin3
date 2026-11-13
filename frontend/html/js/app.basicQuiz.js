@@ -13,7 +13,6 @@ BasicQuiz.prototype = {
   initUI:function(){
     let watchFilter=true;
     //let watchFilter = !(userid == "10106924779084089");
-    console.log("watchFilter :"+watchFilter);
     basicQuizUI = new XeraPanelUI({'id':"basicQuizUI", 'title':"Basic Quiz", 'targetPanel':"1", 'variant':"a",'disableWatch':watchFilter});
     basicQuizAH = new XeraActionHandler({
       'name':'Basic Quiz',
@@ -170,8 +169,6 @@ BasicQuiz.prototype = {
     if (this.undo)
     {
       this.quiz.lastQuestion=null;
-      //console.log(this.quiz.questions[0]);
-      //console.log(this.undoTemp);
       this.quiz.questions[0] = this.undoTemp;
       this.undo = false;
       if (this.quiz.questions[0].submitted) {
@@ -297,8 +294,6 @@ BasicQuiz.prototype = {
       });
       basicQuizUI.update("INF_NEW_QST",this.quiz.questions[0]);
       basicQuizUI.update('TBL_POP_NEW',this.quiz.questions[0].words);
-      //console.log(this.undo);
-      //console.log(this.quiz.lastQuestion);
       basicQuizUI.update("BUT_UND_QST", (this.undo || this.quiz.lastQuestion===null));
       basicQuizUI.update("INP_RST_STA");
       if (this.quiz.questions[0].answers.length==0) {this.markHuh();}
@@ -425,6 +420,5 @@ function BasicQuiz(data){
   this.optionsUI = {
     'listWords':true,
   }
-  //console.log(data);
   this.init(data);
 }

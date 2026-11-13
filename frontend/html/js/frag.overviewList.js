@@ -144,7 +144,6 @@ processSelectedRows: function() {
 			}
 			self.processSelectedRows();
 			}
-			else {console.log("Selection is Disabled");}
 		});
 	},
 
@@ -446,7 +445,6 @@ function OverviewList(data = {}){
 				this.context = data.context;
 				this.init();
 			}
-			else {console.log('---> No Context attached to instance of OverviewList.  Instance Aborted');}
 		}
 		else {appendDebugLog ("XeraOverviewListGroup Error : no parent DOM object defined!");}
 	}

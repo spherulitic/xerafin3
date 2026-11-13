@@ -16,7 +16,6 @@ SlothTimer.prototype = {
 	},
 	stop: function(){
 		if (this.updateLoop!=='undefined'){clearInterval(this.updateLoop);}
-		console.log("STOP");
 		this.update();
 	},
 	report: function(){

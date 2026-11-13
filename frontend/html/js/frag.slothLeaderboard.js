@@ -83,7 +83,6 @@ SlothLeaderboard.prototype = {
 			$(this.table).append(this.addHeaders());
 			let self=this;
 			d.forEach(function(v){
-				console.log(v);
 				$(self.table).append(self.addRow(v));
 			});
 		}

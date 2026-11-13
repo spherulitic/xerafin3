@@ -64,8 +64,6 @@ AlphaDisplay.prototype = {
 		}
 	},
 	redraw: function(data){
-		//console.log("REDRAW DATA");
-		//console.log(data);
 		this.alpha=data.alpha;
 		this.space = data.space;
 		if (typeof data.display!=='undefined'){this.display = data.display;}

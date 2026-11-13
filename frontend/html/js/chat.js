@@ -58,7 +58,6 @@ function startChat () {
     chatBox.addEventListener("keypress", function(e) {
         if (e.which === 13 && $(this).val().trim()) {
            var chatContent = parseEmoji($(this).val());
-           //console.log(chatContent);
            submitChat(chatContent);
            $(this).val("");
         } });
@@ -205,7 +204,7 @@ function updateChats() {
       });
 
   }).catch(function() {
-    console.log('Failed to refresh token');
+    console.error('Failed to refresh token');
   });
 }
 

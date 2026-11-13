@@ -5,8 +5,6 @@ Rankings.prototype = {
     this.draw();
   },
   fetch: function(d){
-    console.log("Fetching rankings. Data sent to stats service:");
-    console.log(d);
     let self= this;
     $.ajax({
       type: "POST",
@@ -22,7 +20,7 @@ Rankings.prototype = {
       },
       error: function(jqXHR, textStatus, errorThrown) {
         $("#heading_text_pan_3").html("Rankings");
-        console.log("Error getting rankings stats, status = " + textStatus + " error: " + errorThrown);
+        console.error("Error getting rankings stats, status = " + textStatus + " error: " + errorThrown);
       }
     });
   },
@@ -211,7 +209,6 @@ Rankings.prototype = {
       }
     });
     if (this.filters.selectorState.includes(0)){
-      //console.log("State 0:"+Number(this.filters.auxSelectorState(0)));
       let x = Number(this.filters.auxSelectorState(0));
       d.pageSize = (((Number(x) === 1)||(Number(x) === 3)) ? 2*this.paginator.plusMinus : this.paginator.numResults);
     }
@@ -270,7 +267,6 @@ Rankings.prototype = {
       case 'QA': case 'SL' : x=0;break;
       case 'AW': x=1;break;
     }
-    console.log("ResType = "+Number(this.filters.auxSelectorState(x)));
     return Number(this.filters.auxSelectorState(x));
   },
   draw: function(){

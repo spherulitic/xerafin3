@@ -93,8 +93,6 @@ XeraSelect.prototype={
 					default: break;
 				}
 			}
-			//if (e.which === 39) {console.log('right movement detected');}
-			//if (e.which === 37) {console.log('left movement detected');}
 
 		});
 		//if search apply toggle event to selector only, else whole select region.
@@ -103,14 +101,11 @@ XeraSelect.prototype={
 			$(this.content).on('click',function(){that.toggleSelection();});
 		$(this.content).on('blur',function(){
 			var x = !(document.activeElement.tagName === 'BODY');
-			console.log("Focus Test:"+x+ " !Body");
 			if (x) {that.toggleSelection(false);}
 		});
 		$(this.dropDown).on('blur',function(){$(that.dropDown).hide();});
 	},
 	toggleSelection: function(d=true){		//d indicating if content/dropdown interaction caused closure
-		//console.log("Toggle Action:"+d);
-		//console.log ("State:"+this.selectState);
 		d ? this.selectState = !this.selectState : this.selectState = false;
 		if (this.selectState) {
 			$(this.dropDown).fadeTo(200,1);
@@ -244,7 +239,6 @@ XeraSelect.prototype={
 		$(this.content).css({'width':'100%'});
 		if (typeof this.id!=='undefined'){this.content.id = this.id;}
 		$(this.content).attr('tabindex',-1);
-		//console.log('Initial Value:'+this.current);
 		this.dataIndex = this.findDataIndex(this.current);
 		this.draw();
 	}

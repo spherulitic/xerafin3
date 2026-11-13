@@ -280,7 +280,6 @@ function XError(data={}){
 	let self=this;
 	addEventListener('error', e => {
 		const { message,source,lineno,colno,error } = e;
-		console.log(e);
 		self.newError(message, source, lineno, colno, error);
 	});
 	//window.onerror = function(e,f,g,h,i){self.newError(e,f,g,h,i);}

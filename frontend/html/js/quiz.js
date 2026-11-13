@@ -67,7 +67,7 @@ class QuizList {
             data: JSON.stringify(d),
             headers: {"Accept": "application/json", "Authorization": keycloak.token},
             url: "resetQuiz",
-            success: function(response, responseStatus) { //console.log("Quiz reset");
+            success: function(response, responseStatus) {
                                                           self.refreshQuizList(self.data);
                               },
             error: function(jqHXR, textStatus, errorThrown) {
@@ -101,7 +101,6 @@ class QuizList {
     typeof this.connectionAttempts!=='undefined' ? this.connectionAttempts = 0 : this.connectionAttempts++;
     if (typeof this.retryActivate!=='undefined'){clearTimeout(this.retryActivate);}
   // takes in an array of quizzes to activate
-  //console.log('QuizIDs:'+quizidList);
     let self = this;
     self.initialized = false;
     let d = { quizidList: quizidList };
@@ -246,7 +245,6 @@ class Quiz {
                         });
     }
     else {
-      //console.log("Quiz not initialized - waiting...");
       setTimeout(function() { self.loadQuestions(numQ); }, 30); } // end if initialized
     } // end if numQ > 0
   }
