@@ -1,4 +1,4 @@
-gunicorn==26.2.0
+gunicorn==27.0.0
 Flask>=3.1.3
 pyjwt[crypto]
 bcrypt>=5.0.0
