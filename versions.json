@@ -3,7 +3,7 @@
   "keycloak": "1.0.1",
   "cron": "1.0.8",
   "frontend": "1.0.30",
-  "lexicon": "1.0.13",
+  "lexicon": "1.0.14",
   "lexicon-loader": "1.0.5",
   "login": "1.0.19",
   "quiz": "1.0.23",
