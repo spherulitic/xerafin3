@@ -209,7 +209,7 @@ class Quiz {
                 return response.json(); })
         .then(responseData => {
                 this.hasHTTPError = false;
-                if(responseData.getFromStudyOrder) {this.eof = responseData.eof;}
+                if(typeof responseData.eof !== 'undefined') {this.eof = responseData.eof;}
                 if(this.eof){overview.fetchData();}
                 let questionArray = responseData.questions;
                 for (let i=0;i<questionArray.length;i++) {
