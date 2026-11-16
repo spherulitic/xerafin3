@@ -374,7 +374,7 @@ def wrong(alpha):
 @app.route("/getQuestions", methods=['GET', 'POST'])
 def getQuestions():
 
-  result = {"_get_from_study_order": False, "questions": [ ] }
+  result = {"questions": [ ] }
 
   params = request.get_json(force=True) # returns dict
   numQuestions = params.get("numQuestions", 1)
@@ -390,7 +390,8 @@ def getQuestions():
   questions = getQuestionsFromCardbox(numQuestions, cardbox, None,
                                       cardbox_requested, rescheduled)
 
-  # This is only used for non-cardbox quizzes
+  # Cardbox cannot be exhausted: it tops itself up from the study order, so
+  # eof is always False here. Exhaustion (eof) is a non-cardbox concept only.
   result["eof"] = False
 
   lex_service = 'http://lexicon:5000'
