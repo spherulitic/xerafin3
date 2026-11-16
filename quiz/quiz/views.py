@@ -135,7 +135,7 @@ def getSubscriptions():
 def getQuestions():
   '''Return a list of questions to the client'''
   params = request.get_json(force=True)
-  result = {"getFromStudyOrder": False, "questions": [ ] }
+  result = {"questions": [ ] }
   isCardbox = params.get('isCardbox', True)
 
   if isCardbox:
@@ -160,9 +160,9 @@ def getQuestions():
     else:
       questions = getNonCardboxQuestions(numQuestions, quizid)
 
-    # Need a flag to let the interface know the quiz is over
-    # And they're getting fewer questions than requested
-
+    # eof is the only exhaustion signal the interface reads. It applies to
+    # non-cardbox quizzes only: they are backed by a finite list of rows, so a
+    # short response means the quiz is done. Cardbox never reports exhaustion.
     if len(questions) != numQuestions:
       result["eof"] = True
     else:

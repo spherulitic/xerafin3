@@ -348,7 +348,7 @@ Invader.prototype = {
           }
         }
         // no new question was returned; a non-cardbox quiz is exhausted
-        if (that.quizid != -1) { that.noMoreWords = true; }
+        if (quiz.eof) { that.noMoreWords = true; }
         that.gettingWord = false;
         return;
       }
