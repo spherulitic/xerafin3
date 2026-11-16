@@ -56,17 +56,15 @@ function getSearchResults(value,type){
 		beforeSend: function(){$("#heading_text_pan_500").html('Manage Users <img src="images/ajaxLoad.gif" style="height:0.8em">');},
 		success: function(response,responseStatus){
 			$("#heading_text_pan_500").html('Manage Users');
-			//console.log(response);
 			displaySearchResults(response);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			console.log("Error, status = " + textStatus + " error: " + errorThrown);
+			console.error("Error, status = " + textStatus + " error: " + errorThrown);
 			$("#heading_text_pan_500").html('Manage Users');
 		}
 	});
 }
 function displaySearchResults(data){
-	console.log(data);
 	var img;
 	$("#searchContent").empty();
 	data.forEach(function(row,index){
@@ -103,7 +101,7 @@ function getUserAdminData (user){
 			displayAdminManageForm(response[0]);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			console.log("Error, status = " + textStatus + " error: " + errorThrown);
+			console.error("Error, status = " + textStatus + " error: " + errorThrown);
 		},
 		complete: function(){
 			$("#heading_text_pan_500").html('Manage Users');
@@ -114,7 +112,6 @@ function getUserAdminData (user){
 function displayAdminManageForm (data){
 	var userVal=data["userid"];
 	var rowData = new Array()
-	console.log(data);
 	delete data["token"];
 	$('#formWrap').empty();
 	var userImpWrap = document.createElement('div');
@@ -150,8 +147,6 @@ function displayAdminManageForm (data){
 	var z = Math.ceil(rowData.length/2);
 	for (x=0;x<z;x++){
 		if (x<z-1){
-			console.log(x+":"+z);
-			console.log(rowData[x+z][0]+" "+rowData[x+z][1]);
 			gGenerateTableRow(['userVar'+x,'userVarValue'+x,'userVar'+(x+z),'userVarValue'+(x+z)],
 				[rowData[x][0],rowData[x][1],rowData[x+z][0],rowData[x+z][1]],'formContent','formContentRow'+x);
 
@@ -190,7 +185,7 @@ function updateSecLevel(user,newValue){
 			getUserAdminData(user);
 		},
 		error: function(jqXHR, textStatus, errorThrown) {
-			console.log("Error, status = " + textStatus + " error: " + errorThrown);
+			console.error("Error, status = " + textStatus + " error: " + errorThrown);
 		},
 		complete: function(){
 			$("#heading_text_pan_500").html('Manage Users');

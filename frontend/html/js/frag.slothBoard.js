@@ -14,11 +14,8 @@ SlothBoard.prototype = {
 		$(this.content).html("");
 		this.tables = new Object();
 		this.wordlist = data;
-		//console.log(data);
 		for (let y=15;y>=2;y--){
 			let x = new Set([...this.wordlist].filter(e => e.length==y));
-			//console.log(this.wordlist);
-			//console.log(x);
 			if (x.size>0){
 				this.tables[y]=new SlothTable({'wordLength':y, 'data': x});
 				$(this.content).append(this.tables[y].output());
@@ -46,11 +43,8 @@ SlothBoard.prototype = {
 		data.wordsRemaining.forEach(function(v){
 			self.showMissed(v);
 		});
-		console.log(data);
 		Object.entries(this.tables).forEach(function([i,v]){
-			//console.log(i);
 			Object.entries(v.cells).forEach(function([a,b]){
-				//console.log(a);
 				$(b).parent().on('mouseenter',function(){
 					self.highlightAlphas(data.toAlpha(a));
 				});
@@ -104,7 +98,6 @@ SlothBoard.prototype = {
 				}
 			});
 			//.entries(v).forEach(function([a,b]){
-			//	console.log(a);
 			//});
 		});
 	},
@@ -118,14 +111,10 @@ SlothBoard.prototype = {
 			e = $(this.tables[s.length].heading);
 			t = $(this.tables[s.length].table);
 			x = (e.offset().top + t.outerHeight() - $(this.content).offset().top + 30) + (e.outerHeight()- $(this.content).height());
-			//console.log("OFFSET TABLE:")
-			//console.log(x);
 		}
 		else {
 			e = $(this.tables[s.length].cells[s]);
 			x = (e.offset().top - $(this.content).offset().top) + ((e.outerHeight()- $(this.content).height())/2);
-			//console.log("OFFSET CELL:");
-			//console.log(x);
 		}
 		$(this.content).scrollTop(x);
 	},

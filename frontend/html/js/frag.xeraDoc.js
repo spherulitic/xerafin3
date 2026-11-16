@@ -3,12 +3,10 @@ XeraDoc.prototype = {
 	resizeAction: function(){
 		if (this.hasBookmarks){
 			if ($(window).width()>1191) {
-				console.log("BOOKMARK LIST SHOWN");
 				$(this.bookmarkList).show();
 				$(this.myBookmarks.dDown).hide();
 			}
 			else {
-				console.log("BOOKMARK LIST HIDDEN");
 				$(this.bookmarkList).hide();
 				$(this.myBookmarks.dDown).show();
 			}

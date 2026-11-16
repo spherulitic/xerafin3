@@ -23,7 +23,6 @@ function clearPanel(panel){
     var cols=JSON.parse(localStorage.panelPositions);
     cols[x[0]].splice(x[1],1);
     localStorage.panelPositions=JSON.stringify(cols);
-    //console.log('After Deletion:'+localStorage.panelPositions);
   }
 }
 
@@ -101,7 +100,6 @@ function createPlaceholderDivs(panelList){
   //need to put in dummy divs as placeholders, then check for them and delete when populating the real ones
   for (var x=0;x<3;x++){
     for (var y=0;y<panelList[x].length;y++){
-      //console.log(x+" "+y);
       colName=getPanelName(x);
       temps = document.createElement('br');
       temps.id = colName+"_temp_"+y;
@@ -116,7 +114,6 @@ function populatePanelsFromArray(){
 //clearing those two localStorage variables on closure (so that they don't fire again without being
 //reinitialized.)
   var panelList=JSON.parse(localStorage.panelPositions);
-  console.log('Panel Population called, contents: '+ JSON.stringify(panelList));
   //special edge case to init chat if not in existing list
   var colStateArray = new Array();
   //These 2 loops have to be separate (thread/race conditions between generatePanel & AjaX calls)
@@ -141,7 +138,6 @@ function populatePanelsFromArray(){
       }
     }
   }
-  console.log('panel States:'+JSON.stringify(colStateArray));
 }
 
 function getPanelInStorageQueue(panel){
@@ -161,12 +157,10 @@ function removePanelInStorageQueue(panel){
   var ind=getPanelInStorageQueue(panel);
   storageQueue.splice(ind[4],1);
   if (storageQueue.length==0){
-    console.log("All panels loaded, clearing queue");
     if (findPanel(2)==false){startChat();}
     localStorage.removeItem('panelStateArray');
   }
   else {localStorage.panelStateArray=JSON.stringify(storageQueue);
-    //console.log('Remaining Queue: '+localStorage.panelStateArray);
   }
 }
 
@@ -184,7 +178,6 @@ function generatePanel(ident, data, targ, refresher, closure){
       var parentId = parentNode.attr('id');
       var indexNode = $('[id^=pan_'+ident+'_]:first');
       var indexValue = indexNode.index();
-      //console.log("New Index:"+indexValue+", Node Name:"+indexNode.attr('id')+", Parent:"+parentId);
       $('[id^=pan_'+ident+'_]').each(function(){
         var divId=$(this).attr('id');
         clearPanel(divId.replace("pan_",""));
@@ -278,7 +271,7 @@ function generatePanel(ident, data, targ, refresher, closure){
     panelContent.className = " "+data.contentClass;
     newPanel.appendChild(panelContent);
 
-    var fireOnce=once(function () {//console.log('Hiding Panel :'+panelSuffix);
+    var fireOnce=once(function () {
     if ((typeof queueData!=='boolean') && (queueData[1]=="true")) {
       if (typeof data.minimizeObject!=='undefined'){
         $('#'+data.minimizeObject).ready(function () {
@@ -313,13 +306,11 @@ function generatePanel(ident, data, targ, refresher, closure){
     //and we need to learn more about Mutation Handlers in general .
     if (typeof queueData=='boolean') {
       if (indexMe==true){
-        //console.log('Replace Fired: '+panelSuffix+', Par:'+$(parentNode).attr('id')+' Ind:'+ indexValue);
         if (indexValue===0){$(parentNode).prepend(newPanel);}
         else {$(parentNode).children().eq(indexValue-1).after(newPanel);}
         addPanel(panelSuffix, $(parentNode).attr('id'), indexValue);
       }
       else {
-        //console.log('Prepend New Fired: '+panelSuffix+','+targ+' at location 0');
         $('#'+targ).prepend(newPanel);
         addPanel(panelSuffix, targ, 0);
       }
@@ -355,7 +346,6 @@ function generatePanel(ident, data, targ, refresher, closure){
       }
       localStorage.panelPositions=JSON.stringify(newPanelArray);
       appendDebugLog("Panel configuration:"+localStorage.panelPositions);
-      console.log("New Panel Config Written");
     }
 <!------------------------------------------------------------------------------------------------------------->
 function generatePanels(){

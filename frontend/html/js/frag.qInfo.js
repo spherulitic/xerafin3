@@ -65,7 +65,7 @@ QInfo.prototype = {
   checkQuizList:function(){
     let x = Object.keys(this.quizList.quizList);
     let y = this.quizList.quizList[x[0]];
-    if (Number(x[0])!==Number(this.data.quizid)){console.log('checkQuizList error')}
+    if (Number(x[0])!==Number(this.data.quizid)){console.error('checkQuizList error')}
     else {
 
       $(this.quizContent).find('td').eq(0).html(((y.quizsize-y.untried)+Number(this.data.firstSubmit))+'/'+y.quizsize);

@@ -98,8 +98,6 @@ SlothHome.prototype = {
 			}
 		});
 		//$(this.alphaInput).on('blur',function(e){
-		//	console.log("BLURRED");
-		//	console.log(e);
 		//	self.action("HOME_GET_CUSTOM",$(self.alphaInput).val());
 		//});
 

@@ -10,7 +10,7 @@ function createNewAudio(ident, args, pare){
     return sound;
   }
   else {
-    console.log ("Error creating new audio "+ident+".  No Source Defined!");
+    console.error ("Error creating new audio "+ident+".  No Source Defined!");
   }
 }
 
@@ -36,7 +36,7 @@ Invader.prototype = {
         that.dailyHighScore = response.daily.score;
       },
       error: function(jqXHR, textStatus, errorThrown) {
-        console.log("Error, status = " + textStatus + " error: " + errorThrown);
+        console.error("Error, status = " + textStatus + " error: " + errorThrown);
       }
     });
   },
@@ -435,7 +435,7 @@ Invader.prototype = {
         that.dailyHighScore = response.daily.score;
       },
       error: function(jqXHR, textStatus, errorThrown) {
-        console.log("Error, status = " + textStatus + " error: " + errorThrown);
+        console.error("Error, status = " + textStatus + " error: " + errorThrown);
       }
     });
   },
@@ -668,5 +668,4 @@ function initInvaders(quizinfo) {
   if (localStorage.musicEnabled == "true") {invadersMusic.pause();invadersMusic.play(); }
   $('#answerBox').prop('disabled', false);
   invader.main(quizinfo);
-  //console.log("panel container"+document.getElementById('content_pan_1_c').offsetWidth);
 }

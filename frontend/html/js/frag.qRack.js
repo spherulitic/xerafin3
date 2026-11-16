@@ -186,14 +186,12 @@ QRack.prototype = {
 		});
 		this.solutions = JSON.parse(JSON.stringify(tempob));
 		this.splitHooks();
-		//console.log('Process start:'+(new Date()).getTime());
 		this.calcWidths(function(){
 			self.rack.setTileValues(self.tileValues);
 			self.rack.newAlpha(self.alpha,self.rackSize,self.display);
 			self.rack.setDrag(true);
 			$(self.container).append(self.leftHook,self.rack.output(),self.rightHook);
 		});
-		//console.log('Process End:'+(new Date()).getTime());
 	},
 	show: function(){
 		$('#'+this.pare).append(this.container);
@@ -204,8 +202,6 @@ QRack.prototype = {
 	}
 }
 function QRack(data){
-	//console.log("New Rack Created");
-	//console.log(data);
 	this.pare = data.pare;
 	this.solutions = {};
 	this.display = Number(localStorage.gAlphaDisplay);

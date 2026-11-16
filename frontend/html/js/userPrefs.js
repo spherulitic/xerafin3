@@ -7,7 +7,7 @@ function initUserPrefs() {
     data: JSON.stringify(d),
     success: showUserPrefs,
     error: function(jqXHR, textStatus, errorThrown) {
-      console.log("Error retrieving user prefs. Status: " + textStatus + "  Error: " + errorThrown);
+      console.error("Error retrieving user prefs. Status: " + textStatus + "  Error: " + errorThrown);
     }
   });
 }
@@ -23,7 +23,7 @@ function updateEnabledLexList() {
       createLexiconEnabled(inputs.lexes);
     },
     error: function(jqXHR, textStatus, errorThrown) {
-      console.log("Error retrieving user prefs. Status: " + textStatus + "  Error: " + errorThrown);
+      console.error("Error retrieving user prefs. Status: " + textStatus + "  Error: " + errorThrown);
     }
   });
 }
@@ -81,7 +81,7 @@ function updateLexicon(data){
     error: function(jqXHR, textStatus, errorThrown) {
       $("#heading_text_pan_1_d").html("Preferences");
       gFloatingAlert("LexiconUpdateAlert",5000,"Lexicon Update", "An error occured whilst attempting to update to "+data.lexicon.toUpperCase()+" "+data.version,500);
-      console.log("Error retrieving user prefs. Status: " + textStatus + "  Error: " + errorThrown);
+      console.error("Error retrieving user prefs. Status: " + textStatus + "  Error: " + errorThrown);
       overlay.clear();
     }
   });
@@ -355,6 +355,6 @@ function uploadProfileImage() {
     $('#profileButton').prop('disabled', false);
     $('#profileButton').val('Error');
     gFloatingAlert("profileAlert",3000,"Profile Image", error.message || "Upload failed.",500);
-    console.log("Profile image upload error: " + error);
+    console.error("Profile image upload error: " + error);
   });
 }

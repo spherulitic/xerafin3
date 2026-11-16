@@ -32,7 +32,6 @@ Paginator.prototype = {
 		return this.resultsRow;
 	},
 	drawTabRow: function(){
-		console.log("PAGE NUMBER CHANGED, SHOULD UPDATE TABS");
 		let self=this;
 		$(this.tabRow).empty();
 		let x = (((this.numResType!==1) && (this.numResType!==3)) ? this.numPages : 1);
@@ -41,7 +40,6 @@ Paginator.prototype = {
 			'currentPage':this.currentPage,
 			'action':function(x){self.runActions(x);}
 		});
-		console.log(this.tabs.output());
 		$(this.tabRow).append(this.tabs.output());
 	},
 	drawPageNumberInput: function(){
@@ -65,7 +63,7 @@ Paginator.prototype = {
 				self.runActions(z);
 			}
 			else {
-				console.log('Invalid Page Number Submitted '+z+' Numpages:'+self.numPages);
+				console.error('Invalid Page Number Submitted '+z+' Numpages:'+self.numPages);
 			}
 		});
 		$(this.pageNumberRegion).append(this.pageNumberLabel,this.pageNumberInput);
@@ -95,7 +93,7 @@ Paginator.prototype = {
 			}
 
 			else {
-				console.log('Invalid Page Size Submitted '+z);
+				console.error('Invalid Page Size Submitted '+z);
 			}
 		});
 		$(this.numResultsInput).attr({'maxlength':3,'size':3});

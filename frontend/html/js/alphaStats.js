@@ -14,7 +14,7 @@ async function showAlphaStats (alpha) {
         const data = await response.json();
         displayAlphaStats(data);
 
-      } catch (error) { console.log("Error getting alphagram stats: " + error.message); }
+      } catch (error) { console.error("Error getting alphagram stats: " + error.message); }
     } else { displayAlphaStats(); }
   }
 }

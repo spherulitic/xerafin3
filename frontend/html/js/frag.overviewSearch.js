@@ -87,7 +87,6 @@ OverviewSearch.prototype = {
 		this.searchQuery.searchType = this.typeSelect.val();
 		let self=this;
 		this.searchRows.forEach(function(v,i){
-			//console.log(v.values);
 			if (self.searchRows[i].isSelected){
 				Object.entries(v.values).forEach(function([obj,objVal]){
 					self.searchQuery[obj] = objVal;
