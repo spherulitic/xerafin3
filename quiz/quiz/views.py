@@ -173,9 +173,14 @@ def getQuestions():
       template = { }
       template["alpha"] = alpha
       template["answers"] = questions[alpha]
-      url = 'http://cardbox:5000/getAuxInfo'
-      data = {"alpha": alpha}
-      auxInfo = xu.check401(requests.post(url, headers=g.headers, json=data)).json()["aux"]
+      # Blank questions never enter the cardbox, so aux info for one is always
+      # empty. Skip the round trip rather than ask for known-empty data.
+      if _is_blank(alpha):
+        auxInfo = { }
+      else:
+        url = 'http://cardbox:5000/getAuxInfo'
+        data = {"alpha": alpha}
+        auxInfo = xu.check401(requests.post(url, headers=g.headers, json=data)).json()["aux"]
       template["correct"] = auxInfo.get("correct")
       template["incorrect"] = auxInfo.get("incorrect")
       template["nextScheduled"] = auxInfo.get("nextScheduled")
@@ -220,6 +225,11 @@ def _cardbox_aux(alpha):
   '''Aux info for a single alphagram. '''
   url = 'http://cardbox:5000/getAuxInfo'
   return xu.check401(requests.post(url, headers=g.headers, json={"alpha": alpha})).json()
+
+def _is_blank(alpha):
+  '''True for a blank question key ("AAIINR?"). Blank keys never touch the
+     cardbox, so every cardbox path is skipped for them. '''
+  return isinstance(alpha, str) and '?' in alpha
 
 def _increment_stats():
   '''Bumps today's leaderboard entry via stats; one retry on 5xx or timeout.
@@ -293,7 +303,18 @@ def submitQuestion():
 
   result['cardboxUpdated'] = False
 
-  if setCardbox is not None:
+  if _is_blank(alpha):
+    # Blank questions never create or move cards (epic #195). Record quiz
+    # progress only and report the cardbox state without touching it, even if
+    # the client sent a cardbox target.
+    if quizid > -1:
+      if correct:
+        mark_correct(alpha, quizid)
+      else:
+        mark_wrong(alpha, quizid)
+    result['score'] = _cardbox_score()
+    result['aux'] = {"alpha": alpha, "aux": { }}
+  elif setCardbox is not None:
     # explicit direct schedule (alpha stats dropdown, moveToCardbox)
     target = int(setCardbox)
     result['aux'], result['score'] = _cardbox_op(alpha, target, target > 0)
@@ -603,6 +624,10 @@ def addQuizToCardbox():
                 (quizid, g.uuid))
   correctAlphas = [x[0] for x in g.con.fetchall()]
 
+  # Blank keys can never be served from the cardbox, so never add them.
+  alphas = [x for x in alphas if not _is_blank(x)]
+  correctAlphas = [x for x in correctAlphas if not _is_blank(x)]
+
   result["numAdded"] = 0
   if alphas:
     url = 'http://cardbox:5000/addManyToCardbox'
@@ -661,7 +686,7 @@ def activateQuiz():
       g.con.execute("update quiz_user_detail set locked = 0 where quiz_id = %s and user_id = %s", (quizid, g.uuid))
     else:
       # load quiz json
-      filename = os.path.join("/app/quizjson", f"{quizid}.json")
+      filename = os.path.join(QUIZJSON_PATH, f"{quizid}.json")
       with open(filename, 'r') as f:
         data = json.load(f)
       # insert into quiz user detail
@@ -865,6 +890,10 @@ def getNonCardboxQuestions (numNeeded, quizid) : # pylint: disable=unused-argume
     "where quiz_id = %s and user_id = %s and locked = 0 and completed = 0 limit %s")
   g.con.execute(getCardsQry, (quizid, g.uuid, numNeeded))
   allQuestions = [x[0] for x in g.con.fetchall()]
+  if not allQuestions:
+    # getManyAnagrams rejects an empty alphagram list with a 400. An empty
+    # batch just means the quiz is exhausted; let getQuestions report eof.
+    return quiz
   url = 'http://lexicon:5000/getManyAnagrams'
   data = {"alphagrams": allQuestions}
   quiz = xu.check401(requests.post(url, headers=g.headers, json=data)).json()

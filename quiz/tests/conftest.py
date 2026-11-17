@@ -1,9 +1,8 @@
-"""Fixtures for the quiz ``submitQuestion`` tests.
+"""Fixtures for the quiz service tests.
 
-The handler is driven with a legacy sloth payload (``quizid`` -1, ``cardbox``
--2), which touches no database rows, and the stats/cardbox HTTP calls are
-scripted per test. Keycloak is bypassed by replacing the ``before_request``
-hook that verifies the JWT.
+Keycloak is bypassed by replacing the ``before_request`` hook that verifies the
+JWT, and ``g.con`` is a scripted fake cursor so no MySQL server is needed. HTTP
+calls to other services are scripted per test (see ``helpers``).
 """
 import os
 import sys
@@ -19,16 +18,23 @@ from flask import g  # noqa: E402
 
 from quiz import app  # noqa: E402
 
-TEST_UUID = "test-user-uuid"
+from helpers import FakeCursor, TEST_UUID  # noqa: E402
 
 
 @pytest.fixture
-def client(monkeypatch):
+def db():
+    """Scripted MySQL cursor exposed to handlers as ``g.con``."""
+    return FakeCursor()
+
+
+@pytest.fixture
+def client(monkeypatch, db):
     """Flask test client with the JWT check replaced by a fixed user."""
     def hook():
         g.uuid = TEST_UUID
         g.headers = {"Authorization": "Bearer test-token"}
         g.mysqlcon = None
+        g.con = db
 
     monkeypatch.setitem(app.before_request_funcs, None, [hook])
     monkeypatch.setitem(app.config, "PROPAGATE_EXCEPTIONS", False)
