@@ -121,7 +121,7 @@ QButtonBank.prototype = {
 	start:function(data){
 		this.data = data;
 		this.toggleButtons(false);
-		$(this.secondRow).find('div>button').filter(':eq(0)').prop('disabled',(this.data.alpha.length<5));
+		$(this.secondRow).find('div>button').filter(':eq(0)').prop('disabled',(this.data.alpha.length<5 || isBlankAlpha(this.data.alpha)));
 		$(this.thirdRow).find('div>button').filter(':eq(1)').prop('disabled',Number(this.data.quizid)===-1);
 		$(this.secondRow).find('div>button').filter(':eq(2)').prop('disabled',(this.data.alpha.length===2));
 	},

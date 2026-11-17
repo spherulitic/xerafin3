@@ -279,6 +279,16 @@ class Quiz {
    return this.questions.filter(q => q.alpha == alpha)[0];
        }
 
+       getQuestionByAnswer(word) {
+         // Plain keys match the exact alphagram first. A blank key (AAIINR?)
+         // matches any word built from the core plus one letter; overlapping
+         // blanks exist, so prefer one that still has this word unanswered.
+   var exact = this.getQuestionByAlpha(toAlpha(word));
+   if (exact) { return exact; }
+   var blanks = this.questions.filter(q => isBlankAlpha(q.alpha) && answerFitsAlpha(word, q.alpha));
+   return blanks.filter(q => q.unanswered.indexOf(word) > -1)[0] || blanks[0];
+       }
+
        closeQuestion(alpha) {
          // modifies self.questions in place and returns true if the question was found
    var q = this.getQuestionByAlpha(alpha);
@@ -339,7 +349,7 @@ class Question {
     // 2 - correct but already answered
     // -1 - truthy; wrong alphagram
     // normal function - no promises
-    if (toAlpha(answer) != this.alpha) {
+    if (!answerFitsAlpha(answer, this.alpha)) {
       return -1;
     }
     else {
@@ -442,7 +452,9 @@ processSubmissionResult(response, correct) {
         this.updateLocalStorage(correct);
     }
 
-    if ($('#pan_5').length !== 0) {
+    // Alphagram info is meaningless for a blank key, and the panel would offer
+    // to add "?" to the cardbox.
+    if ($('#pan_5').length !== 0 && !isBlankAlpha(this.alpha)) {
         showAlphaStats(this.alpha);
     }
 

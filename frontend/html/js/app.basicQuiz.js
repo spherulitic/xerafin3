@@ -293,7 +293,10 @@ BasicQuiz.prototype = {
         'display':Number(localStorage.gAlphaDisplay)
       });
       basicQuizUI.update("INF_NEW_QST",this.quiz.questions[0]);
-      basicQuizUI.update('TBL_POP_NEW',this.quiz.questions[0].words);
+      basicQuizUI.update('TBL_POP_NEW', {
+        'words': this.quiz.questions[0].words,
+        'alpha': this.quiz.questions[0].alpha
+      });
       basicQuizUI.update("BUT_UND_QST", (this.undo || this.quiz.lastQuestion===null));
       basicQuizUI.update("INP_RST_STA");
       if (this.quiz.questions[0].answers.length==0) {this.markHuh();}

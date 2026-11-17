@@ -8,45 +8,49 @@ AnswerArea.prototype = {
   setupWord: function(question) {
 
   var q = this.parent.q;
+  // Ids contain the alphagram, and a blank key's "?" is invalid in a CSS
+  // selector, so every lookup for these ids goes through getElementById.
   if(!document.getElementById('invWords'+question.alpha)) { // don't create duplicate DOM element for alphas on refresh
   gCreateElemArray([
      ['a','div','invAlphaDiv','invAlphaDiv'+question.alpha,'invCurDiv',''],
      ['a1','table','wordTable','invWords'+question.alpha,'a',''],
      ['a2','div','wordTableWrong','invWordsWrong'+question.alpha,'a','']
   ]);
-        if (typeof question.cardbox === "undefined") {
-    $('#invAlphaDiv'+question.alpha).addClass("steelRowedInv");
+        // Blank questions never enter the cardbox, so they get no affordance.
+        if (typeof question.cardbox === "undefined" && !isBlankAlpha(question.alpha)) {
+    $(document.getElementById('invAlphaDiv'+question.alpha)).addClass("steelRowedInv");
           document.getElementById('invAlphaDiv'+question.alpha).onclick = function() {
                               q.getQuestionByAlpha(question.alpha).addToCardbox();
-            $('#invAlphaDiv'+question.alpha).removeClass("steelRowedInv");
-            $('#invAlphaDiv'+question.alpha).addClass("blueRowed");
+            $(document.getElementById('invAlphaDiv'+question.alpha)).removeClass("steelRowedInv");
+            $(document.getElementById('invAlphaDiv'+question.alpha)).addClass("blueRowed");
                                      };
             }
-  $('#invAlphaDiv'+question.alpha).css('visibility','hidden');
+  $(document.getElementById('invAlphaDiv'+question.alpha)).css('visibility','hidden');
      }
      },  // end setupWord
 
   submitAnswer: function() {
 
   var answer = $('#answerBox').val().toUpperCase().trim();
-  var alpha = toAlpha(answer);
   var q = this.parent.q;
   var status;
   $('#answerBox').val("");
-  var questionAnswered = q.getQuestionByAlpha(alpha);
+  var questionAnswered = q.getQuestionByAnswer(answer);
   if ( questionAnswered ) {
     // attempted to answer a real question
     this.lastAnswered = questionAnswered;
     var result = questionAnswered.submitAnswer(answer);
+    // DOM ids key on the question, not on what was typed
+    var alpha = questionAnswered.alpha;
     switch(result) {
       case 0: // wrong answer
         $('#answerBox').toggleClass('flashWrong',200).delay(100).toggleClass('flashWrong',200);
-        $('#invWordsWrong'+alpha).append(" "+answer);
-         $('#invWordsWrong'+alpha).css('visibility','visible');
+        $(document.getElementById('invWordsWrong'+alpha)).append(" "+answer);
+         $(document.getElementById('invWordsWrong'+alpha)).css('visibility','visible');
         if (questionAnswered.unanswered.length > 0) {
-           $('#invCurDiv').prepend($('#invAlphaDiv'+alpha));
+           $('#invCurDiv').prepend($(document.getElementById('invAlphaDiv'+alpha)));
         }
-        var par = $('#invAlphaDiv'+alpha).parent().attr("id");
+        var par = $(document.getElementById('invAlphaDiv'+alpha)).parent().attr("id");
         $('.nav-pills a[href="#'+par+'"]').tab('show');
         status = "wrong";
       break;
@@ -86,7 +90,7 @@ AnswerArea.prototype = {
         tabState = 'invSolvedDiv';
          if (question.quizid > -1 && question.cardboxEligible) {
            // if updating cardbox in non-cardbox quiz (server-decided flag)
-           $("#invWords"+question.alpha).addClass('highlightRow'); }
+           $(document.getElementById("invWords"+question.alpha)).addClass('highlightRow'); }
          data = question.answers.sort();
         $('.nav-pills a[href="#invSolvedDiv"]').tab('show');
         status = "solved";
@@ -98,10 +102,10 @@ AnswerArea.prototype = {
   status = "wrong";
   break;
      } // end switch
-     $("#invAlphaDiv"+question.alpha).prependTo($("#"+tabState));
-     $("#invAlphaDiv"+question.alpha).css('visibility', 'visible');
+     $(document.getElementById("invAlphaDiv"+question.alpha)).prependTo($("#"+tabState));
+     $(document.getElementById("invAlphaDiv"+question.alpha)).css('visibility', 'visible');
      for (var x=0;x<data.length;x++) {
-       var datas = getTableLineData(data[x], eval("question.words."+data[x]));
+       var datas = getTableLineData(data[x], eval("question.words."+data[x]), question.alpha);
        var row = table.insertRow(-1);
        var cells = [ ];
        var cellClassList = [" wordTableLeftHook", " wordTableInnerLeft", " wordTableWord", " wordTableInnerRight", " wordTableLexiconSymbol", " wordTableRightHook", " wordTableDefinition"];

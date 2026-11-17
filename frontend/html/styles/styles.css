@@ -539,6 +539,11 @@ display:table;min-height:50px;
 .quizAlphaRight {text-align:left;padding-left:0px;}
 .quizAlphaLeft br {line-height:2px;font-size:10%;}
 .quizAlphaRight br {line-height: 2px;font-size:10%;}
+/* Blank (?) keys: the wildcard tile has no letter value, so mark it apart. */
+.tileBlank {background-color: rgba(64,64,64,1) !important;color: rgba(215,215,200,0.55) !important;
+  box-shadow: inset 0 0 0 2px rgba(215,215,200,0.7), 0 0 12px #333 !important;}
+.blankAlpha {color:#caa64b;}
+.blankLetter {color:red;}
 .quizPlaceholder {display:inline-block;}
 .quizConnection {text-align:center;height:1.2em;width:100%;vertical-align:middle;color:#111;line-height:1.2em;font-size:0.9em;}
 .quizAnswerRegion {width:95%;vertical-align:middle;overflow:auto;text-align:center;display:inline-block;margin:auto auto;padding-bottom:1em;}

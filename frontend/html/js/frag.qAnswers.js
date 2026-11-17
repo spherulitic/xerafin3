@@ -42,7 +42,7 @@ QAnswers.prototype = {
     this.rows[key].output = document.createElement('tr');
     var y = new Array();
     var lex_symbol = data[4] || "";
-    var list = [data[0],(data[3][0] ? dot : ""),key,(data[3][1] ? dot : ""),lex_symbol,data[1],this.findWordLinks(this.findExtLinks(data[2],key))];
+    var list = [data[0],(data[3][0] ? dot : ""),highlightBlankLetter(key, this.alpha),(data[3][1] ? dot : ""),lex_symbol,data[1],this.findWordLinks(this.findExtLinks(data[2],key))];
     for (var x=0;x<7;x++){
       y[x]= document.createElement('td');
       $(y[x]).html(list[x]);
@@ -110,15 +110,17 @@ QAnswers.prototype = {
   appendWrong: function(ans){
     $(this.wrongAnswers).append(" "+ans);
   },
-  start: function(data){
+  start: function(payload){
     let that=this;
     let q='?';
-    this.data = data;
+    // TBL_POP_NEW passes {words: {...}, alpha: "AAIINR?"}
+    this.data = payload.words;
+    this.alpha = payload.alpha;
     this.hints = 0;
     this.rows = {};
     $(this.answerTable).empty();
     $(this.wrongAnswers).empty();
-    var z = Object.keys(data).sort();
+    var z = Object.keys(this.data).sort();
     z.forEach(function(a){
       that.createRow(a,that.data[a]);
       that.createRow(a+'_H',['','','',[0,0],'','']);
