@@ -1,0 +1,5 @@
+node_modules/
+browsers/
+credentials.json
+results.json
+shots/
