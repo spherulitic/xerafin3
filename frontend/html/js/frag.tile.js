@@ -28,8 +28,6 @@ Tile.prototype = {
 			'position':'relative',
 		});
 		$(this.tile).addClass('noselect');
-		// A blank tile is a wildcard, not a letter, so it gets its own look.
-		if (this.letter === '?') {$(this.tile).addClass('tileBlank');}
 		this.tileLetter= document.createElement('div');
 		$(this.tileLetter).css({'width':'inherit','height':'inherit','vertical-align' : 'middle','text-align':'center'});
 		$(this.tileLetter).html(this.letter);

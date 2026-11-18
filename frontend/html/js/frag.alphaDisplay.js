@@ -85,7 +85,7 @@ AlphaDisplay.prototype = {
 		else {
 			this.textWord = document.createElement('div');
 			$(this.textWord).css({'font-size':this.fontSize+'px','line-height':this.fontSize+'px'});
-			$(this.textWord).html(this.alpha.replace('?', '<span class="blankAlpha">?</span>'));
+			$(this.textWord).html(this.alpha);
 			$(this.container).append(this.textWord);
 		}
 	},
