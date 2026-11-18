@@ -47,3 +47,24 @@ jobs:
             -v "$PWD/${{ matrix.service }}:/app" \
             x-${{ matrix.service }}:test \
             sh -c "pip install -q -r requirements-test.txt && python -m pytest tests -q -p no:cacheprovider"
+
+  frontend-js:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/js-tests/package-lock.json
+
+      - name: Install frontend test deps
+        working-directory: frontend/js-tests
+        run: npm ci
+
+      - name: Run frontend js tests
+        working-directory: frontend/js-tests
+        run: npm test

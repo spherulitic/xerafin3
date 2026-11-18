@@ -59,14 +59,61 @@ async function fetchWithAuth(url, options = {}) {
 
 function toAlpha(word) {return word.split('').sort().join('');}
 
+// A blank question key is a canonical alphagram with a trailing wildcard,
+// e.g. AAIINR?. Its answers are every word built from the core plus one letter.
+function isBlankAlpha(alpha) {
+    return typeof alpha === 'string' && alpha.charAt(alpha.length - 1) === '?';
+}
+
+// The letter the blank supplies for `word`, or null if the word does not fit.
+// The word is sorted, as is the core, so one left-to-right pass that tolerates
+// a single extra character decides whether it matches.
+function blankExtraLetter(word, alpha) {
+    if (!isBlankAlpha(alpha)) { return null; }
+    var core = alpha.slice(0, -1);
+    if (word.length !== core.length + 1) { return null; }
+    var sorted = toAlpha(word);
+    var extra = null;
+    var j = 0;
+    for (var i = 0; i < sorted.length && j < core.length; i++) {
+        if (sorted[i] === core[j]) { j++; }
+        else if (extra === null) { extra = sorted[i]; }
+        else { return null; } // a second mismatch means the word does not fit
+    }
+    if (j !== core.length) { return null; }
+    // An extra letter that sorts after every core letter is never compared.
+    return extra !== null ? extra : sorted.charAt(sorted.length - 1);
+}
+
+function answerFitsAlpha(word, alpha) {
+    if (!isBlankAlpha(alpha)) { return toAlpha(word) === alpha; }
+    return blankExtraLetter(word, alpha) !== null;
+}
+
+// Render `word` with the letter supplied by the blank in red, so answer tables
+// show what the wildcard contributed.
+function highlightBlankLetter(word, alpha) {
+    var extra = blankExtraLetter(word, alpha);
+    if (extra === null) { return word; }
+    var i = word.indexOf(extra);
+    return word.slice(0, i) + '<span class="blankLetter">' + word.charAt(i) + '</span>' + word.slice(i + 1);
+}
+
 function alphaSortVC(content, type) {
-    var consonants = content.replace(/[aeiou]/ig, '');
-    var vowels = content.replace(/[bcdfghjklmnpqrstvwxyz]/ig, '');
+    var vowels = '';
+    var consonants = '';
+    var other = '';
+    content.split('').forEach(function(c) {
+        if (/[aeiou]/i.test(c)) { vowels += c; }
+        else if (/[a-z]/i.test(c)) { consonants += c; }
+        // '?' (and anything unexpected) is neither, so it is kept once and last
+        else { other += c; }
+    });
     if (type === 0) {
-        return vowels + consonants;
+        return vowels + consonants + other;
     }
     else {
-        return consonants + vowels;
+        return consonants + vowels + other;
     }
 }
 
@@ -142,16 +189,11 @@ function stopScrollTimer() {
         clearInterval(scrollTimer);
 }
 
-function getTableLineData(word, auxWordData) {
+function getTableLineData(word, auxWordData, alpha) {
 // auxWordData is the list [ front hooks, back hooks, definition, [frontDot, backDot], lexiconSymbol ]
-   if(document.getElementById('blankQuizCheck') && document.getElementById('blankQuizCheck').checked ) {
-      var givenAlpha = alphagram.replace('?', '');
-      var blankLetter = word;
-      var i = givenAlpha.length;
-      while(i--) {
-         blankLetter = blankLetter.replace(givenAlpha.charAt(i), "");
-      }
-      word = word.replace(blankLetter, "<span style='color: red'>" + blankLetter + "</span>");
+   // Blank questions show which letter the wildcard supplied.
+   if (isBlankAlpha(alpha)) {
+      word = highlightBlankLetter(word, alpha);
    }
 
    // make definitions clickable

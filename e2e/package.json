@@ -1,0 +1,12 @@
+{
+  "name": "xerafin-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local Playwright checks for the blank (?) quiz UI",
+  "scripts": {
+    "test": "node blank-quiz.js"
+  },
+  "devDependencies": {
+    "playwright": "1.65.1"
+  }
+}

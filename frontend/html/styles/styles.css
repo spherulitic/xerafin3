@@ -539,6 +539,7 @@ display:table;min-height:50px;
 .quizAlphaRight {text-align:left;padding-left:0px;}
 .quizAlphaLeft br {line-height:2px;font-size:10%;}
 .quizAlphaRight br {line-height: 2px;font-size:10%;}
+.blankLetter {color:red;}
 .quizPlaceholder {display:inline-block;}
 .quizConnection {text-align:center;height:1.2em;width:100%;vertical-align:middle;color:#111;line-height:1.2em;font-size:0.9em;}
 .quizAnswerRegion {width:95%;vertical-align:middle;overflow:auto;text-align:center;display:inline-block;margin:auto auto;padding-bottom:1em;}
