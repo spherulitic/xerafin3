@@ -66,6 +66,39 @@ function createWindow() {
   return { dom, w };
 }
 
+// Minimal harness for panels.js: three empty column containers, jQuery, and the
+// few globals the file touches outside the panel-layout helpers.
+function createPanelsWindow() {
+  const dom = new JSDOM(
+    '<!doctype html><html><body>' +
+      '<div id="leftArea"></div><div id="middleArea"></div><div id="rightArea"></div>' +
+      '</body></html>',
+    { url: 'http://localhost/', runScripts: 'outside-only' }
+  );
+  const w = dom.window;
+
+  const load = (code, label) => {
+    try {
+      w.eval(code);
+    } catch (e) {
+      throw new Error(`failed to load ${label}: ${e.message}`, { cause: e });
+    }
+  };
+
+  load(fs.readFileSync(JQUERY, 'utf8'), 'jQuery');
+  load(
+    'window.$ = window.jQuery = jQuery;' +
+    'function appendDebugLog(){}' +
+    'function isMobile(){ return false; }' +
+    'function startChat(){}' +
+    'var xerafin = { error: { log: { add: function(){} } } };',
+    'panels.js stubs'
+  );
+  load(fs.readFileSync(path.join(JS, 'panels.js'), 'utf8'), 'panels.js');
+
+  return { dom, w };
+}
+
 // A question object shaped like the /getQuestions response. submitQuestion is
 // replaced so tests never make network calls.
 function makeQuestion(w, alpha, answers) {
@@ -119,4 +152,4 @@ function typeAnswer(w, area, word) {
   return area.submitAnswer();
 }
 
-module.exports = { createWindow, makeQuestion, makeAnswerArea, typeAnswer };
+module.exports = { createWindow, createPanelsWindow, makeQuestion, makeAnswerArea, typeAnswer };

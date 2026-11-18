@@ -1,6 +1,6 @@
 function initBQ(data={
-    'quizid':xerafin.storage.data.overview.currentQuizId,
-    'quizname':xerafin.storage.data.overview.currentName
+    'quizid':xerafin.storage.data.overview.currentQuiz,
+    'quizname':xerafin.storage.data.overview.currentQuizName
     }){
   if (typeof basicQuiz==='undefined'  || $('#pan_1_a').length===0) {
     basicQuiz = new BasicQuiz(data);

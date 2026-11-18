@@ -1,15 +1,92 @@
 
+// The column ids don't match their visual order. On wide screens
+// switch_areas() (index.htm) moves #middleArea before #leftArea, so
+// 'middleArea' renders as the left column and 'leftArea' as the middle one.
+// The saved layout keeps the leftArea/middleArea/rightArea order either way.
+var panelColumns = ['leftArea', 'middleArea', 'rightArea'];
+
+function defaultPanelLayout(){
+  return [[["4",true],["1_a",false]],[["0",false]],[["2",false],["3",false]]];
+}
+
+// Saved panel ids are stored without the 'pan_' DOM prefix. Older layouts can
+// still contain aliases that used to map to the Basic Quiz panel.
+function normalizePanelId(value){
+  if (value===undefined || value===null) {return null;}
+  var id = value.toString().replace(/^pan_/,'');
+  if (id==='' || id==='undefined' || id==='null') {return null;}
+  if (id==='20' || id==='1_e' || id==='1_f') {return '1_a';}
+  return id;
+}
+
+// Reads, validates and normalises the three-column layout. Always returns
+// three arrays of [id, isMinimized] pairs, so callers never see holes or junk.
+function getPanelLayout(){
+  var cols;
+  try {
+    cols = JSON.parse(localStorage.getItem('panelPositions'));
+  } catch (e) {
+    cols = null;
+  }
+  if (!Array.isArray(cols)) {cols = [];}
+  cols.length = 3;
+  var seen = {};
+  for (var x=0;x<3;x++){
+    if (!Array.isArray(cols[x])) {cols[x] = [];}
+    var clean = [];
+    for (var y=0;y<cols[x].length;y++){
+      var entry = cols[x][y];
+      if (!Array.isArray(entry)) {continue;}
+      var id = normalizePanelId(entry[0]);
+      if (!id || /_temp_/.test(id) || seen[id]) {continue;}
+      seen[id] = true;
+      clean.push([id, entry[1]===true || entry[1]==='true']);
+    }
+    cols[x] = clean;
+  }
+  return cols;
+}
+
+function savePanelLayout(cols){
+  localStorage.setItem('panelPositions', JSON.stringify(cols));
+}
+
+// Seeds the default layout, or repairs a saved one that is unusable. A missing
+// panel is never a reason to throw the whole layout away.
+function loadPanelLayout(){
+  if (localStorage.getItem('panelPositions')===null){
+    xerafin.error.log.add('Panels config initialized as blank.','comment');
+    savePanelLayout(defaultPanelLayout());
+    return;
+  }
+  var cols = getPanelLayout();
+  var total = 0;
+  var hasOverview = false;
+  for (var x=0;x<cols.length;x++){
+    total += cols[x].length;
+    for (var y=0;y<cols[x].length;y++){
+      if (cols[x][y][0]==='0') {hasOverview = true;}
+    }
+  }
+  if (total===0){
+    savePanelLayout(defaultPanelLayout());
+    return;
+  }
+  if (!hasOverview){
+    // The overview can't be closed, so a layout without it is corrupt. Put it
+    // back instead of resetting every other panel to the defaults.
+    cols[1].splice(0,0,['0',false]);
+    xerafin.error.log.add('Panels config repaired (overview missing).','comment');
+  }
+  savePanelLayout(cols);
+}
+
 function findPanel(panel){
-  var panelList=JSON.parse(localStorage.panelPositions);
-  //RF NOTE: likely a good solution involving $.each and $.inarray, but I haven't figured them out yet to work in a 3 dimension array walk.
+  var panelList=getPanelLayout();
   for (var x=panelList.length-1;x>-1;x--){
-    if (typeof panelList[x]!=='undefined'){
-      for (var y=panelList[x].length-1;y>-1;y--){
-        if (typeof panelList[x][y]!=='undefined'){
-          if (panelList[x][y][0].toString()==panel){
-            return [x,y];
-          }
-        }
+    for (var y=panelList[x].length-1;y>-1;y--){
+      if (panelList[x][y][0]===panel.toString()){
+        return [x,y];
       }
     }
   }
@@ -18,53 +95,75 @@ function findPanel(panel){
 
 function clearPanel(panel){
   var x=findPanel(panel);
-  if (!x) {}
-  else {
-    var cols=JSON.parse(localStorage.panelPositions);
-    cols[x[0]].splice(x[1],1);
-    localStorage.panelPositions=JSON.stringify(cols);
-  }
+  if (!x) {return;}
+  var cols=getPanelLayout();
+  cols[x[0]].splice(x[1],1);
+  savePanelLayout(cols);
 }
 
 function togglePanel(panel){
   var x=findPanel(panel);
-  var cols=JSON.parse(localStorage.panelPositions);
+  if (!x) {return;}
+  var cols=getPanelLayout();
   cols[x[0]][x[1]][1]=!(cols[x[0]][x[1]][1]);
-  localStorage.panelPositions=JSON.stringify(cols);
+  savePanelLayout(cols);
 }
 
-function addPanel(panel,column ,ind){
-  var colValue=getPanelValue(column);
-  if (ind=-1){
-
-    if ((typeof temp==='undefined') || (typeof temp[colValue]==='undefined')){ind =0;}
-    else {ind = temp[colValue].length;}
-  }
-    var cols=JSON.parse(localStorage.panelPositions);
-    var insertArr = new Array(panel.toString(),false);
-    if (typeof cols[colValue]==='undefined'){
-      cols.splice(0,0,[]);cols.splice(1,0,[]);cols.splice(2,0,[]);
+// Game panels (Basic Quiz, Sloth, Invaders, Wall of Words, Preferences) share
+// one slot. Returns the [column, index] of whichever one is saved, if any.
+function findGamePanelSlot(ident){
+  var cols=getPanelLayout();
+  var re=new RegExp('^'+ident+'_');
+  for (var x=0;x<cols.length;x++){
+    for (var y=0;y<cols[x].length;y++){
+      if (re.test(cols[x][y][0])) {return [x,y];}
     }
-    cols[colValue].splice(ind,0,insertArr);
-    localStorage.panelPositions=JSON.stringify(cols);
+  }
+  return null;
+}
+
+function removeGamePanels(cols, ident){
+  var re=new RegExp('^'+ident+'_');
+  for (var x=0;x<cols.length;x++){
+    cols[x]=cols[x].filter(function(entry){return !re.test(entry[0]);});
+  }
+  return cols;
+}
+
+// Inserts into the DOM and the saved layout at the same column/index.
+function insertPanelAt(panelSuffix, slot, newPanel){
+  var cols=getPanelLayout();
+  var colIndex=slot[0];
+  var $col=$('#'+panelColumns[colIndex]);
+  var children=($col.length>0) ? $col.children() : $();
+  var ind=slot[1];
+  if (typeof ind!=='number' || isNaN(ind) || ind<0) {ind=0;}
+  ind=Math.min(ind, cols[colIndex].length, children.length);
+  if ($col.length>0){
+    if (ind===0) {$col.prepend(newPanel);}
+    else {children.eq(ind-1).after(newPanel);}
+  }
+  cols[colIndex].splice(ind,0,[panelSuffix.toString(),false]);
+  savePanelLayout(cols);
+}
+
+function addPanel(panel,column,ind){
+  var colValue=getPanelValue(column);
+  var cols=getPanelLayout();
+  if (colValue<0) {colValue=0;}
+  if (typeof ind!=='number' || isNaN(ind)) {ind=0;}
+  if (ind===-1 || ind>cols[colValue].length) {ind=cols[colValue].length;}
+  if (ind<0) {ind=0;}
+  cols[colValue].splice(ind,0,[panel.toString(),false]);
+  savePanelLayout(cols);
 }
 
 function getPanelName(value){
-  switch(value){
-    case 0:targetPanel='leftArea'; break;
-    case 1:targetPanel='middleArea'; break;
-    case 2:targetPanel='rightArea'; break;
-  }
-  return(targetPanel);
+  return panelColumns[value];
 }
 
 function getPanelValue(value){
-  switch(value){
-    case 'leftArea' : targetPanel=0; break;
-    case 'middleArea' : targetPanel=1; break;
-    case 'rightArea' : targetPanel=2; break;
-  }
-  return(targetPanel);
+  return panelColumns.indexOf(value);
 }
 
 function panelFunctionLookup(panel){
@@ -113,29 +212,22 @@ function populatePanelsFromArray(){
 //If nextTarget and nextMinim exist, they override some of the values set from those scripts,
 //clearing those two localStorage variables on closure (so that they don't fire again without being
 //reinitialized.)
-  var panelList=JSON.parse(localStorage.panelPositions);
+  var panelList=getPanelLayout();
   //special edge case to init chat if not in existing list
   var colStateArray = new Array();
   //These 2 loops have to be separate (thread/race conditions between generatePanel & AjaX calls)
   for (var x=0;x<3;x++){
     var targetPanel=getPanelName(x);
-    if (typeof panelList[x]==='undefined'){
-      panelList.splice(x,0,[]);
-    }
     for (var y=0;y<panelList[x].length;y++){
-      if (typeof panelList[x][y].length!=='undefined'){
-        var temp = [panelList[x][y][0].toString(),panelList[x][y][1].toString(),targetPanel,y];
-        colStateArray.push(temp);
-      }
+      var temp = [panelList[x][y][0].toString(),panelList[x][y][1].toString(),targetPanel,y];
+      colStateArray.push(temp);
     }
   }
   createPlaceholderDivs(panelList);
   localStorage.setItem('panelStateArray', JSON.stringify(colStateArray));
   for (var x=0;x<3;x++){
     for (var y=0;y<panelList[x].length;y++){
-      if (typeof panelList[x][y].length!=='undefined'){
-        panelFunctionLookup(panelList[x][y][0].toString());
-      }
+      panelFunctionLookup(panelList[x][y][0].toString());
     }
   }
 }
@@ -165,30 +257,18 @@ function removePanelInStorageQueue(panel){
 }
 
 function generatePanel(ident, data, targ, refresher, closure){
+  var panelSuffix, queueData, gameSlot = null;
   if (typeof data.variant==='undefined'){
-    var panelSuffix = ident;
-    var queueData=getPanelInStorageQueue(panelSuffix.toString());
+    panelSuffix = ident;
+    queueData=getPanelInStorageQueue(panelSuffix.toString());
   }
   else {
-    var panelSuffix = ident+'_'+data.variant;
-    var queueData=getPanelInStorageQueue(panelSuffix.toString());
+    panelSuffix = ident+'_'+data.variant;
+    queueData=getPanelInStorageQueue(panelSuffix.toString());
     if (!queueData){
-    if (($('[id^=pan_'+ident+'_]').length>0) && ($('[id^=pan_'+panelSuffix+']').length==0)) {
-      var parentNode = $('[id^=pan_'+ident+'_]:first').parent();
-      var parentId = parentNode.attr('id');
-      var indexNode = $('[id^=pan_'+ident+'_]:first');
-      var indexValue = indexNode.index();
-      $('[id^=pan_'+ident+'_]').each(function(){
-        var divId=$(this).attr('id');
-        clearPanel(divId.replace("pan_",""));
-        $(this).remove();
-      });
-      var indexMe=true;
-    }
-    else {
-      var indexMe=false;
-
-    }
+      // This game isn't in the saved layout. If another game panel is open,
+      // remember its slot so the new game lands exactly where the old one was.
+      gameSlot = findGamePanelSlot(ident);
     }
   }
   var buttonStyle="grey metalBOne";
@@ -305,10 +385,12 @@ function generatePanel(ident, data, targ, refresher, closure){
     //DOMNodeInserted events are to be deprecated at some point (once people stop using IE, most likely :p)
     //and we need to learn more about Mutation Handlers in general .
     if (typeof queueData=='boolean') {
-      if (indexMe==true){
-        if (indexValue===0){$(parentNode).prepend(newPanel);}
-        else {$(parentNode).children().eq(indexValue-1).after(newPanel);}
-        addPanel(panelSuffix, $(parentNode).attr('id'), indexValue);
+      if (gameSlot){
+        var cols = getPanelLayout();
+        removeGamePanels(cols, ident);
+        savePanelLayout(cols);
+        $('[id^=pan_'+ident+'_]').each(function(){ $(this).remove(); });
+        insertPanelAt(panelSuffix, gameSlot, newPanel);
       }
       else {
         $('#'+targ).prepend(newPanel);
@@ -331,20 +413,32 @@ function generatePanel(ident, data, targ, refresher, closure){
     }
 <!------------------------------------------------------------------------------------------------------------->
     function writePanelStatus(panelArray){
-      var newPanelArray=[];
-      for (x=0;x<panelArray.length;x++){
-        if (typeof panelArray[x]!=0){
-          newPanelArray[x]=[];
-          for (y=0;y<panelArray[x].length;y++){
-            if (typeof panelArray[x][y]!=0){
-              var temp=panelArray[x][y].replace('pan_' , '');
-              newPanelArray[x][y]=[temp, getPanelMinimizeStatus(panelArray[x][y])];
-            }
+      var oldLayout=getPanelLayout();
+      var newPanelArray=[[],[],[]];
+      var domIds={};
+      for (var x=0;x<3;x++){
+        var ids=panelArray[x] || [];
+        for (var y=0;y<ids.length;y++){
+          var id=normalizePanelId(ids[y]);
+          if (!id || /_temp_/.test(id)) {continue;}
+          newPanelArray[x].push([id, getPanelMinimizeStatus(ids[y])]);
+          domIds[id]=true;
+        }
+      }
+      // Panels that are configured but haven't loaded yet (cardbox and
+      // alphagram stats arrive after an ajax call) must survive a drag. A
+      // panel that moved columns is already in domIds and stays moved.
+      for (var x=0;x<3;x++){
+        for (var z=0;z<oldLayout[x].length;z++){
+          var existing=oldLayout[x][z][0];
+          if (!domIds[existing]){
+            var at=Math.min(z, newPanelArray[x].length);
+            newPanelArray[x].splice(at,0,[existing, oldLayout[x][z][1]]);
+            domIds[existing]=true;
           }
         }
-        else {newPanelArray[x][0]=[]}
       }
-      localStorage.panelPositions=JSON.stringify(newPanelArray);
+      savePanelLayout(newPanelArray);
       appendDebugLog("Panel configuration:"+localStorage.panelPositions);
     }
 <!------------------------------------------------------------------------------------------------------------->
@@ -361,20 +455,7 @@ function generatePanels(){
     // NB panel positions is an array which contains three arrays -- one per column
     //  with each element in the column array is an array: [panel_id, isCollapsed]
 
-      if (typeof localStorage.panelPositions!=='undefined') {
-        var pp = JSON.parse(localStorage.panelPositions);
-        var hasOverview = false;
-        // Panel 0 is the overview
-        for (var x=0;x<pp.length;x++) {
-            hasOverview = hasOverview || pp[x].map(x => x[0]).includes("0");
-        }
-        if (!hasOverview) { localStorage.removeItem('panelPositions'); }
-      }
-
-      if (typeof localStorage.panelPositions==='undefined'){
-        xerafin.error.log.add('Panels config initialized as blank.','comment');
-        localStorage.setItem('panelPositions','[[["4",true],["1_b",false]],[["0",false]],[["2",false],["3",false]]]');
-      }
+      loadPanelLayout();
       appendDebugLog("Content Populated Successfully");
       $('#pageContent').append(responseData);
       $('#mainLayer').css('opacity','0');
