@@ -1,0 +1,12 @@
+{
+  "name": "xerafin-frontend-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "jsdom tests for the Xerafin quiz frontend",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "jsdom": "^24.1.3"
+  }
+}
