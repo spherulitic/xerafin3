@@ -17,15 +17,18 @@ env:
   PROD_KEYCLOAK_URL: 'https://auth.xerafin.net'
 
 jobs:
-  build-and-push:
+  # Change detection runs first so the test gate knows which suites this push
+  # actually affects. It must also run when no container changed: a broken
+  # workflow edit would otherwise pass the gate vacuously.
+  detect:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     outputs:
-      new_versions_json: ${{ steps.set-versions.outputs.json }}
-      changed: ${{ steps.changed.outputs.containers }}
+      containers: ${{ steps.changed.outputs.containers }}
       config_changed: ${{ steps.changed.outputs.config }}
+      deploy_needed: ${{ steps.changed.outputs.deploy }}
+      testable: ${{ steps.changed.outputs.testable }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -34,12 +37,6 @@ jobs:
           # against github.sha for multi-commit pushes.
           fetch-depth: 0
 
-      - name: Log in to DockerHub
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
       - name: Detect changed containers
         id: changed
         run: |
@@ -47,6 +44,7 @@ jobs:
           ALL_CONTAINERS="chat keycloak cron frontend lexicon lexicon-loader login quiz stats sloth cardbox"
           CHANGED_CONTAINERS=""
           CONFIG_CHANGED="false"
+          CI_CHANGED="false"
 
           if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ github.event.inputs.force_rebuild_all }}" == "true" ]]; then
             echo "Force rebuild all containers requested"
@@ -80,6 +78,12 @@ jobs:
             if grep -qE '^(deploy/|lexicon-db/|\.github/workflows/build-and-push-docker\.yml|\.github/scripts/)' <<< "$CHANGED_FILES"; then
               CONFIG_CHANGED="true"
             fi
+
+            # A change to the gate itself (workflows, scripts, GH metadata)
+            # means every suite must run, but it does not need a deploy.
+            if grep -qE '^\.github/' <<< "$CHANGED_FILES"; then
+              CI_CHANGED="true"
+            fi
           fi
 
           if [ -n "$CHANGED_CONTAINERS" ] || [ "$CONFIG_CHANGED" = "true" ]; then
@@ -88,13 +92,79 @@ jobs:
             DEPLOY_NEEDED="false"
           fi
 
-          echo "CHANGED_CONTAINERS=$CHANGED_CONTAINERS" >> "$GITHUB_ENV"
-          echo "DEPLOY_NEEDED=$DEPLOY_NEEDED" >> "$GITHUB_ENV"
+          # Suites that exist today: the Python services with a tests/ dir and
+          # the frontend's js-tests. A CI edit runs all of them; a config-only
+          # push (deploy/, lexicon-db/) does too; otherwise only the changed.
+          TESTABLE_SUITES="frontend lexicon login quiz stats cardbox"
+          TESTABLE=""
+          if [ "$CI_CHANGED" = "true" ] || { [ "$CONFIG_CHANGED" = "true" ] && [ -z "$CHANGED_CONTAINERS" ]; }; then
+            TESTABLE="$TESTABLE_SUITES"
+          else
+            for suite in $TESTABLE_SUITES; do
+              if [[ " $CHANGED_CONTAINERS " == *" $suite "* ]]; then
+                TESTABLE="$TESTABLE $suite"
+              fi
+            done
+            TESTABLE="${TESTABLE# }"
+          fi
+
+          if [ -n "$TESTABLE" ]; then
+            TESTABLE_JSON=$(printf '%s\n' $TESTABLE | jq -R . | jq -s -c .)
+          else
+            TESTABLE_JSON='[]'
+          fi
+
           echo "containers=$CHANGED_CONTAINERS" >> "$GITHUB_OUTPUT"
           echo "config=$CONFIG_CHANGED" >> "$GITHUB_OUTPUT"
+          echo "deploy=$DEPLOY_NEEDED" >> "$GITHUB_OUTPUT"
+          echo "testable=$TESTABLE_JSON" >> "$GITHUB_OUTPUT"
           echo "Changed Containers: $CHANGED_CONTAINERS"
           echo "Config changed: $CONFIG_CHANGED"
+          echo "CI changed: $CI_CHANGED"
           echo "Deploy needed: $DEPLOY_NEEDED"
+          echo "Testable suites: $TESTABLE_JSON"
+
+  # Tests run before anything is built or pushed, so a red suite never
+  # produces a DockerHub tag.
+  test:
+    needs: detect
+    permissions:
+      contents: read
+    uses: ./.github/workflows/tests.yml
+    with:
+      services: ${{ needs.detect.outputs.testable }}
+
+  build-and-push:
+    needs: [detect, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      # Needed to dispatch tests.yml on the version-bump branch: a PR opened
+      # with GITHUB_TOKEN does not trigger pull_request workflows.
+      actions: write
+    # A failed or cancelled suite must never degrade into "build anyway".
+    if: always() && needs.detect.result == 'success' && (needs.test.result == 'success' || needs.test.result == 'skipped')
+    env:
+      CHANGED_CONTAINERS: ${{ needs.detect.outputs.containers }}
+      DEPLOY_NEEDED: ${{ needs.detect.outputs.deploy_needed }}
+      CONFIG_CHANGED: ${{ needs.detect.outputs.config_changed }}
+    outputs:
+      new_versions_json: ${{ steps.set-versions.outputs.json }}
+      changed: ${{ needs.detect.outputs.containers }}
+      config_changed: ${{ needs.detect.outputs.config_changed }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          # Full history so the version-bump branch and main baseline work.
+          fetch-depth: 0
+
+      - name: Log in to DockerHub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       # The deploy job pins every quadlet from versions.json on the checked-out
       # commit. While a version-bump PR is open, main lags the deployed tags,
@@ -153,6 +223,11 @@ jobs:
           git add versions.json
           git commit -m "ci: Increment version tags for: $CHANGED_CONTAINERS [skip ci]"
           git push origin "$BRANCH_NAME"
+          # A PR opened with GITHUB_TOKEN does not trigger pull_request
+          # workflows, so dispatch the suite on the bump branch ourselves.
+          # versions.json is path-ignored by this workflow, so this bump builds
+          # and deploys nothing: no suites need to run.
+          gh workflow run tests.yml --ref "$BRANCH_NAME" -f services='[]'
           echo "Creating pull request..."
           gh pr create \
             --title "Version updates for changed containers [skip ci]" \
@@ -200,12 +275,19 @@ jobs:
             fi
             docker push spherulitic/$image_name:$VERSION
           done
+
   deploy-to-droplet:
     runs-on: ubuntu-latest
-    needs: build-and-push
+    needs: [test, build-and-push]
     # Deploy when an image changed, or when a quadlet/workflow change needs to
     # be applied. Docs-only and lint-only pushes no longer touch prod (#473).
-    if: needs.build-and-push.outputs.changed != '' || needs.build-and-push.outputs.config_changed == 'true'
+    # The test gate must be green (or skipped because nothing needed testing);
+    # a failure or cancellation never deploys.
+    if: >-
+      always() &&
+      needs.build-and-push.result == 'success' &&
+      (needs.test.result == 'success' || needs.test.result == 'skipped') &&
+      (needs.build-and-push.outputs.changed != '' || needs.build-and-push.outputs.config_changed == 'true')
     concurrency:
       group: deploy-prod
       cancel-in-progress: false

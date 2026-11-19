@@ -2,25 +2,54 @@ name: Tests
 
 on:
   pull_request:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'JSON array of test suites to run, e.g. ["cardbox","quiz"]; empty runs everything'
+        required: false
+        default: ''
+        type: string
+  workflow_call:
+    inputs:
+      services:
+        description: 'JSON array of test suites to run; empty runs everything, [] runs nothing'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   detect:
     runs-on: ubuntu-latest
     outputs:
       services: ${{ steps.list.outputs.services }}
+      frontend: ${{ steps.list.outputs.frontend }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
-      - name: Find services with a tests/ directory
+
+      # The caller passes the suites that changed and have tests. Without an
+      # input, discover every suite, which is what PR runs do. An explicitly
+      # empty array is legitimate: it means the change cannot affect any
+      # suite (e.g. a versions.json bump).
+      - name: Resolve test suites
         id: list
+        env:
+          SERVICES_INPUT: ${{ inputs.services }}
         run: |
-          SERVICES=$(git ls-files | grep -oE '^[^/]+/tests/' | cut -d/ -f1 | sort -u | tr '\n' ' ')
-          echo "Services with tests: $SERVICES"
-          JSON=$(echo "$SERVICES" | xargs -n1 | jq -R . | jq -s -c .)
-          echo "services=$JSON" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ -n "$SERVICES_INPUT" ]; then
+            SUITES=$(printf '%s' "$SERVICES_INPUT" \
+              | jq -c -e 'if type == "array" then . else error("services must be a JSON array") end')
+          else
+            # Every top-level dir with a tests/ directory is a pytest suite.
+            # frontend/js-tests does not match that glob, so add it here.
+            SUITES=$(git ls-files | grep -oE '^[^/]+/tests/' | cut -d/ -f1 | sort -u \
+              | jq -R . | jq -s -c '. + ["frontend"] | unique')
+          fi
+          echo "Suites: $SUITES"
+          # frontend runs in its own job; everything else in the pytest matrix.
+          echo "services=$(jq -c '[.[] | select(. != "frontend")]' <<< "$SUITES")" >> "$GITHUB_OUTPUT"
+          echo "frontend=$(jq -r 'index("frontend") != null' <<< "$SUITES")" >> "$GITHUB_OUTPUT"
 
   test:
     needs: detect
@@ -49,6 +78,8 @@ jobs:
             sh -c "pip install -q -r requirements-test.txt && python -m pytest tests -q -p no:cacheprovider"
 
   frontend-js:
+    needs: detect
+    if: needs.detect.outputs.frontend == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -68,3 +99,29 @@ jobs:
       - name: Run frontend js tests
         working-directory: frontend/js-tests
         run: npm test
+
+  # The single stable check name for branch protection: the matrix job names
+  # change whenever a service gains a tests/ directory, this one does not.
+  tests-required:
+    needs:
+      - detect
+      - test
+      - frontend-js
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail unless every suite passed or was skipped
+        run: |
+          set -euo pipefail
+          echo "detect: ${{ needs.detect.result }}"
+          echo "test: ${{ needs.test.result }}"
+          echo "frontend-js: ${{ needs.frontend-js.result }}"
+          for result in "${{ needs.detect.result }}" "${{ needs.test.result }}" "${{ needs.frontend-js.result }}"; do
+            case "$result" in
+              success|skipped) ;;
+              *)
+                echo "::error::Test suite did not pass ($result)"
+                exit 1
+                ;;
+            esac
+          done
