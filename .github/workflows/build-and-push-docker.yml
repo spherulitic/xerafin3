@@ -73,9 +73,11 @@ jobs:
             done
             CHANGED_CONTAINERS="${CHANGED_CONTAINERS# }"
 
-            # Unit-file-only changes still need a deploy (daemon-reload), even
-            # though no image is rebuilt.
-            if grep -qE '^(deploy/|lexicon-db/|\.github/workflows/build-and-push-docker\.yml|\.github/scripts/)' <<< "$CHANGED_FILES"; then
+            # Unit-file-only changes, mongo config, and the deploy script itself
+            # need a deploy (daemon-reload / SCP), even though no image is
+            # rebuilt. Workflow edits do not: workflows are never copied to the
+            # host, so redeploying for them only re-ships unchanged files.
+            if grep -qE '^(deploy/|lexicon-db/|\.github/scripts/)' <<< "$CHANGED_FILES"; then
               CONFIG_CHANGED="true"
             fi
 

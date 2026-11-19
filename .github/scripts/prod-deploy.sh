@@ -8,7 +8,7 @@
 # Environment:
 #   CHANGED         space-separated container names whose image changed
 #                   (e.g. "cardbox chat"). Empty for a config-only deploy.
-#   CONFIG_CHANGED  "true" when deploy/ (or the workflow/script) changed.
+#   CONFIG_CHANGED  "true" when deploy/, lexicon-db/, or this script changed.
 #   DRY_RUN         "1" to print destructive commands instead of running them.
 #
 # Layer 3 of #472 / #473: restart only the changed units, pre-pull images so
