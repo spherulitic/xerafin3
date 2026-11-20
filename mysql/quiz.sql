@@ -64,7 +64,7 @@ CREATE TABLE `quiz_type_master` (
 
 LOCK TABLES `quiz_type_master` WRITE;
 /*!40000 ALTER TABLE `quiz_type_master` DISABLE KEYS */;
-INSERT INTO `quiz_type_master` VALUES (1,'Daily'),(2,'New'),(3,'Dead Sixes'),(4,'Weekly'),(5,'High Vowel'),(6,'Monthly'),(7,'Probability');
+INSERT INTO `quiz_type_master` VALUES (1,'Daily'),(2,'New'),(3,'Dead Sixes'),(4,'Weekly'),(5,'High Vowel'),(6,'Monthly'),(7,'Probability'),(8,'Blank');
 /*!40000 ALTER TABLE `quiz_type_master` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -121,7 +121,7 @@ CREATE TABLE `sub_master` (
   PRIMARY KEY (`sub_id`),
   KEY `sub_master_quiz_type_fk` (`quiz_type`),
   CONSTRAINT `sub_master_ibfk_1` FOREIGN KEY (`quiz_type`) REFERENCES `quiz_type_master` (`quiz_type`)
-) ENGINE=InnoDB AUTO_INCREMENT=22 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=latin1;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -130,7 +130,7 @@ CREATE TABLE `sub_master` (
 
 LOCK TABLES `sub_master` WRITE;
 /*!40000 ALTER TABLE `sub_master` DISABLE KEYS */;
-INSERT INTO `sub_master` VALUES (1,'Daily Quizzes','Daily 2s','Daily',1,50,2,2),(2,'Daily Quizzes','Daily 3s','Daily',1,50,3,3),(3,'Daily Quizzes','Daily 4s','Daily',1,50,4,4),(4,'Daily Quizzes','Daily 5s','Daily',1,50,5,5),(5,'Daily Quizzes','Daily 6s','Daily',1,50,6,6),(6,'Daily Quizzes','Daily 7s','Daily',1,50,7,7),(7,'Daily Quizzes','Daily 8s','Daily',1,50,8,8),(8,'Daily Quizzes','Daily 9s','Daily',1,50,9,9),(9,'Daily Quizzes','Daily 10s','Daily',1,50,10,10),(10,'Daily Quizzes','Daily 11s','Daily',1,50,11,11),(11,'Daily Quizzes','Daily 12s','Daily',1,50,12,12),(12,'Daily Quizzes','Daily 13s','Daily',1,50,13,13),(13,'Daily Quizzes','Daily 14s','Daily',1,50,14,14),(14,'Daily Quizzes','Daily 15s','Daily',1,50,15,15),(15,'Weekly Workout','Short Stuff','Weekly',4,200,3,4),(16,'Weekly Workout','Mid-Length Mayhem','Weekly',4,200,5,6),(17,'Weekly Workout','Bingo Bazaar','Weekly',4,200,7,8),(18,'Weekly Workout','Long List Legends','Weekly',4,200,9,10),(19,'Monthly Marathon','Short Circuits','Monthly',6,1000,4,6),(20,'Monthly Marathon','Bingo Bash','Monthly',6,1000,7,8),(21,'Monthly Marathon','Long Hots','Monthly',6,1000,9,10);
+INSERT INTO `sub_master` VALUES (1,'Daily Quizzes','Daily 2s','Daily',1,50,2,2),(2,'Daily Quizzes','Daily 3s','Daily',1,50,3,3),(3,'Daily Quizzes','Daily 4s','Daily',1,50,4,4),(4,'Daily Quizzes','Daily 5s','Daily',1,50,5,5),(5,'Daily Quizzes','Daily 6s','Daily',1,50,6,6),(6,'Daily Quizzes','Daily 7s','Daily',1,50,7,7),(7,'Daily Quizzes','Daily 8s','Daily',1,50,8,8),(8,'Daily Quizzes','Daily 9s','Daily',1,50,9,9),(9,'Daily Quizzes','Daily 10s','Daily',1,50,10,10),(10,'Daily Quizzes','Daily 11s','Daily',1,50,11,11),(11,'Daily Quizzes','Daily 12s','Daily',1,50,12,12),(12,'Daily Quizzes','Daily 13s','Daily',1,50,13,13),(13,'Daily Quizzes','Daily 14s','Daily',1,50,14,14),(14,'Daily Quizzes','Daily 15s','Daily',1,50,15,15),(15,'Weekly Workout','Short Stuff','Weekly',4,200,3,4),(16,'Weekly Workout','Mid-Length Mayhem','Weekly',4,200,5,6),(17,'Weekly Workout','Bingo Bazaar','Weekly',4,200,7,8),(18,'Weekly Workout','Long List Legends','Weekly',4,200,9,10),(19,'Monthly Marathon','Short Circuits','Monthly',6,1000,4,6),(20,'Monthly Marathon','Bingo Bash','Monthly',6,1000,7,8),(21,'Monthly Marathon','Long Hots','Monthly',6,1000,9,10),(22,'Daily Quizzes','Daily Blank 7s','Daily',8,50,7,7),(23,'Daily Quizzes','Daily Blank 8s','Daily',8,50,8,8);
 /*!40000 ALTER TABLE `sub_master` ENABLE KEYS */;
 UNLOCK TABLES;
 
