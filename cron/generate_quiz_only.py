@@ -99,7 +99,9 @@ def generate_period_quizzes(session, headers: dict) -> bool:
     """Generate quizzes for all applicable periods"""
     print(f"\n[2/2] Generating quizzes...")
 
-    quiz_url = 'http://quiz:5000/generatePeriodicQuizzes'
+    # This utility is for deliberate regeneration, so bypass the quiz
+    # service's per-day idempotency check.
+    quiz_url = 'http://quiz:5000/generatePeriodicQuizzes?force=1'
     try:
         make_request(
             session,
