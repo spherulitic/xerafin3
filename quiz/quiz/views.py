@@ -29,6 +29,20 @@ dictConfig({
 
 QUIZJSON_PATH = "/app/quizjson"
 
+QUIZ_TYPE_DAILY = 1
+QUIZ_TYPE_NEW = 2
+QUIZ_TYPE_WEEKLY = 4
+QUIZ_TYPE_VOWEL = 5
+QUIZ_TYPE_MONTHLY = 6
+QUIZ_TYPE_PROB = 7
+QUIZ_TYPE_BLANK = 8
+
+BLANK_MIN_ANSWERS = 1
+BLANK_MAX_ANSWERS = 10
+
+class QuizGenerationError(RuntimeError):
+  '''A periodic quiz could not be generated; nothing was stored.'''
+
 @lru_cache(maxsize=1)
 def get_public_key():
   public_key_url = 'http://keycloak:8080/realms/Xerafin'
@@ -104,8 +118,12 @@ def default():
 
 @app.route("/generatePeriodicQuizzes", methods=["GET", "POST"])
 def generatePeriodicQuizzesView():
-  generatePeriodicQuizzes()
-  return jsonify({"status": "completed"})
+  body = request.get_json(silent=True) or {}
+  force = request.args.get('force') == '1' or bool(body.get('force'))
+  result = generatePeriodicQuizzes(force=force)
+  status = 500 if result["failed"] else 200
+  return jsonify({"status": "failed" if result["failed"] else "completed",
+                  **result}), status
 
 @app.route("/getSubscriptions", methods=["GET", "POST"])
 def getSubscriptions():
@@ -365,11 +383,9 @@ def buildQuizIdList(params):
   Shared by getQuizList and resetQuizList so bulk resets match the
   search results exactly.'''
   QUIZ_INACTIVE_TIMER = 4 # how many days before inactive quizzes drop off the list
-  QUIZ_TYPE_NEW = 2
-  QUIZ_TYPE_VOWEL = 5
-  QUIZ_TYPE_PROB = 7
 
-  # Supported search types - myQuizzes, daily, quizid, completed
+  # Supported search types - myQuizzes, completed, daily, weekly, monthly,
+  # quizid, new, vowel, probability
   searchType = params.get('searchType')
   minLength = params.get('minLength', 2)
   maxLength = params.get('maxLength', 15)
@@ -424,18 +440,18 @@ def buildQuizIdList(params):
 
   elif searchType == "daily":
 
-    command = "select quiz_id from quiz_master where quiz_type = 1 and DATE(create_date) between %s and %s and length between %s and %s"
-    g.con.execute(command, [minDate, maxDate, minLength, maxLength])
+    command = "select quiz_id from quiz_master where quiz_type = %s and DATE(create_date) between %s and %s and length between %s and %s"
+    g.con.execute(command, [QUIZ_TYPE_DAILY, minDate, maxDate, minLength, maxLength])
     quizidList = [x[0] for x in g.con.fetchall()]
 
   elif searchType == "weekly":
-    stmt = "select quiz_id from quiz_master where quiz_type = 4 and YEARWEEK(create_date, 1) between YEARWEEK(%s, 1) and YEARWEEK(%s, 1)"
-    g.con.execute(stmt, [minDate, maxDate])
+    stmt = "select quiz_id from quiz_master where quiz_type = %s and YEARWEEK(create_date, 1) between YEARWEEK(%s, 1) and YEARWEEK(%s, 1)"
+    g.con.execute(stmt, [QUIZ_TYPE_WEEKLY, minDate, maxDate])
     quizidList = [x[0] for x in g.con.fetchall()]
 
   elif searchType == "monthly":
-    stmt = "select quiz_id from quiz_master where quiz_type = 6 and EXTRACT(YEAR_MONTH from create_date) between EXTRACT(YEAR_MONTH from %s) and EXTRACT(YEAR_MONTH from %s)"
-    g.con.execute(stmt, [minDate, maxDate])
+    stmt = "select quiz_id from quiz_master where quiz_type = %s and EXTRACT(YEAR_MONTH from create_date) between EXTRACT(YEAR_MONTH from %s) and EXTRACT(YEAR_MONTH from %s)"
+    g.con.execute(stmt, [QUIZ_TYPE_MONTHLY, minDate, maxDate])
     quizidList = [x[0] for x in g.con.fetchall()]
 
   elif searchType == "quizid":
@@ -804,11 +820,62 @@ def mark_wrong (alpha, quizid) :
     "last_answered=NOW(), completed=1 where alphagram = %s and user_id = %s " +
     "and quiz_id = %s", (alpha, g.uuid, quizid))
 
-def generatePeriodicQuizzes():
+def _requestAlphas(url, payload):
+  '''POST to a lexicon generation endpoint and return its JSON body.
+
+     A non-200 response becomes QuizGenerationError so an error body is never
+     stored as a question list. A 401 still propagates as DownstreamError.'''
+  response = xu.check401(
+    requests.post(url, headers=g.headers, json=payload, timeout=60))
+  if response.status_code != 200:
+    try:
+      detail = response.json().get('error', '')
+    except (AttributeError, ValueError):
+      detail = (response.text or '')[:200]
+    raise QuizGenerationError(
+      f'{url} returned {response.status_code}: {detail}')
+  return response.json()
+
+def _validateBlankKeys(keys, quantity, length):
+  '''Reject a blank generation response that is not a full, unique set of
+     canonical keys of the requested answer length.'''
+  if not isinstance(keys, list) or len(keys) != quantity:
+    found = len(keys) if isinstance(keys, list) else type(keys).__name__
+    raise QuizGenerationError(
+      f'blank generator returned {found} keys, expected {quantity}')
+  seen = set()
+  for key in keys:
+    if not isinstance(key, str) or not key.endswith('?'):
+      raise QuizGenerationError(
+        f'invalid blank key {key!r} for length {length}')
+    core = key[:-1]
+    if (len(core) != length - 1
+        or not all('A' <= char <= 'Z' for char in core)
+        or core != ''.join(sorted(core))):
+      raise QuizGenerationError(
+        f'invalid blank key {key!r} for length {length}')
+    if key in seen:
+      raise QuizGenerationError(f'duplicate blank key {key!r}')
+    seen.add(key)
+
+def _quizExistsToday(subId):
+  '''True when this subscription already has a quiz for the current date.'''
+  g.con.execute(
+    "select 1 from quiz_master where sub_id = %s "
+    "and create_date = CURDATE() limit 1",
+    [subId])
+  return g.con.fetchone() is not None
+
+def generatePeriodicQuizzes(force=False): # pylint: disable=too-many-locals
   ''' Generates Daily, Weekly, or Monthly quizzes based on info
-        in the sub_master table '''
+        in the sub_master table.
+
+      Each subscription is generated at most once per day unless force is
+      true. Failed subscriptions are logged and reported, and do not stop the
+      remaining quizzes. '''
   datemasks = {"Daily": '%d %b %Y', "Weekly": '#%W %Y', "Monthly": "%b %Y"}
-  command = '''select sub_id, descr, quantity, frequency, quiz_type, min_length, max_length from sub_master
+  command = '''select sub_id, descr, quantity, frequency, quiz_type,
+                      min_length, max_length from sub_master
              where frequency = %s'''
   g.con.execute(command, ["Daily"])
   quizzes = g.con.fetchall()
@@ -823,28 +890,60 @@ def generatePeriodicQuizzes():
     g.con.execute(command, ["Monthly"])
     quizzes = quizzes + g.con.fetchall()
 
+  result = {"generated": [], "skipped": [], "failed": []}
   for quiz in quizzes:
-    lengths = list(range(quiz[5],quiz[6]+1))
-    kwargs = {"sub_id": quiz[0], "descr": quiz[1], "quantity": quiz[2], "quiz_type": quiz[4], "lengths": lengths}
-    kwargs['datemask'] = datemasks[quiz[3]]
-    generateQuiz(**kwargs)
+    subId, descr, quantity, frequency, quizType, minLength, maxLength = quiz
+    if not force and _quizExistsToday(subId):
+      result["skipped"].append(subId)
+      continue
+
+    lengths = list(range(minLength, maxLength + 1))
+    kwargs = {"sub_id": subId, "descr": descr, "quantity": quantity,
+              "quiz_type": quizType, "lengths": lengths}
+    kwargs['datemask'] = datemasks[frequency]
+    try:
+      generateQuiz(**kwargs)
+      result["generated"].append(subId)
+    except xu.DownstreamError:
+      raise
+    except Exception as e: # pylint: disable=broad-except
+      app.logger.exception(
+        'Failed to generate quiz %s (sub_id %s)', descr, subId)
+      result["failed"].append(
+        {"sub_id": subId, "descr": descr, "error": str(e)})
+
+  return result
 
 def generateQuiz(**kwargs):
-  ''' Accepts args sub_id, descr, where, datemask
-    Creates one quiz from parameters and outputs JSON '''
+  ''' Accepts args sub_id, descr, quantity, quiz_type, lengths, datemask
+    Creates one quiz from parameters and outputs JSON.
+
+    Blank quizzes (quiz_type 8) ask for keys of the stored answer length;
+    other types keep the existing /getRandomAlphas contract. '''
 
   # Get next quiz_id (this query is safe - no user input)
   g.con.execute("select max(quiz_id) from quiz_master")
   result = g.con.fetchone()
   quizid = 0 if result[0] is None else result[0] + 1
-  length_value = kwargs["lengths"][0] if len(kwargs["lengths"]) == 1 else None
+  lengthValue = kwargs["lengths"][0] if len(kwargs["lengths"]) == 1 else None
 
-  # Get alphagrams from lexicon service
-  url = 'http://lexicon:5000/getRandomAlphas'
-  data = {"quantity": kwargs['quantity'], 'lengths': kwargs['lengths']}
+  if kwargs['quiz_type'] == QUIZ_TYPE_BLANK:
+    if lengthValue is None:
+      raise QuizGenerationError(
+        f'blank quiz {kwargs["descr"]} needs a single length')
+    alphagrams = _requestAlphas(
+      'http://lexicon:5000/getRandomBlankAlphas',
+      {"quantity": kwargs['quantity'], "length": lengthValue,
+       "minAnswers": BLANK_MIN_ANSWERS, "maxAnswers": BLANK_MAX_ANSWERS})
+    _validateBlankKeys(alphagrams, kwargs['quantity'], lengthValue)
+  else:
+    alphagrams = _requestAlphas(
+      'http://lexicon:5000/getRandomAlphas',
+      {"quantity": kwargs['quantity'], 'lengths': kwargs['lengths']})
+
   quizJSON = {
     "name": f'{kwargs["descr"]} {datetime.now().strftime(kwargs["datemask"])}',
-    "alphagrams": xu.check401(requests.post(url, headers=g.headers, json=data)).json(),
+    "alphagrams": alphagrams,
     "id": quizid,
     "size": kwargs['quantity']
   }
@@ -866,14 +965,14 @@ def generateQuiz(**kwargs):
       kwargs["sub_id"],
       g.uuid,
       kwargs['quiz_type'],
-      length_value,
+      lengthValue,
       'CSW',
       24
     )
   )
 
   # Save JSON file (this part is fine - file operations, not SQL)
-  filename = os.path.join('/app/quizjson', f'{quizid}.json')
+  filename = os.path.join(QUIZJSON_PATH, f'{quizid}.json')
   with open(filename, 'w') as f:
     f.write(json.dumps(quizJSON))
 
