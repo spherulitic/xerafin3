@@ -440,8 +440,8 @@ def buildQuizIdList(params):
 
   elif searchType == "daily":
 
-    command = "select quiz_id from quiz_master where quiz_type = %s and DATE(create_date) between %s and %s and length between %s and %s"
-    g.con.execute(command, [QUIZ_TYPE_DAILY, minDate, maxDate, minLength, maxLength])
+    command = "select quiz_id from quiz_master where quiz_type in (%s, %s) and DATE(create_date) between %s and %s and length between %s and %s"
+    g.con.execute(command, [QUIZ_TYPE_DAILY, QUIZ_TYPE_BLANK, minDate, maxDate, minLength, maxLength])
     quizidList = [x[0] for x in g.con.fetchall()]
 
   elif searchType == "weekly":
