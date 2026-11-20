@@ -1,0 +1,31 @@
+name: Probe Check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  checks: write
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Create check run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          SHA=$(git rev-parse HEAD)
+          jq -n --arg sha "$SHA" '{
+            name: "rollup-probe",
+            head_sha: $sha,
+            status: "completed",
+            conclusion: "success",
+            output: {
+              title: "rollup probe",
+              summary: "probe created via the Checks API with GITHUB_TOKEN"
+            }
+          }' | gh api --method POST "repos/${{ github.repository }}/check-runs" --input -
