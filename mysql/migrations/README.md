@@ -87,4 +87,4 @@ so read the value from `SHOW CREATE TABLE` instead.
 
 | File | Issue | Environment | Applied | Result |
 |---|---|---|---|---|
-| `001_blank_quiz_type.sql` | #813 | prod | pending — apply with the #809 deploy | — |
+| `001_blank_quiz_type.sql` | #813 | prod | 2026-11-20 | Applied twice (idempotent); type 8 and sub_ids 22/23 verified; AUTO_INCREMENT 24 |
