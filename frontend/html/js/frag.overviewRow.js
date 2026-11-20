@@ -102,6 +102,7 @@ OverviewRow.prototype = {
 		let bgCol="steelRowed";
 		let tooltip="";
 		switch (true) {
+			case (RegExp(/^Daily Blank\s/g).test(this.data.quizname)) : value = 'B';bgCol='burntOrangeRowed';tooltip = 'Blank Quiz';break;
 			case (RegExp(/^Daily\s/g).test(this.data.quizname)) : value = 'D';bgCol='silverRowed';tooltip = 'Daily Quiz';break;
 			case (RegExp(/\#([0-9]|[0-4][0-9]|[5][0-3])(..)20/g).test(this.data.quizname)) : value = 'W';bgCol='goldRowed';tooltip = 'Weekly Workout';break;
 			case (RegExp(/^(Long Hots|Short Circuits|Bingo Bash)\s/g).test(this.data.quizname)) : value = 'M';bgCol='redRowed';tooltip = 'Monthly Marathon';break;
