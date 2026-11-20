@@ -2,11 +2,11 @@
   "chat": "1.1.6",
   "keycloak": "1.0.1",
   "cron": "1.0.10",
-  "frontend": "1.0.33",
+  "frontend": "1.0.34",
   "lexicon": "1.0.15",
   "lexicon-loader": "1.0.5",
   "login": "1.0.20",
-  "quiz": "1.0.27",
+  "quiz": "1.0.28",
   "stats": "1.0.22",
   "sloth": "1.0.12",
   "cardbox": "1.0.38"
