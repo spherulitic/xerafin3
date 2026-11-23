@@ -65,6 +65,8 @@ function createWindow() {
        '\nwindow.SlothTable = SlothTable;', 'frag.slothTable.js');
   load(fs.readFileSync(path.join(JS, 'frag.slothBoard.js'), 'utf8') +
        '\nwindow.SlothBoard = SlothBoard;', 'frag.slothBoard.js');
+  load(fs.readFileSync(path.join(JS, 'app.sloth.js'), 'utf8') +
+       '\nwindow.SlothQuiz = SlothQuiz; window.SlothQuestion = SlothQuestion;', 'app.sloth.js');
   load(CREATE_ELEM_ARRAY, 'gCreateElemArray');
 
   return { dom, w };

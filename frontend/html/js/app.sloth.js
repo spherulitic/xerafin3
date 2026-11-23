@@ -62,11 +62,13 @@ SlothQuiz.prototype = {
     }
   },
   end: async function(){
-    // Submit serially: firing every question at once saturated the browser's
+    // The end-game board reads every endState immediately after end() is
+    // called, so work them all out before the first await. Submissions stay
+    // serial: firing every question at once saturated the browser's
     // connections and put six concurrent /increment calls on the same
     // first-of-day leaderboard row (issue #725).
+    Object.values(this.questions).forEach(v => v.setEndState());
     for (const [, v] of Object.entries(this.questions)) {
-      v.setEndState();
       // 3 = incomplete and in cardbox, 4 = incomplete and not in cardbox:
       // nothing was answered, so there is nothing to submit.
       if ((v.endState===3) || (v.endState===4)) {continue;}
