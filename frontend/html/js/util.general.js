@@ -65,6 +65,23 @@ function isBlankAlpha(alpha) {
     return typeof alpha === 'string' && alpha.charAt(alpha.length - 1) === '?';
 }
 
+// getQuestions sends cardbox: null for a word that is not in the user's
+// cardbox; submitQuestion later rewrites the local copy to -1. Anything at or
+// above 0 is a real cardbox slot.
+function isInCardbox(question) {
+    return question.cardbox !== null &&
+           typeof question.cardbox !== 'undefined' &&
+           Number(question.cardbox) >= 0;
+}
+
+// Answer panes offer "click to add to cardbox" for questions served by a
+// non-cardbox quiz that are not in the cardbox yet. Blank keys never enter it.
+function cardboxAddable(question) {
+    return Number(question.quizid) > -1 &&
+           !isBlankAlpha(question.alpha) &&
+           !isInCardbox(question);
+}
+
 // The letter the blank supplies for `word`, or null if the word does not fit.
 // The word is sorted, as is the core, so one left-to-right pass that tolerates
 // a single extra character decides whether it matches.

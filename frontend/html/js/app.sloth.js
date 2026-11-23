@@ -109,7 +109,7 @@ SlothQuestion.prototype = {
       this.isComplete = true;
     }
   },
-  addToCardbox: function(){
+  addToCardbox: function(onAdded){
     if (this.addDone) {
       this.addDone = false;
       fetchWithAuth("addQuestionToCardbox", {
@@ -118,8 +118,12 @@ SlothQuestion.prototype = {
         if(!response.ok) { throw new Error(`HTTP ${response.status}`); }
         return response.json();
       })
-      .then(responseData => { this.addDone=true; })
+      .then(responseData => {
+        this.addDone=true;
+        if (responseData.status === "success" && typeof onAdded === "function") { onAdded(responseData); }
+      })
       .catch(error=> {
+        this.addDone=true; // allow the player to try again
         console.error(`Error adding ${this.data.alpha}:`, error);
       });
    } else {
@@ -347,8 +351,9 @@ Sloth.prototype = {
     }
   },
   addWord: function(w){
-    this.questions.questions[w].addToCardbox();
-    slothUI.update("BRD_ADD_WORD",w);
+    this.questions.questions[w].addToCardbox(function(){
+      slothUI.update("BRD_ADD_WORD",w);
+    });
   },
   stop: function(){
     this.serverWriteComplete();

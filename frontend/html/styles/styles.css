@@ -597,8 +597,8 @@ font-family:'Montserrat',sans-serif;
 .wordTableHighlightWrong2 {background-color: rgba(186,64,48,0.95);}
 .wordTableHighlightCorrect {background-color: rgba(240,240,230,0.95);}
 .wordTableHighlightNotDue {background-color: rgba(128,164,16,0.95);}
-.wordTableHighlightNotInCardbox {background-color: rgba(64,144,200,0.95);}
-.wordTableHighlightAdded {background-color: hsla(27,85%,35%,0.7);}
+.wordTableHighlightNotInCardbox {background-color: rgba(180,180,180,0.95);cursor:pointer;}
+.wordTableHighlightAdded {background-color: rgba(48,128,186,0.95);}
 .wordTableWrong {color:red;font-weight:bold;width:100%;text-align:right;padding-right:10px;font-family: 'Montserrat', sans-serif;}
 
 /* Chat Specific Classes */
@@ -1015,12 +1015,12 @@ color:rgba(213,213,200,1);box-shadow:0px 0px 3px #444,0px 0px 3px #444;vertical-
 .slothHighlight {border:1px solid white!important;font-size:1.03em;}
 .slothPartial {color:rgba(192,0,0,1);}
 .slothPartialInBox {background-color:rgba(192,0,0,0.95)!important;}
-.slothPartialNotInBox {}
+.slothPartialNotInBox {background-color:rgb(180,180,180)!important;cursor:pointer;}
 .slothMissed {font-style:italic;}
 .slothMissedParent {border:0px;background-color:transparent;}
 .slothMissedInBox {text-decoration:underline!important;text-decoration-style:double;}
-.slothMissedNotInBox {}
-.slothNotInBox {background-color:rgb(180,180,180);}
+.slothMissedNotInBox {background-color:rgb(180,180,180)!important;cursor:pointer;}
+.slothNotInBox {background-color:rgb(180,180,180)!important;cursor:pointer;}
 .slothAdded {background-color:rgba(48,112,148,1)!important;}
 .slothFlashCorrect {background-color:rgba(140,176,48,0.95);}
 .slothFlashDuplicate {background-color:lightblue!important;}
@@ -1239,6 +1239,7 @@ body::-webkit-scrollbar-thumb {
 }
 
 .steelRowedInv {
+	cursor:pointer;
 	background: -moz-linear-gradient(top,  #d6d6c6 0%, #939382 50%, #d6d6c6 98%) !important; /* FF3.6+ */
 	background: -webkit-gradient(linear, left top, left bottom, color-stop(0%,#d6d6c6), color-stop(50%,#939382),color-stop(98%,#d6d6c6))!important; /* Chrome,Safari4+ */
 	background: -webkit-linear-gradient(top,  #d6d6c6 0%,#939382 50%,#d6d6c6 98%)!important; /* Chrome10+,Safari5.1+ */

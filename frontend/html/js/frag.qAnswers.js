@@ -78,6 +78,38 @@ QAnswers.prototype = {
       }
       else {delete that.rows[a];}
     });
+    // A non-cardbox quiz answer that was due moves up in the cardbox; mark the
+    // whole alphagram green once every word has been answered correctly.
+    if (type===0 && Number(this.quizid) > -1 && this.cardboxEligible) {
+      Object.keys(this.data).forEach(function(a){
+        if (that.rows[a]) {
+          $(that.rows[a].output).addClass('highlightRow');
+          that.rows[a].output.title = "Correct - moved up in cardbox";
+        }
+      });
+    }
+  },
+  addAlphaToCardbox: function(){
+    let that=this;
+    let added = function(){
+      Object.keys(that.data).forEach(function(a){
+        let row = that.rows[a].output;
+        $(row).removeClass('wordTableHighlightNotInCardbox');
+        $(row).addClass('wordTableHighlightAdded');
+        row.title = "Added to cardbox";
+        row.onclick = null;
+      });
+    };
+    if (this.question && typeof this.question.addToCardbox === 'function') {
+      this.question.addToCardbox(added);
+    }
+    else {
+      fetchWithAuth("addQuestionToCardbox", {method:"POST",body:JSON.stringify({question:this.alpha})})
+        .then(response => {if(!response.ok){throw new Error(`HTTP ${response.status}`);}
+                return response.json(); })
+        .then(responseData => { if (responseData.status === "success") { added(); } })
+        .catch(error => {console.error("Error adding to Cardbox:", error);});
+    }
   },
   cycleAnswers: function(n){
     $(this.answerTable).children().removeClass('wordTableCycle');
@@ -113,9 +145,13 @@ QAnswers.prototype = {
   start: function(payload){
     let that=this;
     let q='?';
-    // TBL_POP_NEW passes {words: {...}, alpha: "AAIINR?"}
+    // TBL_POP_NEW passes the question plus its served cardbox state.
     this.data = payload.words;
     this.alpha = payload.alpha;
+    this.quizid = payload.quizid;
+    this.cardbox = payload.cardbox;
+    this.cardboxEligible = payload.cardboxEligible;
+    this.question = payload.question;
     this.hints = 0;
     this.rows = {};
     $(this.answerTable).empty();
@@ -127,6 +163,16 @@ QAnswers.prototype = {
 
       $(that.rows[a+'_H'].output).find('td').filter(':eq(2)').html(q.repeat(a.length));
     });
+    // Grey rows are clickable and add the alphagram to the cardbox; they turn
+    // blue only when the server confirms the add.
+    if (cardboxAddable(payload)) {
+      z.forEach(function(a){
+        let row = that.rows[a].output;
+        $(row).addClass('wordTableHighlightNotInCardbox');
+        row.title = "Click to add to cardbox";
+        row.onclick = function(){ that.addAlphaToCardbox(); };
+      });
+    }
     $(this.wrongAnswers).html('');
   },
   init: function(){

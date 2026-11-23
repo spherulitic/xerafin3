@@ -53,6 +53,7 @@ SlothBoard.prototype = {
 				});
 				switch (data.questions[data.toAlpha(a)].endState) {
 					case 0:
+						$(b).parent().addClass('slothNotInBox',0);
 						$(b).parent().prop('title',"Not in cardbox. click to add.");
 						$(b).parent().on('click', function(){
 							self.action("BOARD_ADD_WORD",data.toAlpha(a));
@@ -75,7 +76,7 @@ SlothBoard.prototype = {
 						$(b).parent().prop('title',"Alphagram is in cardbox and missed completely. No action taken.");
 						break;
 					case 4:
-						$(b).addClass('slothMissedNotInBox',0);
+						$(b).parent().addClass('slothMissedNotInBox',0);
 						$(b).parent().css({
 							'border': '1px solid transparent'
 						});
@@ -122,8 +123,10 @@ SlothBoard.prototype = {
 		let self=this;
 		Object.entries(this.tables[w.length].cells).forEach(function([i,v]){
 			if (self.toAlpha(i) == w){
+				$(v).parent().removeClass('slothNotInBox slothMissedNotInBox slothPartialNotInBox');
 				$(v).parent().addClass('slothAdded');
 				$(v).parent().prop('title','Alphagram added to cardbox');
+				$(v).parent().off('click');
 			}
 		});
 	},

@@ -295,7 +295,11 @@ BasicQuiz.prototype = {
       basicQuizUI.update("INF_NEW_QST",this.quiz.questions[0]);
       basicQuizUI.update('TBL_POP_NEW', {
         'words': this.quiz.questions[0].words,
-        'alpha': this.quiz.questions[0].alpha
+        'alpha': this.quiz.questions[0].alpha,
+        'quizid': this.quiz.questions[0].quizid,
+        'cardbox': this.quiz.questions[0].cardbox,
+        'cardboxEligible': this.quiz.questions[0].cardboxEligible,
+        'question': this.quiz.questions[0]
       });
       basicQuizUI.update("BUT_UND_QST", (this.undo || this.quiz.lastQuestion===null));
       basicQuizUI.update("INP_RST_STA");
