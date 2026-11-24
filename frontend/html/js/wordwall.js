@@ -369,7 +369,7 @@ function Wordwall() {
   if (Number(localStorage.gWordwallTheme == 0))  {
     this.COLOR_LIST = [ "black", "azure", "plum", "palegreen", "yellowgreen", "khaki", "salmon", "hotpink", "crimson", "magenta", "chocolate", "peachpuff", "mistyrose", "floralwhite" ] // maximum number of anagrams is 13
   } else if (Number(localStorage.gWordwallTheme == 1)) {
-    this.COLOR_LIST = [ "honeydew", "black", "darkviolet", "darkgreen", "olivegreen", "goldenrod", "indianred", "crimson", "lightcoral", "chocolate", "darkorchid", "darkslateblue", "darkslategrey", "indigo"]
+    this.COLOR_LIST = [ "honeydew", "black", "darkviolet", "darkgreen", "olivedrab", "goldenrod", "indianred", "crimson", "lightcoral", "chocolate", "darkorchid", "darkslateblue", "darkslategrey", "indigo"]
   }
 
   this.gameState = "menu"; // "menu", "active", "inactive"
