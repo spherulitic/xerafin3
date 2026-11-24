@@ -7,7 +7,6 @@ AnswerArea.prototype = {
 
   setupWord: function(question) {
 
-  var q = this.parent.q;
   // Ids contain the alphagram, and a blank key's "?" is invalid in a CSS
   // selector, so every lookup for these ids goes through getElementById.
   if(!document.getElementById('invWords'+question.alpha)) { // don't create duplicate DOM element for alphas on refresh
@@ -16,15 +15,21 @@ AnswerArea.prototype = {
      ['a1','table','wordTable','invWords'+question.alpha,'a',''],
      ['a2','div','wordTableWrong','invWordsWrong'+question.alpha,'a','']
   ]);
+        // Grey means "not in cardbox, click to add"; blue means "added".
         // Blank questions never enter the cardbox, so they get no affordance.
-        if (typeof question.cardbox === "undefined" && !isBlankAlpha(question.alpha)) {
-    $(document.getElementById('invAlphaDiv'+question.alpha)).addClass("steelRowedInv");
-          document.getElementById('invAlphaDiv'+question.alpha).onclick = function() {
-                              q.getQuestionByAlpha(question.alpha).addToCardbox();
-            $(document.getElementById('invAlphaDiv'+question.alpha)).removeClass("steelRowedInv");
-            $(document.getElementById('invAlphaDiv'+question.alpha)).addClass("blueRowed");
-                                     };
-            }
+        if (cardboxAddable(question)) {
+          var alphaDiv = document.getElementById('invAlphaDiv'+question.alpha);
+          $(alphaDiv).addClass("steelRowedInv");
+          alphaDiv.title = "Click to add to cardbox";
+          alphaDiv.onclick = function() {
+            question.addToCardbox(function() {
+              $(alphaDiv).removeClass("steelRowedInv");
+              $(alphaDiv).addClass("blueRowed");
+              alphaDiv.title = "Added to cardbox";
+              alphaDiv.onclick = null;
+            });
+          };
+        }
   $(document.getElementById('invAlphaDiv'+question.alpha)).css('visibility','hidden');
      }
      },  // end setupWord

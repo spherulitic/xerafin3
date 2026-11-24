@@ -62,11 +62,13 @@ SlothQuiz.prototype = {
     }
   },
   end: async function(){
-    // Submit serially: firing every question at once saturated the browser's
+    // The end-game board reads every endState immediately after end() is
+    // called, so work them all out before the first await. Submissions stay
+    // serial: firing every question at once saturated the browser's
     // connections and put six concurrent /increment calls on the same
     // first-of-day leaderboard row (issue #725).
+    Object.values(this.questions).forEach(v => v.setEndState());
     for (const [, v] of Object.entries(this.questions)) {
-      v.setEndState();
       // 3 = incomplete and in cardbox, 4 = incomplete and not in cardbox:
       // nothing was answered, so there is nothing to submit.
       if ((v.endState===3) || (v.endState===4)) {continue;}
@@ -109,7 +111,7 @@ SlothQuestion.prototype = {
       this.isComplete = true;
     }
   },
-  addToCardbox: function(){
+  addToCardbox: function(onAdded){
     if (this.addDone) {
       this.addDone = false;
       fetchWithAuth("addQuestionToCardbox", {
@@ -118,8 +120,12 @@ SlothQuestion.prototype = {
         if(!response.ok) { throw new Error(`HTTP ${response.status}`); }
         return response.json();
       })
-      .then(responseData => { this.addDone=true; })
+      .then(responseData => {
+        this.addDone=true;
+        if (responseData.status === "success" && typeof onAdded === "function") { onAdded(responseData); }
+      })
       .catch(error=> {
+        this.addDone=true; // allow the player to try again
         console.error(`Error adding ${this.data.alpha}:`, error);
       });
    } else {
@@ -347,8 +353,9 @@ Sloth.prototype = {
     }
   },
   addWord: function(w){
-    this.questions.questions[w].addToCardbox();
-    slothUI.update("BRD_ADD_WORD",w);
+    this.questions.questions[w].addToCardbox(function(){
+      slothUI.update("BRD_ADD_WORD",w);
+    });
   },
   stop: function(){
     this.serverWriteComplete();

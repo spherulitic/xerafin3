@@ -512,12 +512,15 @@ retrySubmit(code, correct, setCardbox) {
     );
 }
 
-  addToCardbox() {
+  addToCardbox(onAdded) {
     let d = {question: this.alpha };
-    fetchWithAuth("addQuestionToCardbox", {method:"POST",body:JSON.stringify(d)})
+    return fetchWithAuth("addQuestionToCardbox", {method:"POST",body:JSON.stringify(d)})
       .then(response => {if(!response.ok){throw new Error(`HTTP ${response.status}`);}
               return response.json(); })
-      .then(responseData => { })
+      .then(responseData => {
+              if (responseData.status === "success" && typeof onAdded === "function") {
+                onAdded(responseData); }
+            })
       .catch(error => {console.error("Error adding to Cardbox:", error);});
   }
 } // end class definition
